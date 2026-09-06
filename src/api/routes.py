@@ -134,9 +134,20 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         return {"status": "handed off"}
 
     if is_welcome_trigger(text):
-        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your wellness journey."
-        msg2 = "We offer Online Live Interactive Yoga classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. 700/month (offer price: Rs. 300)."
-        msg3 = "We have batches running throughout the day (Morning, Afternoon, and Evening). Which time slot works best for your schedule?"
+        from src.core import kb_loader
+        detected_c = kb_loader.detect_course_from_text(text, default_course="yoga")
+        active_course = detected_c or "yoga"
+        course_data = kb_loader.get_course_data(active_course)
+        course_name = course_data.get("course", active_course.title())
+        pkgs = course_data.get("pricing", {}).get("packages", [])
+        starter_pkg = pkgs[0] if pkgs else {}
+        base_p = starter_pkg.get("base_price", 700)
+        offer_p = starter_pkg.get("offer_price", 300)
+        dur = starter_pkg.get("duration", "1 Month")
+
+        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
+        msg2 = f"We offer Online Live Interactive {course_name} classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. {base_p:,}/{dur.lower()} (offer price: Rs. {offer_p:,})."
+        msg3 = "We have batches running throughout the day. Which time slot works best for your schedule?"
 
         await send_text_message_async(phone, msg1)
         await asyncio.sleep(1)

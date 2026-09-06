@@ -42,7 +42,7 @@ from src.core.sales_followup import get_sales_followup
 from src.services.agent_summary import send_agent_summary_async
 from src.core.coupons import (
     format_coupon_banner, get_all_coupon_codes, get_coupon_details,
-    detect_package_from_text, VALID_PACKAGES
+    detect_package_from_text
 )
 from src.core.intent_classifier import classify_coupon_and_profile_intent, classify_post_link_intent
 import re
@@ -328,7 +328,7 @@ def get_next_agent_email() -> tuple:
 
 
 def is_welcome_trigger(text: str) -> bool:
-    """Returns True if the message matches the Yoga Ad trigger message (with tolerance for punctuation)."""
+    """Returns True if the message matches an ad trigger message (with tolerance for punctuation)."""
     t = (text or "").strip().lower()
     target = TARGET_MESSAGE_TEXT.strip().lower()
     if t == target:
@@ -337,7 +337,7 @@ def is_welcome_trigger(text: str) -> bool:
     target_norm = re.sub(r"[!?. ]+", " ", target).strip()
     if t_norm == target_norm:
         return True
-    if "can i get more info on yoga classes" in t_norm:
+    if re.search(r"can i get more info on .* (?:classes|course)", t_norm):
         return True
     return False
 
@@ -540,13 +540,11 @@ def get_flow_followup(state: dict) -> str:
 
     # 3. If ready for app link (first time only)
     if state.get("stage") == "READY_FOR_APP_LINK":
+        app_links = kb_loader.format_app_links_display()
         return (
             "Aapke liye ek special welcome discount code hai 🎁\n\n"
             "Sirf Sensationz App download karein ya website par jayein aur apna profile banayein — "
-            "uske baad *Done* ya *Yes* reply karein, aur main turant aapka coupon code bhej dunga!\n\n"
-            "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-            "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/"
+            f"uske baad *Done* ya *Yes* reply karein, aur main turant aapka coupon code bhej dunga!\n\n{app_links}"
         )
 
     # 4. If enrollment completed, coupon sent, or app links already delivered
@@ -649,8 +647,18 @@ def _sanitize_locked_coupons(reply: str, state: dict) -> str:
     if has_unlocked:
         return reply
 
-    active_codes = get_all_coupon_codes() + ["YOGA500", "YOGAFIT"]
-    coupon_patterns = [rf"\*?{re.escape(c)}\*?" for c in set(active_codes)]
+    all_codes = set()
+    for item in kb_loader.get_course_catalog():
+        cid = item.get("id")
+        for c in kb_loader.get_course_coupons(cid).values():
+            if c.get("code"):
+                all_codes.add(c["code"])
+    course_id = state.get("course") or "yoga"
+    for c in kb_loader.get_course_coupons(course_id).values():
+        if c.get("code"):
+            all_codes.add(c["code"])
+
+    coupon_patterns = [rf"\*?{re.escape(c)}\*?" for c in all_codes if c]
     cleaned = reply
     leaked = False
     for pat in coupon_patterns:
@@ -678,9 +686,21 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         return
 
     if is_welcome_trigger(text):
-        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your wellness journey."
-        msg2 = "We offer Online Live Interactive Yoga classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. 700/month (offer price: Rs. 300)."
-        msg3 = "We have batches running throughout the day (Morning, Afternoon, and Evening). Which time slot works best for your schedule?"
+        detected_c = kb_loader.detect_course_from_text(text, default_course="yoga")
+        active_course = detected_c or "yoga"
+        state = await get_user_state_async(phone)
+        state["course"] = active_course
+        course_data = kb_loader.get_course_data(active_course)
+        course_name = course_data.get("course", active_course.title())
+        pkgs = course_data.get("pricing", {}).get("packages", [])
+        starter_pkg = pkgs[0] if pkgs else {}
+        base_p = starter_pkg.get("base_price", 700)
+        offer_p = starter_pkg.get("offer_price", 300)
+        dur = starter_pkg.get("duration", "1 Month")
+
+        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
+        msg2 = f"We offer Online Live Interactive {course_name} classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. {base_p:,}/{dur.lower()} (offer price: Rs. {offer_p:,})."
+        msg3 = "We have batches running throughout the day. Which time slot works best for your schedule?"
 
         await send_text_message_async(phone, msg1)
         await asyncio.sleep(1)
@@ -689,7 +709,6 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         await send_text_message_async(phone, msg3)
 
         # Arm follow-up timer for this welcome message too
-        state = await get_user_state_async(phone)
         arm_followup_timer(state, topic="welcome message")
         await save_user_state_async(phone, state)
 
@@ -814,6 +833,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         demo_block = kb_loader.format_demo_videos_display(active_course)
         demo_sec = f"\n\n🎥 *Sample / Demo Videos:*\n{demo_block}" if demo_block else ""
 
+        app_links = kb_loader.format_app_links_display()
         if has_hindi:
             msg1 = (
                 f"Aap bilkul pehle demo videos dekh sakte hain aur free live trial class attend kar sakte hain! 😊 Har student ko 3 free live trial classes milti hain.{demo_sec}"
@@ -822,10 +842,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
                 "📲 *Live Trial Book Karne Ke Simple Steps:*\n"
                 "1️⃣ Sensationz App download karein ya website visit karein\n"
                 "2️⃣ Profile create karke 'Trial Links' par tap karein\n"
-                "3️⃣ Apna preferred batch timing choose karein aur live trial confirm karein!\n\n"
-                "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/"
+                f"3️⃣ Apna preferred batch timing choose karein aur live trial confirm karein!\n\n{app_links}"
             )
         else:
             msg1 = (
@@ -835,10 +852,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
                 "📲 *Steps to Book Your Live Trial:*\n"
                 "1️⃣ Download the Sensationz App or visit our website\n"
                 "2️⃣ Create your profile and tap on 'Trial Links'\n"
-                "3️⃣ Select your preferred batch timing and confirm your live trial!\n\n"
-                "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/"
+                f"3️⃣ Select your preferred batch timing and confirm your live trial!\n\n{app_links}"
             )
         arm_followup_timer(state, topic=text)
         await save_user_state_async(phone, state)
@@ -936,28 +950,26 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     # ── Deterministic Coupon Unlock & Resend Handlers ────────────────────────
 
 
-    detected_pkg = detect_package_from_text(text)
+    active_course = state.get("course") or "yoga"
+    course_pkgs = kb_loader.get_valid_packages(active_course)
+    detected_pkg = detect_package_from_text(text, course_id=active_course)
     if detected_pkg:
         state["package"] = detected_pkg
-        state["fee"] = VALID_PACKAGES.get(detected_pkg, state.get("fee"))
+        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
 
     if not is_q and not is_info_intent(text) and (
         state["stage"] == "READY_FOR_APP_LINK"
         or (state["stage"] == "APP_LINK_SENT" and not state.get("profile_created") and (detected_pkg or is_fresh_package_selected))
     ):
-        active_course = state.get("course") or "yoga"
-        course_pkgs = kb_loader.get_valid_packages(active_course)
         package = state.get("package") or (list(course_pkgs.keys())[0] if course_pkgs else "1 Month")
         fee = state.get("fee") or course_pkgs.get(package, "")
         fee_str = f" ({fee})" if fee else ""
+        app_links = kb_loader.format_app_links_display()
         msg1 = f"You've selected the {package} package{fee_str}. 👍"
         msg2 = (
             "To continue, please download the Sensationz App (or access via website) and create your profile. "
             "Once that's done, just reply *Done* or *Yes* here, and I'll send you a special welcome coupon code 🎁 "
-            "that you can use to unlock your offer price during checkout in the app or website.\n\n"
-            "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-            "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/"
+            f"that you can use to unlock your offer price during checkout in the app or website.\n\n{app_links}"
         )
         state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
         arm_followup_timer(state, topic=text)
@@ -1006,12 +1018,14 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         )
 
     # Synchronize package if extracted by classifier
-    if _intent.get("package") and _intent["package"] in VALID_PACKAGES:
+    active_course = state.get("course") or "yoga"
+    course_pkgs = kb_loader.get_valid_packages(active_course)
+    if _intent.get("package") and _intent["package"] in course_pkgs:
         state["package"] = _intent["package"]
-        state["fee"] = VALID_PACKAGES[_intent["package"]]
+        state["fee"] = course_pkgs[_intent["package"]]
     elif detected_pkg:
         state["package"] = detected_pkg
-        state["fee"] = VALID_PACKAGES[detected_pkg]
+        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
 
     profile_just_completed = (not is_complaint_or_refund_msg) and (
         _intent.get("is_profile_done") or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE" and not _intent.get("is_coupon_request"))
@@ -1078,21 +1092,21 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         return
 
     elif _is_explicit_coupon_ask:
-        detected_pkg = detect_package_from_text(text)
+        active_course = state.get("course") or "yoga"
+        course_pkgs = kb_loader.get_valid_packages(active_course)
+        detected_pkg = detect_package_from_text(text, course_id=active_course)
         if detected_pkg:
             state["package"] = detected_pkg
-            state["fee"] = VALID_PACKAGES[detected_pkg]
+            state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
 
+        app_links = kb_loader.format_app_links_display()
         # Stage A: User has NOT selected timing/package or reached app links -> Explain unlock requirement with app links
         reply = (
             "Aapka special welcome discount coupon code app ya website par profile banane ke baad unlock hota hai 🎁\n\n"
             "1️⃣ Sensationz App download karein ya website visit karein\n"
             "2️⃣ Profile complete karein\n"
             "3️⃣ Yahan *Done* ya *Yes* reply karein\n\n"
-            "Aur main turant aapka coupon code yahan bhej dunga!\n\n"
-            "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-            "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/"
+            f"Aur main turant aapka coupon code yahan bhej dunga!\n\n{app_links}"
         )
         state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
         arm_followup_timer(state, topic=text)
@@ -1114,6 +1128,11 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     rag_sources = rag_result.get("sources", "")
     rag_retrieval_query = rag_result.get("retrieval_query", "")
     print(f"[TIMING] {phone} rag_query: {time.perf_counter() - t_rag:.2f}s")
+
+    # Resolve system action tags ([UNLOCK_COUPON]) and sync session state
+    from src.state.chat_state import resolve_llm_reply_tags
+    active_course = state.get("course") or "yoga"
+    did_unlock, full_reply = resolve_llm_reply_tags(full_reply, state, course_id=active_course)
 
     # Strip any "type agent" line the LLM generated, count it silently,
     # only resurface after 2 CONSECUTIVE flagged replies.

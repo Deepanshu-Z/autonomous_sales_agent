@@ -82,11 +82,11 @@ _QUESTION_BANK = [
             "kitne type", "kaun kaun",
         ],
         "hindi": (
-            "Aapka main focus kya hai — weight loss, stress relief, ya flexibility? "
+            "Aap is course mein kisi specific topic ya goal par focus karna chahte hain? "
             "Main ussi ke hisaab se best batch suggest kar sakta hoon. 😊"
         ),
         "english": (
-            "What is your main goal — weight loss, stress relief, or flexibility? "
+            "Are you looking to focus on any specific goal or topic in this course? "
             "I can suggest the best batch for you based on that. 😊"
         ),
     },
@@ -188,7 +188,7 @@ _QUESTION_BANK = [
 
 _FALLBACK_BY_STAGE = {
     "NEW": {
-        "hindi": "Yoga classes ke baare mein kuch aur jaanna chahte hain, ya timing discuss karein? 😊",
+        "hindi": "Classes ke baare mein kuch aur jaanna chahte hain, ya timing discuss karein? 😊",
         "english": "Would you like to know more about the classes, or shall we discuss timings? 😊",
     },
     "ENROLL_ASKED": {
@@ -202,26 +202,6 @@ _FALLBACK_BY_STAGE = {
     "TIMING_SELECTED": {
         "hindi": "Kitne time ke liye join karna chahenge — 1 month trial se shuru karein ya seedha 3 months? 😊",
         "english": "How long would you like to join — start with 1 month or go for 3 months? 😊",
-    },
-    "PACKAGE_ASKED": {
-        "hindi": (
-            "Kaunsa package aapke liye best rahega? 😊\n\n"
-            "Fees:\n"
-            "• 1 Month: ₹700 (Offer Price: ₹300)\n"
-            "• 3 Months: ₹1,750 (Offer Price: ₹600)\n"
-            "• 6 Months: ₹3,200 (Offer Price: ₹1,000)\n"
-            "• 1 Year: ₹5,000 (Offer Price: ₹1,800)\n\n"
-            "Offer price app aur welcome coupon ke through applicable hoga ✨"
-        ),
-        "english": (
-            "Which package works best for you? 😊\n\n"
-            "Fees:\n"
-            "• 1 Month: ₹700 (Offer Price: ₹300)\n"
-            "• 3 Months: ₹1,750 (Offer Price: ₹600)\n"
-            "• 6 Months: ₹3,200 (Offer Price: ₹1,000)\n"
-            "• 1 Year: ₹5,000 (Offer Price: ₹1,800)\n\n"
-            "Offer price is applicable through the app and welcome coupon ✨"
-        ),
     },
     "PACKAGE_SELECTED": {
         "hindi": "Bahut badiya! App download karne mein koi help chahiye? 😊",
@@ -378,6 +358,32 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
         return None
 
     stage = state.get("stage", "NEW")
+    from src.core import kb_loader
+    active_course = state.get("course") or "yoga"
+
+    if stage == "PACKAGE_ASKED":
+        fees_block = kb_loader.format_package_fees_display(active_course)
+        if use_hindi:
+            return (
+                "Kaunsa package aapke liye best rahega? 😊\n\n"
+                f"Fees:\n{fees_block}\n\n"
+                "Offer price app aur welcome coupon ke through applicable hoga ✨"
+            )
+        else:
+            return (
+                "Which package works best for you? 😊\n\n"
+                f"Fees:\n{fees_block}\n\n"
+                "Offer price is applicable through the app and welcome coupon ✨"
+            )
+
+    if stage == "NEW":
+        course_data = kb_loader.get_course_data(active_course)
+        course_name = course_data.get("course", active_course.title())
+        if use_hindi:
+            return f"{course_name} classes ke baare mein kuch aur jaanna chahte hain, ya timing discuss karein? 😊"
+        else:
+            return f"Would you like to know more about our {course_name} classes, or shall we discuss timings? 😊"
+
     if stage in _FALLBACK_BY_STAGE:
         q = _FALLBACK_BY_STAGE[stage]
         return q["hindi"] if use_hindi else q["english"]

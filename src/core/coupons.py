@@ -22,79 +22,92 @@ VALID_PACKAGES: Dict[str, str] = kb_loader.get_valid_packages("yoga")
 
 def detect_package_from_text(text: Optional[str], course_id: str = "yoga") -> Optional[str]:
     """
-    Robustly identifies a course package duration (1 Month, 3 Months, 6 Months, 1 Year)
-    from user text, handling English, Hinglish, slang, coupon requests, and price mentions.
-    Guards against misinterpreting class timings (e.g. '6:00 AM', '1:00 PM', '10:00 AM').
-    Dynamically checks duration names, codes, aliases, and prices from the course JSON.
+    Dynamically identifies a course package duration from user text.
+    Iterates over the active course's registry from JSON, matching against:
+    1. Exact canonical name
+    2. Explicit coupon code
+    3. JSON-defined aliases
+    4. Exact base or offer prices
+    5. Dynamic numeric duration patterns derived from the canonical name.
+    Guards against misinterpreting class timings (e.g. '6:00 AM', '1:00 PM').
     """
     if not text:
         return None
     t = re.sub(r"\s+", " ", text.strip().lower())
 
     registry = get_coupon_registry(course_id) or get_coupon_registry("yoga")
+    if not registry:
+        return None
 
     # 1. Exact canonical duration match
     for canonical_name in registry.keys():
         if t == canonical_name.lower():
             return canonical_name
 
-    # 2. Check 1 Year / 12 Months first (to avoid '1' collision with 1 Month)
+    # 2. Check coupon codes from registry
     for canonical_name, data in registry.items():
-        if "year" in canonical_name.lower() or "12" in canonical_name:
-            code = data.get("code", "").lower()
-            base = str(data.get("base_price", ""))
-            offer = str(data.get("offer_price", ""))
-            if re.search(rf"\b(?:12\s*(?:months?|month|m|mahine?)|1\s*(?:years?|year|yr|yrs|y|saal)|one\s*year|ek\s*saal|yearly|annual|annually|{code}|₹\s*{base}|₹\s*{offer})\b", t):
-                return canonical_name
-            if (base in t or offer in t) and len(t) <= 25 and not re.search(r"\b(?:am|pm)\b", t):
-                return canonical_name
-            if re.match(r"^(?:12|12m|1y|1yr|1 year)$", t):
-                return canonical_name
+        code = data.get("code", "").lower()
+        if code and re.search(rf"\b{re.escape(code)}\b", t):
+            return canonical_name
 
-    # 3. Check 6 Months / Half-Yearly
-    for canonical_name, data in registry.items():
-        if "6" in canonical_name:
-            code = data.get("code", "").lower()
-            base = str(data.get("base_price", ""))
-            offer = str(data.get("offer_price", ""))
-            if re.search(rf"\b(?:6\s*(?:months?|month|m|mahine?)|six\s*months?|half\s*yearly|semi\s*annual|semi\s*annually|{code}|₹\s*{base}|₹\s*{offer})\b", t):
-                return canonical_name
-            if (base in t or offer in t) and len(t) <= 25 and not re.search(r"\b(?:am|pm)\b", t):
-                return canonical_name
-            if re.match(r"^(?:6|6m|6 month|6 months)$", t):
-                return canonical_name
-
-    # 4. Check 3 Months / Quarterly
-    for canonical_name, data in registry.items():
-        if "3" in canonical_name:
-            code = data.get("code", "").lower()
-            base = str(data.get("base_price", ""))
-            offer = str(data.get("offer_price", ""))
-            if re.search(rf"\b(?:3\s*(?:months?|month|m|mahine?)|three\s*months?|quarterly|{code}|₹\s*{base}|₹\s*{offer})\b", t):
-                return canonical_name
-            if (base in t or offer in t) and len(t) <= 25 and not re.search(r"\b(?:am|pm)\b", t):
-                return canonical_name
-            if re.match(r"^(?:3|3m|3 month|3 months)$", t):
-                return canonical_name
-
-    # 5. Check 1 Month (Guard against '1:00 pm', '1 pm', '10:00 am', '12:00 pm')
-    if not re.search(r"\b1(?::00)?\s*(?:pm|am)\b", t):
-        for canonical_name, data in registry.items():
-            if "1 month" in canonical_name.lower():
-                code = data.get("code", "").lower()
-                base = str(data.get("base_price", ""))
-                offer = str(data.get("offer_price", ""))
-                if re.search(rf"\b(?:1\s*(?:months?|month|m|mahina|mahine)|one\s*month|monthly|{code}|₹\s*{base}|₹\s*{offer})\b", t):
-                    return canonical_name
-                if (base in t or offer in t) and len(t) <= 25:
-                    return canonical_name
-                if re.match(r"^(?:1|1m|1 month)$", t):
-                    return canonical_name
-
-    # 6. Check generic aliases from registry
+    # 3. Check JSON-defined aliases
     for canonical_name, data in registry.items():
         for alias in data.get("aliases", []):
-            if re.search(rf"\b{re.escape(alias)}\b", t):
+            if re.search(rf"\b{re.escape(alias.lower())}\b", t):
+                return canonical_name
+
+    # 4. Check prices (base_price or offer_price in short text)
+    if not re.search(r"\b(?:am|pm)\b", t):
+        for canonical_name, data in registry.items():
+            base = str(data.get("base_price", ""))
+            offer = str(data.get("offer_price", ""))
+            if (base and base in t) or (offer and offer in t):
+                if len(t) <= 30 or re.search(rf"₹\s*(?:{base}|{offer})", t):
+                    return canonical_name
+
+    # 5. Dynamic numeric + duration unit match
+    # Sort with longer durations first (e.g. Years / 12 Months before 1 Month) to avoid prefix collision
+    def _duration_sort_key(item):
+        name = item[0].lower()
+        nums = re.findall(r"\d+", name)
+        val = int(nums[0]) if nums else 1
+        if "year" in name or "yr" in name:
+            return val * 365
+        elif "month" in name:
+            return val * 30
+        elif "week" in name:
+            return val * 7
+        return val
+
+    sorted_packages = sorted(registry.items(), key=_duration_sort_key, reverse=True)
+
+    for canonical_name, data in sorted_packages:
+        name_lower = canonical_name.lower()
+        nums = re.findall(r"\d+", canonical_name)
+        num = nums[0] if nums else None
+
+        if "year" in name_lower and num:
+            # Matches "1 year", "1 yr", "1y", "1 saal", or "12 months", "12m"
+            if re.search(rf"\b(?:{num}\s*(?:years?|year|yr|yrs|y|saal)|(?:12\s*(?:months?|month|m|mahine?)))\b", t):
+                return canonical_name
+            if re.match(rf"^(?:{num}y|{num}yr|{num}\s*year|12m|12)$", t):
+                return canonical_name
+
+        elif "month" in name_lower and num:
+            # Guard against clock times for 1 Month (e.g. '1:00 pm', '1 pm', '10:00 am')
+            if num == "1" and re.search(r"\b1(?::00)?\s*(?:pm|am)\b", t):
+                continue
+            if re.search(rf"\b{num}\s*(?:months?|month|m|mahina|mahine)\b", t):
+                return canonical_name
+            if re.match(rf"^(?:{num}|{num}m|{num}\s*months?)$", t):
+                return canonical_name
+
+        elif "week" in name_lower and num:
+            if re.search(rf"\b{num}\s*(?:weeks?|week|w|hafta|hafte)\b", t):
+                return canonical_name
+
+        elif "day" in name_lower and num:
+            if re.search(rf"\b{num}\s*(?:days?|day|d|din)\b", t):
                 return canonical_name
 
     return None
@@ -190,3 +203,105 @@ def format_coupon_banner(
             f"{code_details_en}\n\n"
             "Please enter this code during checkout in the Sensationz App or website to activate your discount. See you in class! ✨"
         )
+
+
+def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str = "yoga") -> str:
+    """
+    Backend Secret Gating Architecture:
+    - If profile is NOT created: Codes are strictly locked and hidden from LLM context.
+      Shows offer prices only. Instructs LLM to guide to profile creation and emit
+      the action tag [UNLOCK_COUPON] if customer indicates profile setup.
+    - If profile IS created: Unlocked codes are injected into context for natural conversation.
+    """
+    s = state or {}
+    profile_created = bool(
+        s.get("profile_created")
+        or s.get("coupon_sent")
+        or s.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
+    )
+
+    course_kb = kb_loader.get_course_data(course_id)
+    packages = course_kb.get("pricing", {}).get("packages", [])
+
+    if not profile_created:
+        lines = [
+            "• WELCOME DISCOUNT POLICY (PROFILE REGISTRATION REQUIRED):",
+            "  - Welcome coupon codes are LOCKED and hidden. Codes unlock ONLY AFTER profile registration.",
+            "  - ZERO FABRICATION RULE: You do NOT have any coupon codes. NEVER invent, fabricate, guess, or output ANY coupon code string (e.g. NEVER make up codes like 'WELCOME100', 'DISCOUNT50', or ANY code string).",
+            "  - If customer asks for a coupon or code for ANY package (e.g. '6 month ka coupon do', 'coupon code kya hai', 'give coupon'):",
+            "    1. Warmly explain that coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
+            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is ₹1,000, 1 Month is ₹300).",
+            "    3. Guide them to complete their profile on the Sensationz App or website: https://shop.sensationzperformingarts.com/",
+            "    4. DO NOT provide any coupon code string. Strictly maintain that the code will be sent after profile completion.",
+            "  - PROFILE COMPLETION TRIGGER (SEMANTIC RECOGNITION): If the customer indicates they have created/completed their profile or registered (in ANY phrasing, dialect, or slang, e.g. 'bnadi', 'bna di', 'ho gaya', 'done', 'account banaya', 'sign up kar liya'):",
+            "    CELEBRATE warmly and you MUST include the literal system action tag: [UNLOCK_COUPON] in your response (e.g. 'Congratulations! [UNLOCK_COUPON]'). The backend system will securely intercept this tag and deliver the real coupon code and checkout instructions.",
+            "",
+            "• OFFICIAL OFFER PRICES (Coupon codes are securely hidden until profile created):"
+        ]
+        for pkg in packages:
+            lines.append(f"  • {pkg.get('duration')}: Offer Price ₹{pkg.get('offer_price')} (Regular: ₹{pkg.get('base_price')}) — [Code locked until profile created]")
+        return "\n".join(lines)
+
+    else:
+        selected = s.get("package")
+        lines = [
+            "• WELCOME DISCOUNT — PROFILE CONFIRMED (UNLOCKED):",
+            "  - Customer's profile registration is CONFIRMED. Welcome coupons are UNLOCKED.",
+            "  - Below are the exact unlocked coupon codes for each package duration:",
+        ]
+        for p in packages:
+            lines.append(f"  • {p.get('duration')}: *{p.get('coupon_code')}* (Regular: ₹{p.get('base_price')}, Offer Price: ₹{p.get('offer_price')})")
+
+        if selected:
+            pkg = next((p for p in packages if p.get("duration") == selected), None)
+            if pkg:
+                lines.append(f"\n  - Customer's Selected Package: {pkg.get('duration')}. Share their code *{pkg.get('coupon_code')}* and checkout instructions.")
+        else:
+            lines.append("\n  - Share the coupon code corresponding to whichever duration the customer chooses or asks about.")
+        lines.append("  - NEVER invent or modify codes. Use ONLY the exact codes listed above.")
+        return "\n".join(lines)
+
+
+def format_coupon_unlock_delivery(
+    package_name: Optional[str] = None,
+    course_id: str = "yoga",
+    language: str = "hinglish"
+) -> str:
+    """
+    Returns the clean coupon code delivery block to replace [UNLOCK_COUPON]
+    when intercepted by the backend.
+    """
+    details = get_coupon_details(package_name, course_id=course_id)
+    canonical = normalize_package_name(package_name, course_id=course_id)
+    registry = get_coupon_registry(course_id)
+
+    if details:
+        code = details["code"]
+        offer = details["offer_price"]
+        if language in ["hindi", "hinglish"]:
+            return (
+                f"\n\nYe raha aapka welcome discount coupon code 🎁\n"
+                f"✨ Coupon Code: *{code}* ({canonical} package ke liye — Offer Price: ₹{offer})\n\n"
+                "Isko Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
+            )
+        else:
+            return (
+                f"\n\nHere is your welcome discount coupon code 🎁\n"
+                f"✨ Coupon Code: *{code}* (for {canonical} package — Offer Price: ₹{offer})\n\n"
+                "Please enter this code during checkout in the Sensationz App or website to activate your discount. See you in class! ✨"
+            )
+    else:
+        lines = [f"• {pkg}: *{data['code']}* (Offer: ₹{data['offer_price']})" for pkg, data in registry.items()]
+        codes_block = "\n".join(lines)
+        if language in ["hindi", "hinglish"]:
+            return (
+                f"\n\nYe rahe aapke welcome discount coupon codes 🎁\n"
+                f"{codes_block}\n\n"
+                "Apne selected package ke liye coupon code Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
+            )
+        else:
+            return (
+                f"\n\nHere are your welcome discount coupon codes 🎁\n"
+                f"{codes_block}\n\n"
+                "Please enter the coupon code for your selected package during checkout in the Sensationz App or website. See you in class! ✨"
+            )

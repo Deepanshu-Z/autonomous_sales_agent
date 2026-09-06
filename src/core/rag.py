@@ -132,31 +132,6 @@ def _build_history_messages(chat_history: list = None):
     return messages
 
 
-def _is_transactional_input(text: str) -> bool:
-    """
-    Checks if user input is a pure procedural choice/confirmation rather
-    than an informational question or video link request.
-    """
-    txt = text.lower().strip()
-
-    # Priority keywords for video/demo requests and informational queries (NEVER skip RAG for these)
-    info_keywords = [
-        "video", "videos", "demo", "recording", "recordings",
-        "sample", "watch", "trial", "link", "youtube", "teacher",
-        "syllabus", "fees", "fee", "cost", "price"
-    ]
-    if any(kw in txt for kw in info_keywords):
-        return False  # Force RAG vector search to run
-
-    # List of simple procedural trigger words
-    procedural_triggers = [
-        "yes", "yeah", "yep", "sure", "ok", "okay", "hi", "hii", "hello", "hey",
-        "morning", "evening", "afternoon", "6-7am", "7-8am", "8-9am", "10-11am",
-        "12-1pm", "4-5pm", "5-6pm", "6-7pm", "7-8pm", "1 month", "3 months", "6 months",
-        "1 year", "installed", "downloaded", "done","one month", "three months" 
-    ]
-    return txt in procedural_triggers
-
 
 def _build_retrieval_query(question: str, chat_history: list = None) -> str:
     """

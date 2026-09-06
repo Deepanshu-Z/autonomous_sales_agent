@@ -61,24 +61,25 @@ def test_prompt_generation():
     print("\n[TEST 2] Testing prompt generation & token budget...")
     enc = tiktoken.get_encoding("o200k_base")
 
-    # 1. New user (Coupon Locked)
+    # 1. New user (Profile registration PENDING)
     prompt_new = prompt.format_system_prompt({"stage": "NEW"})
     tokens_new = len(enc.encode(prompt_new))
-    assert "LOCKED 🔒" in prompt_new, "Coupon should be LOCKED for new users"
+    assert "Profile Created: PENDING" in prompt_new, "Profile should be PENDING for new users"
     assert "OFFICIAL COURSE DATA" in prompt_new, "COURSE_DATA block missing"
+    assert "YOGA300" in prompt_new, "Course coupon codes should be provided dynamically"
     assert tokens_new < 5000, f"Prompt token count {tokens_new} exceeds 5,000 threshold"
-    print(f"  -> New session prompt generated: {tokens_new} tokens (Under 5k budget, Coupon LOCKED).")
+    print(f"  -> New session prompt generated: {tokens_new} tokens (Under 5k budget, Profile PENDING).")
 
-    # 2. Profile created user (Coupon Unlocked)
+    # 2. Profile created user (Profile registration CONFIRMED)
     prompt_unlocked = prompt.format_system_prompt({
         "stage": "PROFILE_COMPLETED",
         "profile_created": True,
         "package": "1 Month"
     })
     tokens_unlocked = len(enc.encode(prompt_unlocked))
-    assert "UNLOCKED 🔓" in prompt_unlocked, "Coupon should be UNLOCKED when profile_created=True"
+    assert "Profile Created: CONFIRMED" in prompt_unlocked, "Profile should be CONFIRMED when profile_created=True"
     assert "YOGA300" in prompt_unlocked, "Applicable coupon YOGA300 should be present"
-    print(f"  -> Profile completed prompt generated: {tokens_unlocked} tokens (Coupon UNLOCKED).")
+    print(f"  -> Profile completed prompt generated: {tokens_unlocked} tokens (Profile CONFIRMED).")
 
 
 def test_coupons_and_rag_integration():

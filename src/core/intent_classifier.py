@@ -51,51 +51,12 @@ _COUPON_CANONICAL = "coupon"
 _COUPON_FUZZY_THRESHOLD = 60  # fuzz.ratio >= 60 → probably means "coupon"
 _COUPON_REGEX = re.compile(r"\b[ckq][aeou]{1,3}p[aeou]{0,2}n[a-z]{0,4}\b", re.IGNORECASE)
 
-# Short stems that indicate profile/completion context
-_PROFILE_STEMS = [
-    "profile", "account", "signup", "register", "login",
-    "done", "ready", "complete", "created", "downloaded", "installed",
-    "bna", "bana", "banali", "bnali", "banadi", "bnadi", "banaya", "banayi",
-    "kardi", "krdi", "kardiya", "krdiya", "hogaya", "hogya", "hgya", "hgaya", "bangaya", "bangya",
-    "krlia", "krliya", "karliya", "karlia", "karli", "krli", "kardia", "krdia",
-    "nipat", "nipta", "khatam", "kaam", "dono", "finish", "setup",
-    "hn", "han", "haa", "hnji", "hanji",
-]
-
-_COMPLETION_VERBS_HINDI = [
-    "le hai", "le h", "le he",
-    "liya hai", "liya h", "li hai", "li h",
-    "chuka", "chuki", "gaya", "gya", "gayi", "gai",
-    "diya", "di hai", "di h", "hgya", "h gya", "krdia na", "kr diya na",
-]
-
-
-def _has_fuzzy_coupon_word(text: str) -> bool:
-    """Check if any word in text fuzzy-matches 'coupon' or follows phonetic coupon variations."""
-    words = re.findall(r"\w+", text.lower())
-    for w in words:
-        if _COUPON_REGEX.search(w):
-            return True
-        if len(w) >= 4 and (fuzz.ratio(w, _COUPON_CANONICAL) >= _COUPON_FUZZY_THRESHOLD or fuzz.partial_ratio(_COUPON_CANONICAL, w) >= 70):
-            return True
-    return False
-
-
-def _has_profile_like_content(text: str) -> bool:
-    """Check if text contains profile/completion-related words."""
-    t = text.lower()
-    # Check stems
-    if any(stem in t for stem in _PROFILE_STEMS):
-        return True
-    # Check Hindi completion verb phrases
-    if any(verb in t for verb in _COMPLETION_VERBS_HINDI):
-        return True
-    return False
-
 
 # ── Unified Post-Link Classification Prompt ──────────────────────────────
 
-_UNIFIED_CLASSIFIER_SYSTEM_PROMPT = """You classify incoming customer WhatsApp messages for a Yoga Studio chatbot.
+# ── Unified Post-Link Classification Prompt ──────────────────────────────
+
+_UNIFIED_CLASSIFIER_SYSTEM_PROMPT = """You classify incoming customer WhatsApp messages for Sensationz performing arts & wellness academy.
 The customer may write in Hindi, Hinglish, or English with typos, abbreviations, or informal slang.
 
 CURRENT FUNNEL CONTEXT:
@@ -116,7 +77,7 @@ Classify the customer's message into EXACTLY ONE primary intent:
 5. "OTHER":
    - Casual greeting or uncategorized.
 
-Also extract course package duration if mentioned ("1 Month", "3 Months", "6 Months", "1 Year", or null).
+Also extract course package duration if mentioned (e.g. "1 Month", "3 Months", "6 Months", "1 Year", or null).
 
 Return ONLY strict JSON:
 {
@@ -127,7 +88,7 @@ Return ONLY strict JSON:
 }"""
 
 
-async def _llm_classify_unified(text: str) -> dict:
+async def _llm_classify_unified(text: str, course_id: str = "yoga") -> dict:
     """Call the LLM for unified intent & package classification."""
     try:
         llm = _get_classifier_llm()
@@ -137,11 +98,14 @@ async def _llm_classify_unified(text: str) -> dict:
         ])
         raw = resp.content.strip().strip("`").replace("json\n", "").strip()
         data = json.loads(raw)
+        from src.core.coupons import normalize_package_name
+        pkg_raw = data.get("package")
+        resolved_pkg = normalize_package_name(pkg_raw, course_id=course_id) if pkg_raw else None
         return {
             "intent": str(data.get("intent", "OTHER")),
             "is_coupon_request": bool(data.get("is_coupon_request", False)),
             "is_profile_done": bool(data.get("is_profile_done", False)),
-            "package": data.get("package") if data.get("package") in ["1 Month", "3 Months", "6 Months", "1 Year"] else None,
+            "package": resolved_pkg,
         }
     except Exception as e:
         print(f"[intent_classifier] LLM fallback error: {e}")
@@ -169,7 +133,8 @@ async def classify_coupon_and_profile_intent(
         }
 
     # ── LLM Unified Classifier ──
-    llm_res = await _llm_classify_unified(text)
+    course_id = (state or {}).get("course") or "yoga"
+    llm_res = await _llm_classify_unified(text, course_id=course_id)
     is_cpn = regex_coupon_result or llm_res["is_coupon_request"] or (llm_res["intent"] == "COUPON_OR_PROFILE_DONE" and not llm_res["is_profile_done"])
     is_prof = regex_profile_result or llm_res["is_profile_done"] or (llm_res["intent"] == "COUPON_OR_PROFILE_DONE")
     return {
@@ -200,4 +165,5 @@ async def classify_post_link_intent(
         }
 
     # 2. LLM Unified Classifier
-    return await _llm_classify_unified(text)
+    course_id = (state or {}).get("course") or "yoga"
+    return await _llm_classify_unified(text, course_id=course_id)

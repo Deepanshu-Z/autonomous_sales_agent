@@ -301,8 +301,13 @@ def is_user_asking_question(text: str) -> bool:
     if "?" in txt:
         return True
     
-    # Simple greetings or initial "yoga" mentions are NOT questions
-    if txt in ["hi", "hii", "hello", "hey", "yoga", "yog", "online yoga", "yoga classes", "namaste"]:
+    # Explicit enrollment intent statements (e.g. "I want to join...", "enroll karna hai") without question marks are NOT questions
+    enroll_statements = ["i want to join", "want to join", "join karna hai", "enroll karna hai", "admission lena hai", "i want to enroll", "mujhe join karna"]
+    if any(st in txt for st in enroll_statements) and not any(qw in txt for qw in ["?", "kya", "kaise", "how", "what", "can i"]):
+        return False
+
+    # Simple greetings are NOT questions
+    if txt in ["hi", "hii", "hello", "hey", "namaste", "good morning", "good evening"]:
         return False
 
     # Strong single-word keywords that are always questions/informational requests
@@ -335,8 +340,7 @@ def is_user_asking_question(text: str) -> bool:
         "kiska", "kiski", "kiske", "kaha", "kahan",
         "teacher", "teachers", "faculty", "student", "students",
         "discount", "costly", "expensive", "syllabus", "demo", "trial",
-        "hindi", "english", "classes", "fees", "language", "languages",
-        "btao", "batao", "bataen", "bataiye", "detail", "details", "info", "information"
+        "fees", "btao", "batao", "bataen", "bataiye", "detail", "details", "info", "information"
     ]
     
     words = txt.split()
@@ -346,7 +350,8 @@ def is_user_asking_question(text: str) -> bool:
         
     return False
 
-from src.core.coupons import VALID_PACKAGES, detect_package_from_text, normalize_package_name
+from src.core.coupons import detect_package_from_text, normalize_package_name
+from src.core import kb_loader
 
 
 GREETING_WORDS = ["hi", "hii", "hello", "hey", "namaste", "good morning", "good evening", "good afternoon"]
@@ -357,353 +362,258 @@ CONFIRMATION_WORDS = [
     "accha", "acha", "theek", "theek hai", "sahi", "sahi hai", "got it", "understood", "fine"
 ]
 
-def _detect_timing(text_lower: str) -> tuple:
+def normalize_text_for_timing(text: str) -> str:
+    t = text.lower().strip()
+    # Normalize unicode dashes (en-dash, em-dash, minus, horizontal bar) to standard ASCII hyphen
+    t = re.sub(r"[\u2010\u2012\u2013\u2014\u2015\u2212]", "-", t)
+    # Replace slashes between digits with hyphen (e.g. 5/6 -> 5-6)
+    t = re.sub(r"(\d+)\s*/\s*(\d+)", r"\1-\2", t)
+    # Remove :00 minutes e.g. 5:00 -> 5, 6:00 -> 6
+    t = re.sub(r"(\d{1,2}):00", r"\1", t)
+    return t
+
+
+def detect_timing_from_text(text: str, course_id: str = "yoga") -> tuple:
     """
-    Comprehensive timing detection supporting all user typing styles:
-    Hindi 'X se Y', compact 'XYam', 'X to Y am/pm', 'X-Y am/pm', 'Xam/Xpm',
-    'morning X', 'subah X', 'evening X', 'shaam X', 'night X'.
+    Dynamically identifies a batch timing slot from user text based on the active course's valid timings.
+    Supports English, Hindi, Hinglish, compact forms (6am, 5-6pm, subah 6, shaam 7).
     Returns: (timing_str or None, is_ambiguous: bool, ambiguous_range: str)
     """
-    t = text_lower
-
-    def has(*pats):
-        return any(p in t for p in pats)
-
-    def re_has(pattern):
-        return bool(re.search(pattern, t))
-
-    # === Priority 0: Explicit check for UNAVAILABLE / UNSUPPORTED batch requests ===
-    # If user explicitly asks for batch ranges that do not exist (e.g. 11-12, 1-2, 2-3, 3-4, 8-9 PM, 9-10, 10-11 PM),
-    # return None so slot extraction NEVER locks it in, allowing RAG to explain it is unavailable.
-    unsupported_patterns = [
-        # 11:00 AM - 12:00 PM / 11:00 AM
-        r"(?<![0-9])11\s*(?:to|-|se|\s)\s*12\b",
-        r"(?<![0-9])11\s*:\s*00\s*(?:to|-|se|\s)\s*12\s*:\s*00\b",
-        r"\b11se12\b",
-        r"\b11to12\b",
-        r"\b11-12\b",
-        r"(?<![0-9])11\s*am\b",
-        r"(?<![0-9])11\s*(?:baje|bje|ka\s*batch)\b",
-        r"\bgyara(?:h)?\s*baje\b",
-
-        # 1:00 PM - 2:00 PM / 1:00 PM
-        r"(?<![0-9])1\s*(?:to|-|se|\s)\s*2\b",
-        r"\b1-2\b",
-        r"(?<![0-9])1\s*pm\b",
-        r"(?<![0-9])1\s*(?:baje|bje)\b",
-        r"\bek\s*baje\b",
-
-        # 2:00 PM - 3:00 PM / 2:00 PM
-        r"(?<![0-9])2\s*(?:to|-|se|\s)\s*3\b",
-        r"\b2-3\b",
-        r"(?<![0-9])2\s*pm\b",
-        r"(?<![0-9])2\s*(?:baje|bje)\b",
-        r"\bdo\s*baje\b",
-
-        # 3:00 PM - 4:00 PM / 3:00 PM
-        r"(?<![0-9])3\s*(?:to|-|se|\s)\s*4\b",
-        r"\b3-4\b",
-        r"(?<![0-9])3\s*pm\b",
-        r"(?<![0-9])3\s*(?:baje|bje)\b",
-        r"\bteen\s*baje\b",
-
-        # 8:00 PM - 9:00 PM / 8:00 PM
-        r"(?<![0-9])8\s*(?:to|-|se|\s)\s*9\s*pm\b",
-        r"(?<![0-9])8\s*:\s*00\s*(?:to|-|se|\s)\s*9\s*:\s*00\s*pm\b",
-        r"\b8se9pm\b",
-        r"\b8to9pm\b",
-        r"\b8-9pm\b",
-        r"\b89pm\b",
-        r"(?<![0-9])8\s*pm\b",
-
-        # 9:00 - 10:00 (AM or PM) / 9:00 (AM or PM)
-        r"(?<![0-9])9\s*(?:to|-|se|\s)\s*10\b",
-        r"(?<![0-9])9\s*:\s*00\s*(?:to|-|se|\s)\s*10\s*:\s*00\b",
-        r"\b9se10\b",
-        r"\b9to10\b",
-        r"\b9-10\b",
-        r"(?<![0-9])9\s*am\b",
-        r"(?<![0-9])9\s*pm\b",
-        r"(?<![0-9])9\s*(?:baje|bje)\b",
-        r"\bnau\s*baje\b",
-
-        # 10:00 PM - 11:00 PM / 10:00 PM
-        r"(?<![0-9])10\s*(?:to|-|se|\s)\s*11\s*pm\b",
-        r"(?<![0-9])10\s*:\s*00\s*(?:to|-|se|\s)\s*11\s*:\s*00\s*pm\b",
-        r"\b10se11pm\b",
-        r"\b10to11pm\b",
-        r"\b10-11pm\b",
-        r"\b1011pm\b",
-        r"(?<![0-9])10\s*pm\b",
-
-        # 11:00 PM, 12:00 AM - 4:00 AM
-        r"(?<![0-9])11\s*pm\b",
-        r"(?<![0-9])12\s*am\b",
-        r"(?<![0-9])1\s*am\b",
-        r"(?<![0-9])2\s*am\b",
-        r"(?<![0-9])3\s*am\b",
-        r"(?<![0-9])4\s*am\b",
-        r"(?<![0-9])4\s*(?:to|-|se|\s)\s*5\s*am\b",
-    ]
-    if any(re_has(p) for p in unsupported_patterns):
+    if not text:
         return None, False, ""
+    t = f" {normalize_text_for_timing(text)} "
 
-    # === Priority 1: Explicit MORNING / SUBAH / AM ranges & indicators ===
-    # 5:00–6:00 AM
-    if (has("5 se 6 am", "5se6am", "5 to 6 am", "5to6am", "5-6 am", "5-6am", "5 6 am", "56am", "5:00 am", "5:00am", "subah 5", "5 baje subah", "morning 5", "5 morning", "morning 5 am", "5 am morning", "subah 5 baje", "5 bje subah", "subah 5 se 6", "5 to 6 morning", "5-6 morning")
-            or re_has(r"(?<![0-9\-])\b5(?:\s*:\s*00)?\s*am\b")
-            or re_has(r"\b(?:morning|subah)\s*5(?:\s*:\s*00)?(?:\s*am|\s*baje|\s*bje|\b)")
-            or re_has(r"\b5(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:subah|morning)\b")):
-        return "5:00–6:00 AM", False, ""
+    valid_timings = kb_loader.get_valid_timings(course_id)
 
-    # 6:00–7:00 AM
-    if (has("6 se 7 am", "6se7am", "6 to 7 am", "6to7am", "6-7 am", "6-7am", "6 7 am", "67am", "6:00 am", "6:00am", "subah 6", "6 baje subah", "morning 6", "6 morning", "morning 6 am", "6 am morning", "subah 6 baje", "6 bje subah", "subah 6 se 7", "6 to 7 morning", "6-7 morning")
-            or re_has(r"(?<![0-9\-])\b6(?:\s*:\s*00)?\s*am\b")
-            or re_has(r"\b(?:morning|subah)\s*6(?:\s*:\s*00)?(?:\s*am|\s*baje|\s*bje|\b)")
-            or re_has(r"\b6(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:subah|morning)\b")):
-        return "6:00–7:00 AM", False, ""
+    is_am = bool(re.search(r"\b(?:am|morning|subah|sawere|savere|mrng|morng)\b", t))
+    is_pm = bool(re.search(r"\b(?:pm|evening|shaam|sham|night|raat|dopahar|dophar|dupehar|dupahar|afternoon|aftern|lunch)\b", t))
 
-    # 7:00–8:00 AM
-    if (has("7 se 8 am", "7se8am", "7 to 8 am", "7to8am", "7-8 am", "7-8am", "7 8 am", "78am", "7:00 am", "7:00am", "subah 7", "7 baje subah", "morning 7", "7 morning", "morning 7 am", "7 am morning", "subah 7 baje", "7 bje subah", "subah 7 se 8", "7 to 8 morning", "7-8 morning")
-            or re_has(r"(?<![0-9\-])\b7(?:\s*:\s*00)?\s*am\b")
-            or re_has(r"\b(?:morning|subah)\s*7(?:\s*:\s*00)?(?:\s*am|\s*baje|\s*bje|\b)")
-            or re_has(r"\b7(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:subah|morning)\b")):
-        return "7:00–8:00 AM", False, ""
+    def re_has(p):
+        return bool(re.search(p, t))
 
-    # 8:00–9:00 AM
-    if (has("8 se 9 am", "8se9am", "8 to 9 am", "8to9am", "8-9 am", "8-9am", "8 9 am", "89am", "8:00 am", "8:00am", "subah 8", "8 baje subah", "morning 8", "8 morning", "morning 8 am", "8 am morning", "subah 8 baje", "8 bje subah", "subah 8 se 9", "8 to 9 morning", "8-9 morning")
-            or re_has(r"(?<![0-9\-])\b8(?:\s*:\s*00)?\s*am\b")
-            or re_has(r"\b(?:morning|subah)\s*8(?:\s*:\s*00)?(?:\s*am|\s*baje|\s*bje|\b)")
-            or re_has(r"\b8(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:subah|morning)\b")):
-        return "8:00–9:00 AM", False, ""
+    # Priority 1: Range extraction (e.g. 6-7, 6 to 7, 6 7 am, chhe se saat)
+    range_regex = r"(?<![0-9])(\d{1,2})\s*(?:am|pm)?\s*(?:to|-|se|\s)\s*(\d{1,2})\s*(am|pm)?\b"
+    compact_regex = r"\b(\d{1,2})(\d{1,2})\s*(am|pm)\b"
 
-    # 10:00–11:00 AM
-    if (has("10 se 11 am", "10se11am", "10 to 11 am", "10to11am", "10-11 am", "10-11am", "10 11 am", "1011am", "10:00 am", "10:00am", "subah 10", "10 baje subah", "morning 10", "10 morning", "morning 10 am", "10 am morning", "subah 10 baje", "10 bje subah", "das baje", "subah 10 se 11", "10 to 11 morning", "10-11 morning")
-            or re_has(r"(?<![0-9\-])\b10(?:\s*:\s*00)?\s*am\b")
-            or re_has(r"\b(?:morning|subah)\s*10(?:\s*:\s*00)?(?:\s*am|\s*baje|\s*bje|\b)")
-            or re_has(r"\b10(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:subah|morning)\b")):
-        return "10:00–11:00 AM", False, ""
+    m_compact = re.search(compact_regex, t)
+    m_range = re.search(range_regex, t)
 
-    # === Priority 2: Explicit AFTERNOON / EVENING / SHAAM / NIGHT / PM ranges & indicators ===
-    # 12:00–1:00 PM
-    if (has("12 se 1 pm", "12se1pm", "12 to 1 pm", "12to1pm", "12-1 pm", "12-1pm", "12 1 pm", "121pm", "12:00 pm", "12:00pm", "dopahar", "dophar", "dupehar", "dupahar", "lunch", "baarah baje", "12 baje dopahar", "afternoon", "aftern", "aftrnoon", "aftrn", "aftn", "after noon", "afternoon batch", "afternoon slot", "afternoon timing", "afternoon class")
-            or re_has(r"(?<![0-9\-])\b12(?:\s*:\s*00)?\s*pm\b")
-            or re_has(r"\b(?:afternoon|aftern|aftrnoon|aftrn|aftn|dopahar|dophar|dupehar|dupahar)\b")
-            or re_has(r"\b(?:afternoon|aftern|dopahar|dophar)\s*12\b")):
-        return "12:00–1:00 PM", False, ""
+    start_hr, end_hr, explicit_merid = None, None, None
 
-    # 4:00–5:00 PM
-    if (has("4 se 5 pm", "4se5pm", "4 to 5 pm", "4to5pm", "4-5 pm", "4-5pm", "4 5 pm", "45pm", "4:00 pm", "4:00pm", "shaam 4", "4 baje shaam", "evening 4", "4 evening", "evening 4 pm", "4 pm evening", "shaam 4 baje", "4 bje shaam", "night 4 pm", "shaam 4 se 5", "4 to 5 evening", "4-5 evening")
-            or re_has(r"(?<![0-9\-])\b4(?:\s*:\s*00)?\s*pm\b")
-            or re_has(r"\b(?:evening|shaam|night)\s*4(?:\s*:\s*00)?(?:\s*pm|\s*baje|\s*bje|\b)")
-            or re_has(r"\b4(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:shaam|evening|night)\b")):
-        return "4:00–5:00 PM", False, ""
+    if m_range:
+        s_candidate = int(m_range.group(1))
+        e_candidate = int(m_range.group(2))
+        start_hr, end_hr = s_candidate, e_candidate
+        explicit_merid = (m_range.group(3) or "").lower()
+        if not explicit_merid and m_range.group(0):
+            if "am" in m_range.group(0) and not is_pm:
+                explicit_merid = "am"
+            elif "pm" in m_range.group(0) and not is_am:
+                explicit_merid = "pm"
 
-    # 5:00–6:00 PM
-    if (has("5 se 6 pm", "5se6pm", "5 to 6 pm", "5to6pm", "5-6 pm", "5-6pm", "5 6 pm", "56pm", "5:00 pm", "5:00pm", "shaam 5", "5 baje shaam", "evening 5", "5 evening", "evening 5 pm", "5 pm evening", "shaam 5 baje", "5 bje shaam", "night 5", "night 5 pm", "shaam 5 se 6", "5 to 6 evening", "5-6 evening", "5 to 6 shaam", "5-6 shaam")
-            or re_has(r"(?<![0-9\-])\b5(?:\s*:\s*00)?\s*pm\b")
-            or re_has(r"\b(?:evening|shaam|night)\s*5(?:\s*:\s*00)?(?:\s*pm|\s*baje|\s*bje|\b)")
-            or re_has(r"\b5(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:shaam|evening|night)\b")):
-        return "5:00–6:00 PM", False, ""
+    if start_hr is None and m_compact:
+        start_hr = int(m_compact.group(1))
+        end_hr = int(m_compact.group(2))
+        explicit_merid = (m_compact.group(3) or "").lower()
 
-    # 6:00–7:00 PM
-    if (has("6 se 7 pm", "6se7pm", "6 to 7 pm", "6to7pm", "6-7 pm", "6-7pm", "6 7 pm", "67pm", "6:00 pm", "6:00pm", "shaam 6", "6 baje shaam", "evening 6", "6 evening", "evening 6 pm", "6 pm evening", "shaam 6 baje", "6 bje shaam", "night 6", "night 6 pm", "shaam 6 se 7", "6 to 7 evening", "6-7 evening", "6 to 7 shaam", "6-7 shaam")
-            or re_has(r"(?<![0-9\-])\b6(?:\s*:\s*00)?\s*pm\b")
-            or re_has(r"\b(?:evening|shaam|night)\s*6(?:\s*:\s*00)?(?:\s*pm|\s*baje|\s*bje|\b)")
-            or re_has(r"\b6(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:shaam|evening|night)\b")):
-        return "6:00–7:00 PM", False, ""
+    hindi_range_map = [
+        (("paanch", "chhe"), 5, 6), (("panch", "che"), 5, 6),
+        (("chhe", "saat"), 6, 7), (("che", "saat"), 6, 7),
+        (("saat", "aath"), 7, 8), (("aath", "nau"), 8, 9),
+        (("das", "gyarah"), 10, 11), (("baarah", "ek"), 12, 1),
+        (("chaar", "paanch"), 4, 5)
+    ]
+    for (w1, w2), s_h, e_h in hindi_range_map:
+        if re.search(rf"\b{w1}\s*(?:se|to|-)\s*{w2}\b", t):
+            start_hr, end_hr = s_h, e_h
+            break
 
-    # 7:00–8:00 PM
-    if (has("7 se 8 pm", "7se8pm", "7 to 8 pm", "7to8pm", "7-8 pm", "7-8pm", "7 8 pm", "78pm", "7:00 pm", "7:00pm", "shaam 7", "7 baje shaam", "evening 7", "7 evening", "evening 7 pm", "7 pm evening", "shaam 7 baje", "7 bje shaam", "night 7", "night 7 pm", "shaam 7 se 8", "7 to 8 evening", "7-8 evening", "7 to 8 shaam", "7-8 shaam")
-            or re_has(r"(?<![0-9\-])\b7(?:\s*:\s*00)?\s*pm\b")
-            or re_has(r"\b(?:evening|shaam|night)\s*7(?:\s*:\s*00)?(?:\s*pm|\s*baje|\s*bje|\b)")
-            or re_has(r"\b7(?:\s*:\s*00)?\s*(?:baje|bje)?\s*(?:shaam|evening|night)\b")):
-        return "7:00–8:00 PM", False, ""
+    if start_hr is not None and end_hr is not None:
+        merid = explicit_merid or ("am" if is_am and not is_pm else "pm" if is_pm and not is_am else None)
+        cands = [vt for vt in valid_timings if re.search(rf"\b{start_hr}(?::00)?\s*(?:to|-|–)\s*{end_hr}", vt)]
+        if merid:
+            matched = [vt for vt in cands if merid.upper() in vt.upper()]
+            if matched:
+                return matched[0], False, ""
+        elif len(cands) == 1:
+            return cands[0], False, ""
+        elif len(cands) > 1:
+            return None, True, f"{start_hr}:00–{end_hr}:00"
 
-    # === Priority 3: Unambiguous ranges/times WITHOUT AM/PM (only one slot exists in entire 24h schedule) ===
-    if ("pm" not in t and "night" not in t and "shaam" not in t and "evening" not in t) and (
-        has("10 to 11", "10 se 11", "10-11", "10 11", "10 baje", "10 bje", "das baje") or re_has(r"(?<![0-9])\b10\b")
-    ):
-        return "10:00–11:00 AM", False, ""
+    # Priority 2: Single hours with meridiem
+    hour_checks = [
+        (5, ["5", "paanch", "panch"]),
+        (6, ["6", "chhe", "che"]),
+        (7, ["7", "saat"]),
+        (8, ["8", "aath"]),
+        (10, ["10", "das"]),
+        (12, ["12", "baarah"]),
+        (4, ["4", "chaar"]),
+    ]
 
-    if ("pm" not in t and "night" not in t and "shaam" not in t and "evening" not in t) and (
-        has("8 to 9", "8 se 9", "8-9", "8 9", "8 baje", "8 bje", "aath baje") or re_has(r"(?<![0-9])\b8\b")
-    ):
-        return "8:00–9:00 AM", False, ""
+    for hr, aliases in hour_checks:
+        for alias in aliases:
+            is_hr_mentioned = (
+                re_has(rf"(?<![0-9\-])\s*{alias}\s*(?:am|morning|subah|sawere)\b")
+                or re_has(rf"(?<![0-9\-])\s*{alias}\s*(?:pm|evening|shaam|night|raat|dopahar|afternoon)\b")
+                or (is_am and re_has(rf"(?<![0-9\-])\s*{alias}(?:\s*baje|\s*bje|\s*am|\b)"))
+                or (is_pm and re_has(rf"(?<![0-9\-])\s*{alias}(?:\s*baje|\s*bje|\s*pm|\b)"))
+            )
+            if is_hr_mentioned:
+                merid = "am" if is_am and not is_pm else ("pm" if is_pm and not is_am else None)
+                if not merid:
+                    if re_has(rf"(?<![0-9\-])\s*{alias}\s*(?:am|morning|subah|sawere)\b"):
+                        merid = "am"
+                    elif re_has(rf"(?<![0-9\-])\s*{alias}\s*(?:pm|evening|shaam|night|raat|dopahar|afternoon)\b"):
+                        merid = "pm"
 
-    if ("am" not in t and "morning" not in t and "subah" not in t) and (
-        has("4 to 5", "4 se 5", "4-5", "4 5", "4 baje", "4 bje", "chaar baje") or re_has(r"(?<![0-9])\b4\b")
-    ):
-        return "4:00–5:00 PM", False, ""
+                cands = [vt for vt in valid_timings if re.search(rf"\b{hr}(?::00)?\s*(?:to|-|–)", vt)]
+                if merid:
+                    matched = [vt for vt in cands if merid.upper() in vt.upper()]
+                    if matched:
+                        return matched[0], False, ""
+                    return None, False, ""
+                elif len(cands) == 1:
+                    return cands[0], False, ""
+                elif len(cands) > 1:
+                    return None, True, f"{hr}:00"
 
-    if has("12 to 1", "12 se 1", "12-1", "12 1", "12 baje", "12 bje", "dopahar") or re_has(r"(?<![0-9])\b12\b"):
-        return "12:00–1:00 PM", False, ""
-
-    # === Priority 4: Ambiguous times & ranges (both AM and PM slots exist — ask user for AM/PM clarification) ===
-    if re_has(r"(?<![0-9\-])\b6(?:\s*:\s*00)?(?:\s*baje|\s*bje|\s*se|\s*to|-|\b)"):
-        return None, True, "6:00"
-    if re_has(r"(?<![0-9\-])\b7(?:\s*:\s*00)?(?:\s*baje|\s*bje|\s*se|\s*to|-|\b)"):
-        return None, True, "7:00"
-    if re_has(r"(?<![0-9\-])\b5(?:\s*:\s*00)?(?:\s*baje|\s*bje|\s*se|\s*to|-|\b)"):
-        return None, True, "5:00"
+    # Priority 3: Single bare hour without am/pm (e.g. "6 baje", "10 baje")
+    for hr, aliases in hour_checks:
+        for alias in aliases:
+            if re_has(rf"(?<![0-9\-])\s*{alias}(?:\s*baje|\s*bje|\b)"):
+                cands = [vt for vt in valid_timings if re.search(rf"\b{hr}(?::00)?\s*(?:to|-|–)", vt)]
+                if len(cands) == 1:
+                    return cands[0], False, ""
+                elif len(cands) > 1:
+                    return None, True, f"{hr}:00"
 
     return None, False, ""
 
 
+def resolve_llm_reply_tags(reply: str, state: dict, course_id: str = "yoga") -> tuple[bool, str]:
+    """
+    Detects semantic action tags and coupon codes emitted by the LLM.
+    1. If [UNLOCK_COUPON] is present:
+       - Marks state: profile_created=True, app_installed=True, coupon_sent=True, stage="COUPON_SENT"
+       - Replaces [UNLOCK_COUPON] with the secret coupon code & checkout instructions
+         via coupons.format_coupon_unlock_delivery().
+    2. If an explicit coupon code for course_id is present:
+       - Confirms state unlocked.
+    Returns (state_unlocked: bool, resolved_reply: str).
+    """
+    if not reply or not isinstance(state, dict):
+        return False, reply or ""
+
+    from src.core import kb_loader
+    from src.core.coupons import format_coupon_unlock_delivery
+
+    resolved_reply = reply
+    did_unlock = False
+
+    # 1. Check for [UNLOCK_COUPON] action tag
+    if "[UNLOCK_COUPON]" in resolved_reply:
+        state["profile_created"] = True
+        state["app_installed"] = True
+        state["coupon_sent"] = True
+        state["stage"] = "COUPON_SENT"
+        did_unlock = True
+
+        hindi_markers = ["kya", "hai", "mujhe", "batao", "chahiye", "ka", "ki", "ke", "nahi", "haan", "se", "bhi", "aapka", "karein", "hain"]
+        has_hindi = any(w in resolved_reply.lower() for w in hindi_markers) or any("\u0900" <= ch <= "\u097F" for ch in resolved_reply)
+        lang = "hinglish" if has_hindi else "english"
+
+        coupon_delivery = format_coupon_unlock_delivery(
+            state.get("package"),
+            course_id=course_id,
+            language=lang
+        )
+        resolved_reply = resolved_reply.replace("[UNLOCK_COUPON]", coupon_delivery).strip()
+
+    # 2. Semantic Fallback: Did LLM confirm user created their profile?
+    # e.g. "Aapka profile ban gaya hai", "profile complete ho gaya", "welcome coupon mil gaya"
+    # Guard: only if profile was NOT already confirmed, and reply is celebrating completion, NOT guiding to create
+    if not did_unlock and not state.get("profile_created"):
+        llm_confirmed_profile = bool(re.search(
+            r"(?:profile|account)\s*(?:ban\s*g|complete\s*ho\s*g|creat\w+\s*ho\s*g|ban\s*chuki|ban\s*gya|ban\s*gaya|ready\s*hai)|"
+            r"(?:welcome\s*coupon\s*mil\s*gaya)|"
+            r"(?:congratulations.*profile)",
+            resolved_reply,
+            re.IGNORECASE
+        )) and not bool(re.search(
+            r"(?:profile\s*(?:banayein|bana\s*lijiye|complete\s*karein|banana\s*hoga|banane\s*ke\s*baad)|download\s*karein)",
+            resolved_reply,
+            re.IGNORECASE
+        ))
+
+        if llm_confirmed_profile:
+            state["profile_created"] = True
+            state["app_installed"] = True
+            state["coupon_sent"] = True
+            state["stage"] = "COUPON_SENT"
+            did_unlock = True
+
+            hindi_markers = ["kya", "hai", "mujhe", "batao", "chahiye", "ka", "ki", "ke", "nahi", "haan", "se", "bhi", "aapka", "karein", "hain"]
+            has_hindi = any(w in resolved_reply.lower() for w in hindi_markers) or any("\u0900" <= ch <= "\u097F" for ch in resolved_reply)
+            lang = "hinglish" if has_hindi else "english"
+
+            coupon_delivery = format_coupon_unlock_delivery(
+                state.get("package"),
+                course_id=course_id,
+                language=lang
+            )
+            resolved_reply = f"{resolved_reply}\n\n{coupon_delivery}".strip()
+
+    # 3. Check if LLM mentioned an explicit coupon code (e.g. in post-unlock turns)
+    coupons = kb_loader.get_course_coupons(course_id)
+    coupon_codes = [c.get("code") for c in coupons.values() if c.get("code")]
+    for code in coupon_codes:
+        if re.search(rf"\b{re.escape(code)}\b", resolved_reply, re.IGNORECASE):
+            state["profile_created"] = True
+            state["app_installed"] = True
+            state["coupon_sent"] = True
+            state["stage"] = "COUPON_SENT"
+            did_unlock = True
+            break
+
+    # 4. Anti-Hallucination Sanitizer for Unverified Sessions:
+    # If session is NOT verified and was NOT unlocked, ensure NO coupon codes (real or fabricated) are leaked.
+    if not did_unlock and not state.get("profile_created"):
+        resolved_reply = re.sub(
+            r"\*?\b(?:welcome|yoga|kathak|coupon|code|flat|save|off)\d{2,5}\b\*?",
+            "welcome coupon",
+            resolved_reply,
+            flags=re.IGNORECASE
+        )
+        resolved_reply = re.sub(
+            r"(?:coupon\s*code|code)\s*(?:hai|is|:)?\s*[\*\"\']?([A-Z]{3,10}\d{2,5})[\*\"\']?",
+            "coupon code profile complete karne ke baad unlock hoga",
+            resolved_reply,
+            flags=re.IGNORECASE
+        )
+
+    return did_unlock, resolved_reply
+
+
+def sync_state_from_llm_reply(reply: str, state: dict, course_id: str = "yoga") -> bool:
+    """
+    Detects state change from what the LLM did, NOT what the user said.
+    Inspects the LLM's output for [UNLOCK_COUPON] or explicit coupon codes.
+    Updates state: profile_created=True, app_installed=True, coupon_sent=True, stage="COUPON_SENT".
+    Returns True if coupon was detected/unlocked and state updated, False otherwise.
+    """
+    did_unlock, _ = resolve_llm_reply_tags(reply, state, course_id=course_id)
+    return did_unlock
+
 
 def is_profile_completed_signal(text: str, state: dict = None) -> bool:
     """
-    Dynamically and robustly detects if the user indicates that they have created
-    their profile, registered an account, downloaded the app, or completed setup.
-    Handles Hindi, Hinglish, English, slang, and coupled coupon requests.
-    Guards against how-to / future inquiries (e.g. 'profile kaise banaye', 'kese kru').
+    Deprecated: State changes are now detected from the LLM's output
+    (via sync_state_from_llm_reply) rather than fragile keyword matching on user input.
+    Preserved for backward compatibility.
     """
-    if not text:
-        return False
-    t = text.lower().strip()
-
-    # 0. Negations / problem markers (profile creation failed, error, unable)
-    NEGATION_MARKERS = [
-        r"\b(nahi|nhi|not|unable|fail|failed|error|issue|problem)\b.*?\b(ban|bana|bna|create|download|install|chal|open|ho\s*raha|ho\s*rahi|hua|hui)\b",
-        r"\b(ban|bana|bna|create|download|install)\b.*?\b(nahi|nhi|not|unable)\b",
-    ]
-    if any(re.search(p, t) for p in NEGATION_MARKERS):
-        return False
-
-    # 1. Emphatic assertions of prior completion (overrides any rhetorical inquiry in the same sentence)
-    # e.g., "bana to li bhai ab kese banau", "bna to li", "kar to liya", "maine to bana li", "already bana li"
-    EMPHATIC_ASSERTION_PATTERNS = [
-        r"\b(bana|bna)\s+to\s+li\b",
-        r"\b(kar|kr)\s+to\s+(liya|diya)\b",
-        r"\bho\s+to\s+(gaya|gya|gayi|gai)\b",
-        r"\b(already|pehle\s+se|pehle\s+hi)\s+(created|made|done|completed|registered|downloaded|installed|bana|banali|banayi)\b",
-        r"\bmaine\s+to\s+(bana|create)\b",
-    ]
-    if any(re.search(p, t) for p in EMPHATIC_ASSERTION_PATTERNS):
+    if state and (state.get("profile_created") or state.get("coupon_sent")):
         return True
-
-    # 2. Check for pure how-to / future questions or imperatives (inquiry/request, not completion)
-    # e.g., "bnalo", "banalo", "bana do", "profile kaise banaye", "kese banau", "app download karni hai"
-    # Note: "ab kya karna hai" / "aage kya karein" are next-step questions, NOT how-to-create inquiries!
-    INQUIRY_MARKERS = [
-        r"\b(kaise|kese|how|kyun)\b.*?\b(bana|create|kare|kru|download|register|fill|khol)",
-        r"\b(banana|banani)\s+h(ai)?\b",
-        r"\b(download|install)\s*(karna|krna|karni|krni)\s+h(ai)?\b",
-        r"\b(create|banane)\s*(karna|krna|karni|krni|chahiye)\s+h(ai)?\b",
-        r"\b(bnalo|banalo|bana\s*do|bna\s*do|kardo|krdo|kar\s*do|kr\s*do)\b",
-        r"\bkese\s+kru\b",
-        r"\bkaise\s+karein?\b",
-        r"\bhelp\s+chahiye\b",
-    ]
-
-    # 3. Standalone past-action completion verbs (Hindi/Hinglish/English)
-    # e.g. "bnali", "banali", "bna li", "bana li", "banadi", "bnadi", "kardi", "krdi", "kardiya", "ho gaya", "done", "created"
-    # Also covers informal present-perfect: "bna le hai", "kar le hai", "le liya hai", "hgya h", "krdia na"
-    STANDALONE_PAST_VERBS = [
-        r"\b(bnali|banali|bna\s*li|bana\s*li|banadi|bnadi|bna\s*di|bana\s*di|bana\s*diya|bna\s*diya|bana\s*liya|banaliya|bna\s*liya|bnaliya)\b",
-        r"\b(kardi|krdi|kardiya|krdiya|kar\s*liya|kr\s*liya|karliya|krliya|karlia|krlia|kar\s*lia|kr\s*lia|kar\s*li|kr\s*li|karli|krli|kar\s*diya|kr\s*diya|kardia|krdia|kar\s*dia|kr\s*dia|kar\s*di|kr\s*di)\s*(?:na|ji|bhai|yaar|sir|mam)?\b",
-        r"\b(ho\s*gaya|hogaya|ho\s*gya|hogya|h\s*gaya|hgaya|h\s*gya|hgya|ban\s*gaya|bangaya|ban\s*gya|bangya|ban\s*gayi|bangayi|ban\s*gai|bangai)\b",
-        r"\b(created|completed|registered|setup\s*done|all\s*done)\b",
-        # Informal present-perfect: "bna le hai", "bana le hai", "kar le hai", "kr le hai", "hgya h"
-        r"\b(bna|bana)\s*le\s*(hai|h|he)\b",
-        r"\b(kar|kr)\s*le\s*(hai|h|he)\b",
-        r"\b(hgya|hogya|ho\s*gya|ho\s*gaya|krdia|krdiya|kar\s*diya|bna\s*li|banali)\s*(hai|h|he|na)\b",
-        # "le liya hai", "le li hai" (have done it)
-        r"\ble\s*(liya|li)\s*(hai|h|he)?\b",
-    ]
-
-    # 4. Direct noun + past-verb semantic combinations
-    # Noun: profile / account / id / details / app
-    NOUN_RE = r"(profile|profil|profl|account|acnt|acc|id|details?)"
-    PAST_VERB_RE = (
-        r"("
-        r"create\s*k(ar|r)\s*li|create\s*k(ar|r)\s*liya|create\s*k(ar|r)\s*di|create\s*k(ar|r)\s*diya|"
-        r"create\s*kiya|create\s*ho\s*g(aya|ya|yi|i)|created|"
-        r"bana\s*li|banali|bna\s*li|bnali|bana\s*diya|banadi|bna\s*diya|bnadi|bna\s*di|bana\s*di|bana\s*liya|banaliya|bna\s*liya|bnaliya|"
-        r"banaya|banayi|"
-        r"bana\s*chuka|bna\s*chuka|ban\s*chuki|ban\s*chuka|"
-        r"ban\s*gayi|bangayi|ban\s*gai|bangai|ban\s*gya|bangya|ban\s*gaya|bangaya|"
-        r"kar\s*liya|kr\s*liya|karliya|krliya|karlia|krlia|kar\s*lia|kr\s*lia|kardiya|krdiya|kardia|krdia|kar\s*dia|kr\s*dia|kar\s*li|kr\s*li|karli|krli|kar\s*di|kr\s*di|kardi|krdi|"
-        r"ho\s*g(aya|ya|yi|i)|hog(aya|ya|yi|i)|"
-        r"ready|done|completed?|setup|set|registered"
-        r")"
-    )
-
-    # App download / install completion
-    APP_NOUN_RE = r"(app|application|sensationz)"
-    APP_PAST_VERB_RE = (
-        r"(download\s*k(ar|r)\s*li|download\s*k(ar|r)\s*liya|download\s*ho\s*g(aya|ya|yi|i)|downloaded|"
-        r"install\s*k(ar|r)\s*li|install\s*k(ar|r)\s*liya|install\s*ho\s*g(aya|ya|yi|i)|installed|"
-        r"khol\s*li|open\s*k(ar|r)\s*li)"
-    )
-
-    _EXPLICIT_COMPLETION_PHRASES = [
-        "profile created", "profile done", "profile complete", "created profile",
-        "profile ban gayi", "profile ban gai", "profile bana li", "profile banali",
-        "profile bna li", "profile bnali", "profile banadi", "profile bnadi",
-        "profile bna di", "profile bana di", "profile ready", "profile set",
-        "account created", "account ban gaya", "account bana liya", "profile setup",
-        # Colloquial task/setup completions
-        "krlia", "karliya", "krliya", "karlia", "kr lia", "kar lia",
-        "krdiya", "kardiya", "krdia", "kardia", "kr dia", "kar dia", "karli", "krli",
-        "hogya", "hogaya", "ho gaya", "hgya", "h gya", "h gaya", "hgaya",
-        "hgya h", "hogya h", "ho gya h", "krdia na", "krdiya na", "kar diya na", "kardiya na",
-        "both done", "sab ho gaya", "sab ho gya", "dono ho gaya", "dono ho gya",
-        "dono kaam", "dono kaam ho gaye", "dono kaam nipat gaye", "dono kaam nipat gya",
-        "nipat gaya", "nipat gaye", "nipat gya", "nipta diya", "sab nipta diya",
-        "kaam ho gaya", "kaam hogaya", "kaam khatam", "khatam kar diya", "finish kar diya",
-        "download kar liya", "download kr liya", "install kar liya", "install kr liya",
-        "app done", "downloaded", "installed", "app installed", "app downloaded",
-        "setup done", "all done", "done profile created", "profile created done",
-        "done created", "yes created", "id bana li", "id banali", "id ban gayi",
-        "login kar liya", "login ho gaya", "signup kar liya", "sign up ho gaya",
-        "registered", "registered on app", "profile is ready", "profile is done",
-        # Informal present-perfect (common Hindi/Hinglish)
-        "profile bna le hai", "profile bana le hai",
-        "profile bna le h", "profile bana le h",
-        "profile kar le hai", "profile kar le h",
-        "account bna le hai", "account bana le hai",
-        "sab kar le hai", "sab kar le h",
-    ]
-
-    has_past_completion = (
-        any(re.search(p, t) for p in STANDALONE_PAST_VERBS)
-        or bool(re.search(rf"\b{NOUN_RE}\b.*?{PAST_VERB_RE}", t))
-        or bool(re.search(rf"{PAST_VERB_RE}.*?\b{NOUN_RE}\b", t))
-        or bool(re.search(rf"\b{APP_NOUN_RE}\b.*?{APP_PAST_VERB_RE}", t))
-        or bool(re.search(rf"{APP_PAST_VERB_RE}.*?\b{APP_NOUN_RE}\b", t))
-        or any(p in t for p in _EXPLICIT_COMPLETION_PHRASES)
-    )
-
-    # 5. Contextual Affirmations (strictly when in app link / profile creation stage)
-    current_stage = (state.get("stage") if state else "") or ""
-    if current_stage in ["APP_LINK_SENT", "READY_FOR_APP_LINK"]:
-        _AFFIRMATIVE_SIGNALS = [
-            "done", "yes", "haan", "haa", "han", "hn", "ha", "ji haan", "ji han", "ji hn", "bilkul",
-            "yes done", "haan done", "hn done", "han done", "ok done", "done done", "kar diya", "kardiya",
-            "kr diya", "krdiya", "krdia", "kardia", "kr dia", "kar dia", "kar li", "krli", "ho gaya", "hogaya",
-            "ho gya", "hogya", "hgya", "h gya", "h gaya", "hgaya", "ban gaya", "bangaya", "ban gayi", "bangayi",
-            "bnali", "banali", "bna li", "bana li", "bna di", "banadi", "bnadi", "kardi", "krdi", "hnji", "hanji",
-            "krdia na", "krdiya na", "kar diya na", "kardiya na", "hgya h", "hogya h", "ho gya h", "hn hn hgya h"
-        ]
-        words = re.findall(r"\w+", t)
-        affirmative_words = {
-            "done", "yes", "haan", "han", "hn", "haa", "ha", "hnji", "hanji", "bilkul",
-            "hgya", "hogya", "krdia", "krdiya", "banali", "bnali", "banadi", "bnadi"
-        }
-        if any(w in affirmative_words for w in words):
-            has_past_completion = True
-        elif any(p in t for p in _AFFIRMATIVE_SIGNALS):
-            has_past_completion = True
-
-    # If there's an affirmative completion signal, it takes precedence over next-step questions
-    if has_past_completion:
-        return True
-
-    # Otherwise, if it matches an inquiry marker, reject it
-    if any(re.search(p, t) for p in INQUIRY_MARKERS):
-        return False
-
     return False
 
 
@@ -718,12 +628,19 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
     # Reset follow-up counter whenever customer is actively chatting
     state["follow_up_count"] = 0
 
+    from src.core import kb_loader
+    # Dynamically detect if user is referring to a specific course from catalog
+    detected_course = kb_loader.detect_course_from_text(text, default_course=None)
+    if detected_course:
+        state["course"] = detected_course
+    course_id = state.get("course") or "yoga"
+    is_course_keyword = bool(detected_course)
+
     text_lower = text.lower().strip()
     is_q = is_user_asking_question(text)
 
     # Keywords for initial contact vs confirmation vs slots
     is_greeting = matches_any(text_lower, GREETING_WORDS)
-    is_yoga_keyword = any(w in text_lower for w in ["yoga", "yog", "yaga", "yogi", "yoga classes", "online yoga", "yoga details", "yoga course"])
     is_confirmation = matches_any(text_lower, CONFIRMATION_WORDS)
 
     # --- 0.1 Detect App Install & Profile Completion (High Priority Semantic Engine) ---
@@ -747,7 +664,7 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
             state["timing"] = None
             state["package"] = None
             state["fee"] = None
-        elif is_greeting or is_yoga_keyword:
+        elif is_greeting or is_course_keyword:
             state["stage"] = advance_stage(state["stage"], "ENROLL_ASKED")
             state["timing"] = None
             state["package"] = None
@@ -767,7 +684,6 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
             state["stage"] = "TRIAL_REQUESTED"
 
     # --- 0.5 Detect Intent to Change / Remove Slots ---
-
     change_kws = ["change", "remove", "galat", "wrong", "dusra", "delete", "nahi chahiye", "cancel"]
     if any(kw in text_lower for kw in change_kws) and state["stage"] != "NEW":
         changed = False
@@ -803,21 +719,19 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
             is_pm = any(w in ["pm", "shaam", "evening", "evng", "night", "raat", "sham"] for w in tokens) or any(w in text_lower for w in ["shaam", "evening", "night", "raat", "sham"]) or text_lower in ["pm", "shaam", "evening"]
             
             resolved_timing = None
-            if is_am and not is_pm:
-                if "5" in pending_amb:
-                    resolved_timing = "5:00–6:00 AM"
-                elif "6" in pending_amb:
-                    resolved_timing = "6:00–7:00 AM"
-                elif "7" in pending_amb:
-                    resolved_timing = "7:00–8:00 AM"
-            elif is_pm and not is_am:
-                if "5" in pending_amb:
-                    resolved_timing = "5:00–6:00 PM"
-                elif "6" in pending_amb:
-                    resolved_timing = "6:00–7:00 PM"
-                elif "7" in pending_amb:
-                    resolved_timing = "7:00–8:00 PM"
-            
+            course_timings = kb_loader.get_valid_timings(course_id)
+            amb_nums = re.findall(r"\d+", pending_amb)
+            amb_hr = int(amb_nums[0]) if amb_nums else None
+
+            if amb_hr:
+                target_merid = "am" if (is_am and not is_pm) else ("pm" if (is_pm and not is_am) else None)
+                if target_merid:
+                    for vt in course_timings:
+                        m_vt = re.search(r"(\d{1,2})(?::\d{2})?\s*(?:to|-|–|\u2013)\s*(\d{1,2})(?::\d{2})?\s*(AM|PM)", vt, re.I)
+                        if m_vt and int(m_vt.group(1)) == amb_hr and m_vt.group(3).lower() == target_merid:
+                            resolved_timing = vt
+                            break
+
             if resolved_timing:
                 state["timing"] = resolved_timing
                 state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
@@ -826,7 +740,7 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
                 timing_found = True
 
         if not timing_found:
-            timing_str, is_ambiguous, ambiguous_range = _detect_timing(text_lower)
+            timing_str, is_ambiguous, ambiguous_range = detect_timing_from_text(text, course_id=course_id)
             if timing_str:
                 state["timing"] = timing_str
                 state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
@@ -838,37 +752,28 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
                 timing_found = True  # Prevents LLM fallback from executing and overriding ambiguous timings
 
     # --- 2. Detect Package / Duration Slot ---
-    # Check if a package is mentioned in the text using robust pattern matching
-    detected_pkg = detect_package_from_text(text)
+    course_pkgs = kb_loader.get_valid_packages(course_id)
+    detected_pkg = detect_package_from_text(text, course_id=course_id)
 
     is_package_detected = False
 
     # Whenever a package duration is mentioned or asked about, immediately update active package slot
     if detected_pkg:
         state["package"] = detected_pkg
-        state["fee"] = VALID_PACKAGES[detected_pkg]
+        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
         is_package_detected = True
     elif not is_q:
-        # Fallback for bare numbers in package stage
-        is_package_stage = (state.get("timing") is not None or state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED", "PACKAGE_SELECTED"])
-        _short_text = len(text_lower.strip()) <= 15
+        # Fallback for bare price numbers in package stage from course registry
+        coupons = kb_loader.get_course_coupons(course_id)
         tokens = [w.strip(".,!?:;₹") for w in text_lower.replace(",", "").split()]
-        if _short_text and any(w in tokens for w in ["5000", "1800", "3850"]):
-            state["package"] = "1 Year"
-            state["fee"] = VALID_PACKAGES["1 Year"]
-            is_package_detected = True
-        elif _short_text and any(w in tokens for w in ["3200", "1000", "2050"]):
-            state["package"] = "6 Months"
-            state["fee"] = VALID_PACKAGES["6 Months"]
-            is_package_detected = True
-        elif _short_text and any(w in tokens for w in ["1750", "600"]):
-            state["package"] = "3 Months"
-            state["fee"] = VALID_PACKAGES["3 Months"]
-            is_package_detected = True
-        elif _short_text and any(w in tokens for w in ["700", "300", "500"]):
-            state["package"] = "1 Month"
-            state["fee"] = VALID_PACKAGES["1 Month"]
-            is_package_detected = True
+        for pkg_name, data in coupons.items():
+            b_str = str(data.get("base_price", ""))
+            o_str = str(data.get("offer_price", ""))
+            if any(tok in [b_str, o_str] for tok in tokens if tok):
+                state["package"] = pkg_name
+                state["fee"] = course_pkgs.get(pkg_name, state.get("fee"))
+                is_package_detected = True
+                break
 
     needs_llm_fallback = (
         not timing_found and not is_package_detected
@@ -878,13 +783,13 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
         and state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED", "PACKAGE_SELECTED", "ENROLL_CONFIRMED"]
     )
     if needs_llm_fallback:
-        slot_result = await extract_slot_llm(text, chat_history)
+        slot_result = await extract_slot_llm(text, chat_history, course_id=course_id)
         if slot_result["timing"] and not state.get("timing"):
             state["timing"] = slot_result["timing"]
             state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
         if slot_result["package"] and not state.get("package"):
             state["package"] = slot_result["package"]
-            state["fee"] = VALID_PACKAGES[slot_result["package"]]
+            state["fee"] = course_pkgs.get(slot_result["package"], "")
         
     # Update funnel stage dynamically based on timing and package availability
     if state.get("timing") and state.get("package"):
@@ -902,3 +807,4 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
     # Persist updated session state asynchronously
     await save_user_state_async(phone, state)
     return state
+

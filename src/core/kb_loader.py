@@ -75,17 +75,30 @@ def get_course_data(course_id: str = "yoga") -> Dict[str, Any]:
     return {}
 
 
-def get_course_prompt_str(course_id: str = "yoga", minified: bool = True) -> str:
+def _redact_coupon_codes(data: Any) -> Any:
+    """Recursively redacts coupon_code keys from course data to prevent prompt leaks."""
+    if isinstance(data, dict):
+        return {k: _redact_coupon_codes(v) for k, v in data.items() if k != "coupon_code"}
+    elif isinstance(data, list):
+        return [_redact_coupon_codes(item) for item in data]
+    return data
+
+
+def get_course_prompt_str(course_id: str = "yoga", minified: bool = True, include_coupons: bool = True) -> str:
     """
     Returns a cached JSON string of the course data optimized for prompt injection.
     Minified format saves ~1,200 tokens of whitespace indentation.
+    When include_coupons is False, coupon_code fields are completely redacted
+    so the LLM prompt cannot leak codes prior to profile completion.
     """
     cid = (course_id or "yoga").lower().strip()
-    cache_key = f"{cid}_{minified}"
+    cache_key = f"{cid}_{minified}_{include_coupons}"
     if cache_key in _PROMPT_STR_CACHE:
         return _PROMPT_STR_CACHE[cache_key]
 
-    data = get_course_data(cid)
+    raw_data = get_course_data(cid)
+    data = raw_data if include_coupons else _redact_coupon_codes(raw_data)
+
     if minified:
         prompt_str = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
     else:
@@ -327,3 +340,20 @@ def format_demo_videos_display(course_id: str = "yoga") -> str:
     demos = data.get("trial_class", {}).get("demo_videos", {})
     lines = [f"• Trainer {name}: {url}" for name, url in demos.items() if url]
     return "\n".join(lines)
+
+
+def format_app_links_display() -> str:
+    """
+    Dynamically formats platform download and access links from data/global_rules.json.
+    """
+    rules = get_global_rules()
+    platforms = rules.get("access_platforms", {})
+    android = platforms.get("android_app", "https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev")
+    ios = platforms.get("ios_app", "https://apps.apple.com/us/app/sensationz/id6761418351")
+    web = platforms.get("website_portal", "https://shop.sensationzperformingarts.com/")
+    return (
+        f"📱 Android: {android}\n"
+        f"🍎 iOS: {ios}\n"
+        f"💻 Website / PC / Laptop: {web}"
+    )
+

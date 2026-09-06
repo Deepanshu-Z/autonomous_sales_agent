@@ -81,28 +81,14 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
     app_str = "CONFIRMED" if s.get("app_installed") else "PENDING"
     profile_str = "CONFIRMED" if s.get("profile_created") else "PENDING"
 
-    has_unlocked = bool(
+    profile_confirmed = bool(
         s.get("profile_created")
         or s.get("coupon_sent")
         or s.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT"]
     )
 
-    from src.core.coupons import format_coupon_prompt_string
-    applicable_coupon = format_coupon_prompt_string(package_str, course_id=course_id)
-
-    if has_unlocked:
-        coupon_instruction = (
-            f"UNLOCKED 🔓 - User has completed profile setup (or confirmed 'done', 'bnadi', 'kardi', 'bana li').\n"
-            f"   • Coupon codes for {course_id.title()}: {applicable_coupon}.\n"
-            "   • IF user asks for coupon code, discounts, or confirms profile creation (e.g. 'bnadi', 'bna di', 'kardi', 'done'): CELEBRATE and SHARE the welcome discount coupon code IMMEDIATELY with instructions to apply at checkout!\n"
-            "   • IF user asks an informational or operational question (timing, teacher, syllabus, health): Answer their question thoroughly and remind them their coupon is ready to use."
-        )
-    else:
-        coupon_instruction = (
-            "LOCKED 🔒 - User has NOT completed profile yet.\n"
-            "   • STRICT ZERO-LEAK RULE: NEVER reveal any coupon code names in your answer until they create their profile!\n"
-            "   • Quote only official base & offer prices, and explain the welcome coupon is sent immediately after creating their profile in the app or website."
-        )
+    from src.core.coupons import build_coupon_context
+    coupon_instruction = build_coupon_context(s, course_id=course_id)
 
     state_context = (
         f"- Customer's Selected Batch Timing: {timing_str}\n"
@@ -110,12 +96,16 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
         f"- Package Fee: {fee_str}\n"
         f"- Funnel Stage: {stage_str}\n"
         f"- App Installed: {app_str}\n"
-        f"- Profile Created: {profile_str}\n"
-        f"- Coupon Access Status: {coupon_instruction}"
+        f"- Profile Created: {'CONFIRMED (unlocked)' if profile_confirmed else 'PENDING (locked)'}\n"
+        f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
 
-    # Fetch minified JSON string of the active course
-    course_json_str = kb_loader.get_course_prompt_str(course_id, minified=True)
+    # Fetch minified JSON string of the active course (coupon codes securely redacted if not confirmed)
+    course_json_str = kb_loader.get_course_prompt_str(
+        course_id,
+        minified=True,
+        include_coupons=profile_confirmed
+    )
 
     return BASE_SYSTEM_TEMPLATE.format(
         state_context=state_context,

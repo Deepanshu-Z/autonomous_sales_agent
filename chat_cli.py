@@ -111,13 +111,6 @@ async def chat_session():
             print(f"🎯 Switched active course to: '{course_name}'")
             continue
 
-        # Check if user indicates profile creation completion (e.g. 'bnadi', 'bna di', 'kardi', 'done', 'profile ban gayi')
-        from src.state.chat_state import is_profile_completed_signal
-        if is_profile_completed_signal(user_input, state):
-            state["profile_created"] = True
-            state["app_installed"] = True
-            state["stage"] = "PROFILE_COMPLETED"
-
         # Detect if user explicitly mentions a course from catalog and persist in session state
         detected_course = kb_loader.detect_course_from_text(user_input, default_course=None)
         if detected_course:
@@ -126,6 +119,14 @@ async def chat_session():
         active_course = state.get("course", "yoga")
 
         # Detect package from text to update state
+        # Detect timing from text to update state
+        from src.state.chat_state import detect_timing_from_text
+        t_str, is_amb, amb_r = detect_timing_from_text(user_input, course_id=active_course)
+        if t_str:
+            state["timing"] = t_str
+            if state["stage"] in ["NEW", "ENROLL_ASKED", "ENROLL_CONFIRMED"]:
+                state["stage"] = "TIMING_SELECTED"
+
         pkg = detect_package_from_text(user_input, course_id=active_course)
         if pkg:
             state["package"] = pkg
@@ -145,13 +146,23 @@ async def chat_session():
             elif turn["role"] == "assistant":
                 messages.append(AIMessage(content=turn["content"]))
 
+        last_ai_msg = ""
+        for turn in reversed(chat_history):
+            if turn["role"] == "assistant":
+                last_ai_msg = turn["content"]
+                break
+
         # Immediate context user prompt
         user_prompt = (
-            f"Customer's Message: \"{user_input}\"\n\n"
+            f"--- IMMEDIATE CONTEXT ---\n"
+            f"AI's Last Message: \"{last_ai_msg}\"\n"
+            f"Customer's Current Reply: \"{user_input}\"\n\n"
             "INSTRUCTION:\n"
-            "1. STRICT LANGUAGE MATCHING: Match the language of Customer's Message (English -> 100% English, Hindi -> Hindi, Hinglish -> Hinglish).\n"
-            "2. Answer EVERY distinct question or topic thoroughly.\n"
-            "3. Follow all formatting rules (*bold* with single asterisks, • bullets, raw links)."
+            "1. Analyze the customer's reply specifically in context of the AI's last message.\n"
+            "2. Follow all welcome coupon and profile rules from the system prompt (if customer created/completed profile or registered, celebrate and include [UNLOCK_COUPON]).\n"
+            "3. STRICT LANGUAGE MATCHING: Match the language of Customer's Current Reply (English -> 100% English, Hindi -> Hindi, Hinglish -> Hinglish).\n"
+            "4. Answer EVERY distinct question or topic thoroughly.\n"
+            "5. Follow all formatting rules (*bold* with single asterisks, • bullets, raw links)."
         )
         messages.append(HumanMessage(content=user_prompt))
 
@@ -160,9 +171,12 @@ async def chat_session():
         full_reply = ""
 
         try:
-            # Stream response in real-time
             resp = await llm.ainvoke(messages)
-            full_reply = resp.content.strip()
+            raw_reply = resp.content.strip()
+
+            # Resolve system action tags ([UNLOCK_COUPON]) and sync session state
+            from src.state.chat_state import resolve_llm_reply_tags
+            did_unlock, full_reply = resolve_llm_reply_tags(raw_reply, state, course_id=active_course)
             print(full_reply)
 
             latency = time.perf_counter() - t0

@@ -1,0 +1,61 @@
+{
+    "organization": {
+        "name": "Sensationz Media & Arts Pvt Ltd",
+        "established": 2007,
+        "students_trained": "100,000+",
+        "countries_served": "18+",
+        "headquarters": "Rohini, Delhi, India",
+        "physical_branches": [
+            {
+                "name": "Delhi Branch 1",
+                "address": "B-305, 3rd Floor, North Ex Mall, Rohini Sector-9, Delhi"
+            },
+            {
+                "name": "Delhi Branch 2",
+                "address": "A-201, 2nd Floor, North Ex Mall, Rohini Sector-9, Delhi"
+            },
+            {
+                "name": "Uttarakhand Branch",
+                "address": "House No. 178, Naul (Ward No. 3), Naukuchiatal, Bhimtal (Nainital), Uttarakhand"
+            }
+        ],
+        "important_branch_policy": "Physical branch addresses are administrative offices only. Online classes are attended from home anywhere worldwide. CASH OR OFFLINE PAYMENT IS STRICTLY NOT ACCEPTED AT ANY PHYSICAL BRANCH.",
+        "social_media": {
+            "website": "https://www.sensationzperformingarts.com/",
+            "instagram": "https://www.instagram.com/sensationz_performing_arts/",
+            "facebook": "https://www.facebook.com/sensationz.dance/",
+            "youtube": "https://www.youtube.com/@SensationzDanceAndMusic"
+        }
+    },
+    "access_platforms": {
+        "android_app": "https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
+        "ios_app": "https://apps.apple.com/us/app/sensationz/id6761418351",
+        "website_portal": "https://shop.sensationzperformingarts.com/",
+        "supported_devices": [
+            "Mobile Phone",
+            "Laptop",
+            "Desktop",
+            "Tablet"
+        ],
+        "ios_coupon_instruction": "iOS App does not support coupon entry due to Apple App Store restrictions. Users on iOS should apply the coupon on the official website (https://shop.sensationzperformingarts.com/) and then log in to the iOS app to attend classes."
+    },
+    "universal_payment_policies": {
+        "accepted_payment_methods": [
+            "UPI",
+            "Credit/Debit Cards",
+            "Net Banking",
+            "Google Play",
+            "Apple App Store"
+        ],
+        "cash_payment_accepted": false,
+        "bank_transfer_accepted": false,
+        "no_auto_debit_guarantee": "All course fees are strictly one-time payments per package. There are NO automatic recurring debits, subscriptions, or hidden charges.",
+        "refund_policy": "Course fees once paid are strictly non-refundable under any circumstances.",
+        "transfer_policy": "Enrollments and subscriptions are valid for 1 individual only and cannot be transferred to friends or family."
+    },
+    "support_and_escalation": {
+        "agent_trigger": "*agent*",
+        "phone_number_policy": "Never share any personal employee or trainer phone numbers on chat. If a user demands a call or special assistance, direct them to type *agent* so a support coordinator can reach out.",
+        "emi_queries": "For installment or EMI requests, direct user to type *agent*."
+    }
+}

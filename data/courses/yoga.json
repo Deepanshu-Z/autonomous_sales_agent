@@ -1,0 +1,577 @@
+{
+    "_meta": {
+        "version": "3.0",
+        "course": "yoga",
+        "organization": "Sensationz Media & Arts",
+        "document_status": "active",
+        "language_support": [
+            "en",
+            "hi"
+        ],
+        "last_updated": "2025"
+    },
+    "organization": {
+        "name": "Sensationz Media & Arts",
+        "established": 2007,
+        "students_trained": "100,000+",
+        "countries_served": "18+",
+        "services_offered": [
+            "Yoga",
+            "Wellness",
+            "Dance",
+            "Fitness",
+            "Music",
+            "Spoken English",
+            "Kathak"
+        ],
+        "studio_location": "Rohini, Delhi, India",
+        "branches": [
+            {
+                "name": "Delhi Branch 1",
+                "address": "B-305, 3rd Floor, North Ex Mall, Rohini Sector-9, Delhi"
+            },
+            {
+                "name": "Delhi Branch 2",
+                "address": "A-201, 2nd Floor, North Ex Mall, Rohini Sector-9, Delhi"
+            },
+            {
+                "name": "Uttarakhand Branch",
+                "address": "House No. 178, Naul (Ward No. 3), Naukuchiatal, Bhimtal (Nainital), Uttarakhand"
+            }
+        ],
+        "important_note": "Physical branches are office addresses only. Online Yoga course is accessible from anywhere worldwide.",
+        "social_media": {
+            "website": "https://www.sensationzperformingarts.com/",
+            "instagram": "https://www.instagram.com/sensationz_performing_arts/",
+            "facebook": "https://www.facebook.com/sensationz.dance/",
+            "youtube": "https://www.youtube.com/@SensationzDanceAndMusic",
+            "google_reviews": "https://www.google.com/search?q=sensationz+media+and+arts+pvt+ltd+reviews"
+        }
+    },
+    "course_overview": {
+        "name": "Online Live Interactive Yoga",
+        "mode": "Online Only",
+        "platform": "Sensationz App",
+        "class_format": "Live and interactive",
+        "class_days": "Monday to Friday (5 days per week)",
+        "weekend_classes": false,
+        "session_duration_minutes": 60,
+        "minimum_age_years": 8,
+        "prior_experience_required": false,
+        "batch_size_range": "35 to 50 students (varies per batch)",
+        "class_language": [
+            "Hindi",
+            "English"
+        ],
+        "all_teachers_female": true,
+        "suitable_for": [
+            "Beginners",
+            "Intermediate learners",
+            "Experienced practitioners",
+            "Working professionals",
+            "Homemakers",
+            "College students"
+        ],
+        "duration_options": [
+            "1 Month",
+            "3 Months",
+            "6 Months",
+            "1 Year"
+        ],
+        "available_from_anywhere": true,
+        "recordings_available": false,
+        "certificate_provided": false,
+        "trial_classes_available": true,
+        "max_trial_classes": 3,
+        "trial_cost": "Free"
+    },
+    "access_links": {
+        "android_app": "https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
+        "ios_app": "https://apps.apple.com/us/app/sensationz/id6761418351",
+        "website_portal": "https://shop.sensationzperformingarts.com/",
+        "supported_devices": [
+            "Mobile phone",
+            "Laptop",
+            "Desktop",
+            "Tablet"
+        ],
+        "internet_required": true,
+        "note_physical_studio": "The Rohini studio is NOT where online classes are held. Students join from their own devices."
+    },
+    "pricing": {
+        "currency": "INR",
+        "gst_included_in_listed_price": false,
+        "gst_percentage": 5,
+        "gst_added_at": "Checkout in app or website",
+        "offer_mechanism": "Welcome coupon sent after profile creation in app/website",
+        "offer_applies_via": [
+            "Sensationz App",
+            "Official Website"
+        ],
+        "beginner_recommendation": "1 Month package",
+        "packages": [
+            {
+                "duration": "1 Month",
+                "duration_code": "1M",
+                "base_price": 700,
+                "offer_price": 300,
+                "coupon_code": "YOGA300",
+                "gst_on_offer": 15,
+                "total_with_gst_offer": 315,
+                "per_day_offer": "Rs.10 (offer price)"
+            },
+            {
+                "duration": "3 Months",
+                "duration_code": "3M",
+                "base_price": 1750,
+                "offer_price": 600,
+                "coupon_code": "YOGA600",
+                "gst_on_offer": 30,
+                "total_with_gst_offer": 630,
+                "per_day_offer": "Rs.6/day — less than a cup of tea"
+            },
+            {
+                "duration": "6 Months",
+                "duration_code": "6M",
+                "base_price": 3200,
+                "offer_price": 1000,
+                "coupon_code": "YOGA1000",
+                "gst_on_offer": 50,
+                "total_with_gst_offer": 1050,
+                "per_day_offer": "Rs.5.5/day"
+            },
+            {
+                "duration": "1 Year",
+                "duration_code": "1Y",
+                "base_price": 5000,
+                "offer_price": 1800,
+                "coupon_code": "YOGA1800",
+                "gst_on_offer": 90,
+                "total_with_gst_offer": 1890,
+                "per_day_offer": "Rs.5/day"
+            }
+        ],
+        "payment_methods": [
+            "UPI",
+            "Cards",
+            "Net Banking",
+            "Google Play",
+            "Apple App Store"
+        ],
+        "cash_payment_allowed": false,
+        "bank_transfer_allowed": false,
+        "emi_available": "Contact agent for details",
+        "auto_debit": false,
+        "hidden_charges": false,
+        "enrollment_transfer": false,
+        "one_payment_per_person": true,
+        "pricing_authority_note": "Do not quote any fees not listed in this document unless replaced by a newer official version."
+    },
+    "batch_timings": {
+        "total_batches": 10,
+        "flexibility_at_enrollment": "Full flexibility — choose any available slot",
+        "batch_change_policy": "Batch shift request allowed ONLY after 1 month of enrollment. Cannot change during the first month.",
+        "classes_per_day": 1,
+        "batches": [
+            {
+                "slot": "Morning",
+                "time_24h": "05:00-06:00",
+                "time_12h": "5:00 AM to 6:00 AM",
+                "instructors": [
+                    "Jagriti Mishra"
+                ]
+            },
+            {
+                "slot": "Morning",
+                "time_24h": "06:00-07:00",
+                "time_12h": "6:00 AM to 7:00 AM",
+                "instructors": [
+                    "Suman Lata",
+                    "Priya Mathur"
+                ]
+            },
+            {
+                "slot": "Morning",
+                "time_24h": "07:00-08:00",
+                "time_12h": "7:00 AM to 8:00 AM",
+                "instructors": [
+                    "Mradula"
+                ]
+            },
+            {
+                "slot": "Morning",
+                "time_24h": "08:00-09:00",
+                "time_12h": "8:00 AM to 9:00 AM",
+                "instructors": [
+                    "Sonali Dhote",
+                    "Prachi"
+                ]
+            },
+            {
+                "slot": "Morning",
+                "time_24h": "10:00-11:00",
+                "time_12h": "10:00 AM to 11:00 AM",
+                "instructors": [
+                    "Nidhi"
+                ]
+            },
+            {
+                "slot": "Afternoon",
+                "time_24h": "12:00-13:00",
+                "time_12h": "12:00 PM to 1:00 PM",
+                "instructors": [
+                    "Nidhi"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "16:00-17:00",
+                "time_12h": "4:00 PM to 5:00 PM",
+                "instructors": [
+                    "Mradula"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "17:00-18:00",
+                "time_12h": "5:00 PM to 6:00 PM",
+                "instructors": [
+                    "Mradula"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "18:00-19:00",
+                "time_12h": "6:00 PM to 7:00 PM",
+                "instructors": [
+                    "Suman Lata"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "19:00-20:00",
+                "time_12h": "7:00 PM to 8:00 PM",
+                "instructors": [
+                    "Nidhi"
+                ]
+            }
+        ],
+        "unavailable_slots": [
+            "9:00 AM to 10:00 AM",
+            "11:00 AM to 12:00 PM",
+            "1:00 PM to 4:00 PM",
+            "After 8:00 PM"
+        ],
+        "gender_specific_batches": false,
+        "earliest_batch": "5:00 AM to 6:00 AM",
+        "latest_batch": "7:00 PM to 8:00 PM"
+    },
+    "teachers": [
+        {
+            "name": "Mradula",
+            "experience_years": "13+",
+            "qualifications": [
+                "YCB Level 2 Yoga Wellness Instructor (Ministry of AYUSH, Govt of India)",
+                "YCB Level 3 Yoga Wellness Instructor (Ministry of AYUSH, Govt of India)"
+            ],
+            "certifications": [
+                "Yoga Volunteering Program (Ministry of AYUSH)",
+                "Prenatal and Postnatal Yoga and Garbhasanskar Teaching Training (Dr. Malati's Ayuryog Centre, Delhi)"
+            ],
+            "specialization": [
+                "Prenatal and Postnatal Yoga",
+                "Garbhasanskar",
+                "Mindful movement",
+                "Wellness"
+            ],
+            "assigned_batches": [
+                "7:00 AM to 8:00 AM",
+                "4:00 PM to 5:00 PM",
+                "5:00 PM to 6:00 PM"
+            ],
+            "demo_video": "https://youtu.be/vXZ6UtrWpM8?si=WYpuo8Us7xIkXT8n"
+        },
+        {
+            "name": "Suman Lata",
+            "experience_years": "4+",
+            "qualifications": [
+                "Certified in Yoga Therapy (Shubh Yoga Foundation)",
+                "200-Hour Yoga Teacher Training (Yoga Alliance, Shrikutir Yoga and Wellness, USA)"
+            ],
+            "certifications": [
+                "Certified Yoga Wellness Instructor (Yoga Certification Board, Ministry of AYUSH)"
+            ],
+            "specialization": [
+                "Yoga Therapy",
+                "Yoga Wellness",
+                "Comprehensive Teacher Training"
+            ],
+            "assigned_batches": [
+                "6:00 AM to 7:00 AM",
+                "6:00 PM to 7:00 PM"
+            ],
+            "demo_video": "https://youtu.be/IiVVdu4NkwI?si=leLgCK40Uo5Qhr0V"
+        },
+        {
+            "name": "Nidhi",
+            "experience_years": "5+",
+            "qualifications": [
+                "Post Graduation in Yoga from Arunachal University of Studies (2023)"
+            ],
+            "certifications": [
+                "Certified Yoga Professional with academic specialization in Yoga"
+            ],
+            "specialization": [
+                "Academically specialized Yoga instruction"
+            ],
+            "assigned_batches": [
+                "10:00 AM to 11:00 AM",
+                "12:00 PM to 1:00 PM",
+                "7:00 PM to 8:00 PM"
+            ],
+            "demo_video": null
+        },
+        {
+            "name": "Sonali Dhote",
+            "experience_years": "6+",
+            "qualifications": [
+                "200-Hour Yoga Teacher Training (Trisula Yoga Vedanta Training Academy)"
+            ],
+            "certifications": [
+                "Certified Yoga Teacher Training Course (Professional Yoga Teacher Training)"
+            ],
+            "specialization": [
+                "Yoga Teacher Training",
+                "Vedanta-based yoga practices"
+            ],
+            "assigned_batches": [
+                "8:00 AM to 9:00 AM"
+            ],
+            "demo_video": null
+        },
+        {
+            "name": "Priya Mathur",
+            "experience_years": "8+",
+            "qualifications": [
+                "RYTT 200-Hour Yoga Teacher Training (Sri Sri School of Yoga)",
+                "Foundation Course in Yoga (Morarji Desai National Institute of Yoga)"
+            ],
+            "certifications": [
+                "108 Surya Namaskar participant"
+            ],
+            "specialization": [
+                "RYTT 200",
+                "Foundational yoga",
+                "Traditional practices"
+            ],
+            "assigned_batches": [
+                "6:00 AM to 7:00 AM"
+            ],
+            "demo_video": "https://youtu.be/M2Zh9SaHpX4?si=RXg-HXGI5n_ftxs-"
+        },
+        {
+            "name": "Jagriti Mishra",
+            "experience_years": "6+",
+            "qualifications": [
+                "Certified Yoga Protocol Instructor (Yoga Certification Board, Ministry of AYUSH)",
+                "Certified in Yoga Science (Morarji Desai National Institute of Yoga)",
+                "200-Hour Yoga Teacher Training Course (TTC) Completed"
+            ],
+            "certifications": [
+                "Certified Yoga Protocol Instructor (Ministry of AYUSH)",
+                "Certified in Yoga Science (Morarji Desai National Institute of Yoga)"
+            ],
+            "specialization": [
+                "Yoga Protocol",
+                "Yoga Science",
+                "Structured student-focused practice"
+            ],
+            "assigned_batches": [
+                "5:00 AM to 6:00 AM"
+            ],
+            "demo_video": null
+        }
+    ],
+    "syllabus": {
+        "yoga_foundations": [
+            "Yoga Basics",
+            "Hatha Yoga",
+            "Asana Practice",
+            "Manual Yoga",
+            "Posture Correction",
+            "Desk Yoga",
+            "Surya Namaskar"
+        ],
+        "breathing_and_meditation": [
+            "Pranayama",
+            "Meditation"
+        ],
+        "fitness_yoga": [
+            "Power Yoga",
+            "Yoga for Weight Loss",
+            "Flexibility Training",
+            "Strength Building",
+            "Balance Improvement"
+        ],
+        "health_focused_yoga": [
+            "Yoga for Back Pain",
+            "Yoga for PCOS",
+            "Yoga for Stress Relief",
+            "Yoga for Flexibility and Strength",
+            "Disease Management Yoga"
+        ]
+    },
+    "course_benefits": {
+        "focus_areas": [
+            "Flexibility",
+            "Strength",
+            "Balance",
+            "Posture",
+            "Breathing Control",
+            "Mental Focus",
+            "Stress Management",
+            "Overall Fitness"
+        ],
+        "disclaimer": "These are course focus areas, not medical guarantees or cure claims."
+    },
+    "what_to_keep_ready": [
+        "Yoga Mat",
+        "Comfortable Clothing",
+        "Water Bottle",
+        "Stable Internet Connection"
+    ],
+    "trial_class": {
+        "available": true,
+        "cost": "Free",
+        "max_trials": 3,
+        "booking_platform": "Sensationz App",
+        "booking_steps": [
+            "Download the Sensationz App",
+            "Login using Continue with Google",
+            "Complete your profile (Name, Gender, Country, etc.)",
+            "Go to Profile then tap Trial Links",
+            "Select the desired trial class (e.g. Yoga)",
+            "Select preferred Timing, Days, and Teacher",
+            "Tap Confirm Trial Enrollment",
+            "Your trial will be confirmed and booked"
+        ],
+        "demo_videos": {
+            "Suman Lata": "https://youtu.be/IiVVdu4NkwI?si=leLgCK40Uo5Qhr0V",
+            "Mradula": "https://youtu.be/vXZ6UtrWpM8?si=WYpuo8Us7xIkXT8n",
+            "Priya Mathur": "https://youtu.be/M2Zh9SaHpX4?si=RXg-HXGI5n_ftxs-"
+        }
+    },
+    "enrollment": {
+        "steps": [
+            "Select preferred batch timing",
+            "Select package duration (1M / 3M / 6M / 1Y)",
+            "Download the Sensationz App or visit the website",
+            "Create your profile (login via Google)",
+            "Reply Done or Yes on WhatsApp to receive welcome coupon",
+            "Apply coupon at checkout for offer price",
+            "Complete payment"
+        ],
+        "payment_platform": "Sensationz App or official website only",
+        "coupon_delivery": "Sent via WhatsApp after profile creation",
+        "ios_coupon_note": "iOS App does not support coupon entry due to Apple restrictions. Use the website (https://shop.sensationzperformingarts.com/) to apply coupon, then login to iOS app to attend classes.",
+        "batches_start": "Ongoing — enroll anytime"
+    },
+    "policies": {
+        "refund": {
+            "refundable": false,
+            "notes": "Fees once paid are strictly non-refundable under any circumstances."
+        },
+        "leave_and_absence": {
+            "leave_permitted": false,
+            "pause_permitted": false,
+            "missed_class_carryover": false
+        },
+        "class_cancellation_by_company": {
+            "compensation": "Missed class will be rescheduled",
+            "teacher_absence": "Another teacher will conduct the class"
+        },
+        "batch_change": {
+            "allowed_after_months": 1,
+            "allowed_during_first_month": false
+        },
+        "enrollment_transfer": {
+            "transferable": false,
+            "notes": "One payment is valid for one person only"
+        },
+        "multiple_classes_per_day": false,
+        "gender_specific_batches": false,
+        "auto_debit": false,
+        "hidden_charges": false
+    },
+    "not_offered": {
+        "course_types": [
+            "Prenatal Yoga",
+            "Postnatal Yoga",
+            "Kids Yoga",
+            "1-on-1 private classes",
+            "Offline / in-person classes"
+        ],
+        "other": [
+            "Recordings of live classes",
+            "Course completion certificate",
+            "Leave or class pause",
+            "Refunds",
+            "Diet plans (general suggestions may be given by teachers)"
+        ],
+        "face_yoga_note": "Face Yoga is a separate course and not included in the general online Yoga classes.",
+        "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
+    },
+    "health_and_medical": {
+        "covered_topics": [
+            "Back Pain (yoga-focused)",
+            "PCOS (yoga-focused)",
+            "Stress Relief",
+            "Disease Management",
+            "Flexibility and Strength"
+        ],
+        "medical_disclaimer": "Course is for general wellness only. Not a substitute for medical treatment. Advise users to consult a doctor for medical conditions.",
+        "prenatal_yoga_instruction": "Do NOT mention Mradula's prenatal certification when answering about Prenatal Yoga. Simply state we do not currently offer it."
+    },
+    "support_and_escalation": {
+        "human_agent_trigger": "User types *agent*",
+        "human_agent_action": "Conversation assigned to team member who will reach out shortly",
+        "phone_numbers": "Do NOT share any personal phone numbers. Direct to agent flow only.",
+        "emi_queries": "Direct to agent",
+        "coupon_queries": "Direct to enrollment flow first, then agent if needed"
+    },
+    "other_courses": {
+        "available": true,
+        "course_list": [
+            "Dance",
+            "Kathak",
+            "Fitness",
+            "Music",
+            "Singing",
+            "Guitar",
+            "Keyboard",
+            "Drawing",
+            "Acting",
+            "Aerobics",
+            "Zumba",
+            "Spoken English",
+            "Face Yoga",
+            "Tummy Yoga",
+            "Meditation"
+        ],
+        "details_via": [
+            "Sensationz App",
+            "Website: https://shop.sensationzperformingarts.com/"
+        ],
+        "support_note": "For details on other courses, direct user to the app/website, or ask them to type *agent*."
+    },
+    "ai_behavior_rules": {
+        "instructor_inference": "NEVER infer one batch's instructor for another batch. Each batch has a fixed assigned instructor.",
+        "pricing_authority": "Only quote prices listed in this document.",
+        "medical_claims": "Never make medical guarantees, cure claims, or give personalized prescriptions.",
+        "prenatal_teacher_mention": "Do NOT mention Mradula's prenatal certification in response to Prenatal Yoga questions.",
+        "refund_promise": "NEVER promise refunds or exceptions under any circumstances.",
+        "common_sense_gap_fill": "If a question is not directly covered but adjacent to KB data, use reasoning grounded in KB context. Do not contradict any KB fact.",
+        "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
+        "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/"
+    }
+}

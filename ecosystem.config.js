@@ -16,7 +16,7 @@ module.exports = {
     },
     {
       name: "whatsapp-followup-worker",
-      script: "follow_up_worker.py",
+      script: "src/workers/follow_up_worker.py",
       interpreter: "python3", // Path to python or virtualenv (e.g., "./venv/bin/python3")
       autorestart: true,
       restart_delay: 5000,

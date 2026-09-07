@@ -1,4 +1,9 @@
 {
+    "_meta": {
+        "version": "1.0",
+        "scope": "GLOBAL — shared across every Sensationz course. Merged into every course payload by kb_loader.",
+        "last_updated": "2026"
+    },
     "organization": {
         "name": "Sensationz Media & Arts Pvt Ltd",
         "established": 2007,
@@ -24,7 +29,8 @@
             "website": "https://www.sensationzperformingarts.com/",
             "instagram": "https://www.instagram.com/sensationz_performing_arts/",
             "facebook": "https://www.facebook.com/sensationz.dance/",
-            "youtube": "https://www.youtube.com/@SensationzDanceAndMusic"
+            "youtube": "https://www.youtube.com/@SensationzDanceAndMusic",
+            "google_reviews": "https://www.google.com/search?q=sensationz+media+and+arts+pvt+ltd+reviews"
         }
     },
     "access_platforms": {
@@ -37,6 +43,8 @@
             "Desktop",
             "Tablet"
         ],
+        "internet_required": true,
+        "note_physical_studio": "The Rohini studio is NOT where online classes are held. Students join from their own devices.",
         "ios_coupon_instruction": "iOS App does not support coupon entry due to Apple App Store restrictions. Users on iOS should apply the coupon on the official website (https://shop.sensationzperformingarts.com/) and then log in to the iOS app to attend classes."
     },
     "universal_payment_policies": {
@@ -50,12 +58,55 @@
         "cash_payment_accepted": false,
         "bank_transfer_accepted": false,
         "no_auto_debit_guarantee": "All course fees are strictly one-time payments per package. There are NO automatic recurring debits, subscriptions, or hidden charges.",
+        "emi_available": "Contact agent for details",
         "refund_policy": "Course fees once paid are strictly non-refundable under any circumstances.",
-        "transfer_policy": "Enrollments and subscriptions are valid for 1 individual only and cannot be transferred to friends or family."
+        "transfer_policy": "Enrollments and subscriptions are valid for 1 individual only and cannot be transferred to friends or family.",
+        "pricing_authority_note": "Only quote prices listed in the active course's own pricing data. Never invent fees."
+    },
+    "universal_course_policies": {
+        "leave_and_absence": {
+            "leave_permitted": false,
+            "pause_permitted": false,
+            "missed_class_carryover": false
+        },
+        "class_cancellation_by_company": {
+            "compensation": "Missed class will be rescheduled",
+            "teacher_absence": "Another teacher will conduct the class, or the class will be rescheduled"
+        },
+        "batch_change": {
+            "allowed_after_months": 1,
+            "allowed_during_first_month": false
+        },
+        "multiple_classes_per_day": false,
+        "gender_specific_batches": false
+    },
+    "universal_enrollment_flow": {
+        "steps": [
+            "Select preferred batch timing",
+            "Select package duration (1M / 3M / 6M / 1Y)",
+            "Download the Sensationz App or visit the website",
+            "Create your profile (login via Google)",
+            "Reply Done or Yes on WhatsApp to receive welcome coupon",
+            "Apply coupon at checkout for offer price",
+            "Complete payment"
+        ],
+        "payment_platform": "Sensationz App or official website only",
+        "coupon_delivery": "Sent via WhatsApp after profile creation"
     },
     "support_and_escalation": {
-        "agent_trigger": "*agent*",
-        "phone_number_policy": "Never share any personal employee or trainer phone numbers on chat. If a user demands a call or special assistance, direct them to type *agent* so a support coordinator can reach out.",
-        "emi_queries": "For installment or EMI requests, direct user to type *agent*."
+        "human_agent_trigger": "User types *agent*",
+        "human_agent_action": "Conversation assigned to team member who will reach out shortly",
+        "phone_numbers": "Do NOT share any personal phone numbers. Direct to agent flow only.",
+        "emi_queries": "Direct to agent",
+        "coupon_queries": "Direct to enrollment flow first, then agent if needed"
+    },
+    "ai_behavior_rules": {
+        "instructor_inference": "NEVER infer one batch's instructor for another batch. Each batch has a fixed assigned instructor.",
+        "pricing_authority": "Only quote prices listed in the active course's KB data.",
+        "medical_claims": "Never make medical guarantees, cure claims, or give personalized prescriptions.",
+        "refund_promise": "NEVER promise refunds or exceptions under any circumstances.",
+        "common_sense_gap_fill": "If a question is not directly covered but adjacent to KB data, use reasoning grounded in KB context. Do not contradict any KB fact.",
+        "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
+        "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/"
     }
 }

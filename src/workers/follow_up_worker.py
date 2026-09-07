@@ -27,17 +27,7 @@ supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 redis_conn = get_redis_connection()
 
 POLL_INTERVAL = 30  # seconds between sweeps
-PRIORITY_AGENT_EMAIL_ANOTHER_1 = os.getenv("PRIORITY_AGENT_EMAIL_ANOTHER_1")
-PRIORITY_AGENT_EMAIL_ANOTHER_2 = os.getenv("PRIORITY_AGENT_EMAIL_ANOTHER_2")
-AGENT_POOL = [e for e in [PRIORITY_AGENT_EMAIL_ANOTHER_1, PRIORITY_AGENT_EMAIL_ANOTHER_2] if e]
-
-
-def get_next_agent_email() -> tuple:
-    if not AGENT_POOL:
-        return os.getenv("PRIORITY_AGENT_EMAIL"), 0
-    counter = redis_conn.incr("agent_round_robin_counter")
-    index = (counter - 1) % len(AGENT_POOL)
-    return AGENT_POOL[index], index
+from src.services.agent_handoff import get_next_agent_email
 
 
 from datetime import datetime, timezone

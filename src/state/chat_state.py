@@ -491,10 +491,11 @@ def detect_timing_from_text(text: str, course_id: str = "yoga") -> tuple:
     return None, False, ""
 
 
-def resolve_llm_reply_tags(reply: str, state: dict, course_id: str = "yoga") -> tuple[bool, str]:
+def resolve_llm_reply_tags(reply: str, state: dict, course_id: str = "yoga", user_text: str = "") -> tuple[bool, str]:
     """
     Detects semantic action tags and coupon codes emitted by the LLM.
     1. If [UNLOCK_COUPON] is present:
+       - Checks user_text to ensure customer was not merely asking where/how to create a profile.
        - Marks state: profile_created=True, app_installed=True, coupon_sent=True, stage="COUPON_SENT"
        - Replaces [UNLOCK_COUPON] with the secret coupon code & checkout instructions
          via coupons.format_coupon_unlock_delivery().
@@ -510,6 +511,16 @@ def resolve_llm_reply_tags(reply: str, state: dict, course_id: str = "yoga") -> 
 
     resolved_reply = reply
     did_unlock = False
+
+    # Guard: If user was asking WHERE or HOW to create a profile (e.g. 'kha bnani h', 'kaise banaye'),
+    # any [UNLOCK_COUPON] is a false-positive hallucination and must NOT be unlocked.
+    if user_text:
+        u_clean = user_text.lower().strip()
+        has_help_word = any(w in u_clean for w in ["kha", "kahan", "kaha", "where", "kaise", "how", "kidhar", "link", "steps", "bnani", "banani"])
+        has_completion_word = any(w in u_clean for w in ["banadi", "bna di", "bana di", "ho gaya", "done", "created", "completed", "sign up kar", "account bana", "registered"])
+        if has_help_word and not has_completion_word:
+            resolved_reply = resolved_reply.replace("[UNLOCK_COUPON]", "").strip()
+            return False, resolved_reply
 
     # 1. Check for [UNLOCK_COUPON] action tag
     if "[UNLOCK_COUPON]" in resolved_reply:

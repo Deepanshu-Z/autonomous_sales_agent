@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.core import prompt, kb_loader
 from src.core.coupons import get_all_coupon_codes, build_coupon_context
 from src.state.chat_state import sync_state_from_llm_reply, resolve_llm_reply_tags
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_openai import ChatOpenAI
 
 
 def test_prompt_secret_isolation_when_locked():
@@ -216,6 +218,41 @@ async def test_live_llm_correct_6_month_coupon_when_unlocked():
     assert "WELCOME300" not in reply, f"Hallucinated WELCOME300, got:\n{reply}"
 
 
+async def test_live_llm_no_unlock_on_where_to_make():
+    """Confirms user asking 'kha bnani h' does NOT leak coupon codes or unlock profile."""
+    state = {"stage": "NEW", "profile_created": False, "coupon_sent": False}
+    sys_content = prompt.format_system_prompt(state, course_id="yoga")
+
+    last_ai = "The fees for our Yoga courses are 1 Month: 300 offer price. Coupon codes unlock only after profile registration."
+    user_msg = "kha bnani h"
+
+    messages = [
+        SystemMessage(content=sys_content),
+        HumanMessage(content="fees"),
+        AIMessage(content=last_ai),
+        HumanMessage(content=(
+            f"--- IMMEDIATE CONTEXT ---\n"
+            f"AI's Last Message: \"{last_ai}\"\n"
+            f"Customer's Current Reply: \"{user_msg}\"\n\n"
+            "INSTRUCTION:\n"
+            "1. Analyze the customer's reply specifically in context of the AI's last message.\n"
+            "2. Follow all welcome coupon and profile rules from the system prompt.\n"
+            "3. STRICT LANGUAGE & SCRIPT MATCHING: Match the exact language AND script of Customer's Current Reply.\n"
+        ))
+    ]
+
+    llm = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o"), temperature=0.3)
+    resp = await llm.ainvoke(messages)
+    raw_reply = resp.content.strip()
+
+    did_unlock, resolved_reply = resolve_llm_reply_tags(raw_reply, state, course_id="yoga", user_text=user_msg)
+
+    assert did_unlock is False, f"Expected did_unlock to be False on 'kha bnani h', got True! Raw reply was:\n{raw_reply}"
+    assert state["profile_created"] is False
+    assert state["coupon_sent"] is False
+    assert "YOGA300" not in resolved_reply, f"Coupon code leaked on question 'kha bnani h':\n{resolved_reply}"
+
+
 async def main():
     print("==================================================")
     print("  RUNNING COUPON SECRET GATING SECURITY TESTS     ")
@@ -248,8 +285,12 @@ async def main():
     await test_live_llm_correct_6_month_coupon_when_unlocked()
     print("   PASSED: YOGA1000 correctly delivered for 6 Months (not YOGA300 or WELCOME300)!")
 
+    print("\n8. Testing Live LLM: Question 'kha bnani h' does NOT unlock coupon...")
+    await test_live_llm_no_unlock_on_where_to_make()
+    print("   PASSED: Zero coupon codes revealed on question 'kha bnani h'!")
+
     print("\n==================================================")
-    print("  ALL 7 SECURITY & UNLOCK TESTS PASSED 100%!     ")
+    print("  ALL 8 SECURITY & UNLOCK TESTS PASSED 100%!     ")
     print("==================================================")
 
 

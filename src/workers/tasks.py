@@ -9,7 +9,10 @@ KEY CONCURRENCY DESIGN:
 - Redis INCR-based round-robin for agent assignment (atomic, no global lock).
 """
 
+import sys
 import os
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 import time
 import asyncio
 import json
@@ -40,11 +43,14 @@ from src.core.rag import ask_rag_async, stream_rag
 from src.services.redis_client import get_redis_connection
 from src.core.sales_followup import get_sales_followup
 from src.services.agent_summary import send_agent_summary_async
+from src.services.agent_handoff import execute_agent_handoff_async, get_next_agent_email
+from src.core.refusal_engine import evaluate_refusal_async
+from src.core.contextual_followup import generate_contextual_followup_async
 from src.core.coupons import (
     format_coupon_banner, get_all_coupon_codes, get_coupon_details,
     detect_package_from_text
 )
-from src.core.intent_classifier import classify_coupon_and_profile_intent, classify_post_link_intent
+from src.core.intent_classifier import classify_coupon_and_profile_intent, classify_post_link_intent, is_app_link_request
 import re
 from src.core import kb_loader
 
@@ -361,6 +367,19 @@ def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = 
         except Exception:
             pass
 
+    # Check TEST_MODE / ALLOWED_TEST_NUMBERS bypass for direct WhatsApp testing
+    if os.getenv("TEST_MODE", "").strip().lower() in ("true", "1", "yes"):
+        print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: TEST_MODE is enabled in environment")
+        return True
+
+    allowed_raw = os.getenv("ALLOWED_TEST_NUMBERS", "").strip()
+    if allowed_raw and phone:
+        allowed_test = [p.strip().replace("+", "") for p in allowed_raw.split(",") if p.strip()]
+        clean_phone = phone.replace("+", "").strip()
+        if clean_phone in allowed_test:
+            print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: Whitelisted in ALLOWED_TEST_NUMBERS")
+            return True
+
     target_ad = (TARGET_AD_ID or os.getenv("TARGET_AD_ID") or "").strip()
 
     if isinstance(referral_data, str):
@@ -392,33 +411,18 @@ def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = 
 
 
 # ---------------------------------------------------------------------------
-# Agent handoff (async)
+# Agent handoff (async) — delegates to reusable agent_handoff service
 # ---------------------------------------------------------------------------
-async def handle_agent_handoff_async(phone: str, start_time: float = None):
+async def handle_agent_handoff_async(phone: str, start_time: float = None, reply: str = None, escalation_reason: str = "Customer ne 'agent' type kiya"):
     """Handles customer request to talk to a human / call support — fully async."""
     print(f"[tasks] Agent requested by {phone}")
-    reply = (
-        "Connecting you with our support team! 🙏\n\n"
-        "Aapki request humari team tak pahunch gayi hai. "
-        "Ek team member aapse jald connect karenge 😊"
-    )
-
-    agent, agent_index = get_next_agent_email()
-    if agent:
-        await assign_chat_to_agent_async(phone, agent)
-        await send_text_message_async(phone, reply)
-        await mark_escalated_async(phone)
-        asyncio.create_task(log_message_async(phone, "agent", reply))
-        # Send Hinglish summary to the assigned agent's WhatsApp number
-        asyncio.create_task(
-            send_agent_summary_async(phone, agent_index, escalation_reason="Customer ne 'agent' type kiya")
+    if not reply:
+        reply = (
+            "Connecting you with our support team! 🙏\n\n"
+            "Aapki request humari team tak pahunch gayi hai. "
+            "Ek team member aapse jald connect karenge 😊"
         )
-    else:
-        await send_text_message_async(phone, reply)
-
-    latency_sec = round(time.time() - start_time, 2) if start_time else None
-    print(f"[TIMING] {phone} agent_handoff TOTAL: {latency_sec}s")
-    asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
+    await execute_agent_handoff_async(phone, user_reply_text=reply, escalation_reason=escalation_reason, start_time=start_time)
 
 
 def is_info_intent(text: str) -> bool:
@@ -769,50 +773,42 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     is_fresh_timing_selected = (prev_stage != "TIMING_SELECTED" and state["stage"] == "TIMING_SELECTED")
     is_fresh_package_selected = (prev_stage != "PACKAGE_SELECTED" and state["stage"] == "PACKAGE_SELECTED")
 
-    # ── DISINTEREST CHECK ── Must run BEFORE any stage guard so it intercepts first.
-    # Handles: 'im not interested', 'not intersted' (typo), 'nahi chahiye', etc.
-    if is_disinterest and not state.get("disinterest_asked_feedback"):
-        state["disinterest_asked_feedback"] = True
+    # ── INTELLIGENT REFUSAL, RISK & RESOLUTION EVALUATION ───────────────────────
+    # Reusable component: checks for course refusal, asks missing reason, resolves via KB,
+    # or immediately triggers agent handoff if legal risk, safety risk, or unresolvable.
+    refusal_eval = await evaluate_refusal_async(text, history, state)
+    res_type = refusal_eval.get("resolution_type")
+
+    if res_type == "ESCALATE_TO_AGENT":
+        reply_msg = _format_for_whatsapp(
+            refusal_eval.get("reply_message")
+            or "We have listened to your query and understand your concern. Connecting you with our support team specialist..."
+        )
+        esc_reason = refusal_eval.get("escalation_reason") or "Customer refusal / risk"
+        state["awaiting_refusal_reason"] = False
+        await save_user_state_async(phone, state)
+        await execute_agent_handoff_async(phone, user_reply_text=reply_msg, escalation_reason=esc_reason, start_time=start_time)
+        return
+    elif res_type == "ASK_REASON":
+        state["awaiting_refusal_reason"] = True
         arm_followup_timer(state, topic=text)
         await save_user_state_async(phone, state)
-        reply = _feedback_request_msg(text)
-        await send_text_message_async(phone, reply)
+        reply_msg = _format_for_whatsapp(refusal_eval.get("reply_message") or "")
+        await send_text_message_async(phone, reply_msg)
         latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply))
+        asyncio.create_task(save_message_async(phone, "assistant", reply_msg, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "ai", reply_msg))
         return
-
-    if state.get("disinterest_asked_feedback"):
-        state["disinterest_asked_feedback"] = False
+    elif res_type == "PROVIDE_SOLUTION":
+        state["awaiting_refusal_reason"] = False
+        arm_followup_timer(state, topic=text)
         await save_user_state_async(phone, state)
-        if is_disinterest:
-            # User still not interested — graceful exit, no pressure
-            hindi_markers = ["nahi", "nhi", "mat", "abhi", "kya", "hai", "bhi", "se"]
-            has_devanagari = any("\u0900" <= ch <= "\u097F" for ch in text)
-            has_hindi_word = any(w in text_lower.split() for w in hindi_markers)
-            if has_devanagari or has_hindi_word:
-                reply = "Theek hai, samajh gaye! 🙏 Jab bhi mann kare, hum yahaan hain."
-            else:
-                reply = "Totally understood! 🙏 We're here whenever you're ready."
-            reset_follow_up_timer(state)
-            await save_user_state_async(phone, state)
-            await send_text_message_async(phone, reply)
-            latency_sec = round(time.time() - start_time, 2) if start_time else None
-            # Fire-and-forget background logging
-            asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-            asyncio.create_task(log_message_async(phone, "ai", reply))
-            return
-        # User shared their reason — fall through to RAG with gentle context hint
-        history = list(history) + [{
-            "role": "system",
-            "content": (
-                "The customer had previously expressed disinterest. They have now shared a reason. "
-                "Gently address their specific concern and show how Sensationz can help, "
-                "without being pushy. Do NOT force them. Keep it warm and helpful. "
-                "End with an open invitation, not a hard sell."
-            )
-        }]
+        reply_msg = _format_for_whatsapp(refusal_eval.get("reply_message") or "")
+        await send_text_message_async(phone, reply_msg)
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", reply_msg, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "ai", reply_msg))
+        return
     # ── TRIAL / DEMO REQUEST HANDLER (Pure procedural requests only; informational queries go to RAG) ──
     _PURE_TRIAL_BOOKING_KWS = [
         "trial book", "book trial", "trial lena hai", "demo lena hai", "trial kaise book karein",
@@ -1027,7 +1023,9 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         state["package"] = detected_pkg
         state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
 
-    profile_just_completed = (not is_complaint_or_refund_msg) and (
+    _is_app_link = is_app_link_request(text) or (_intent.get("intent") == "APP_LINK_REQUEST")
+
+    profile_just_completed = (not is_complaint_or_refund_msg) and (not _is_app_link) and (
         _intent.get("is_profile_done") or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE" and not _intent.get("is_coupon_request"))
     )
     if profile_just_completed:
@@ -1035,12 +1033,49 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         state["profile_created"] = True
         state["stage"] = advance_stage(state["stage"], "PROFILE_COMPLETED")
 
-    _is_explicit_coupon_ask = (not is_complaint_or_refund_msg) and (
+    _is_explicit_coupon_ask = (not is_complaint_or_refund_msg) and (not _is_app_link) and (
         _intent.get("is_coupon_request") or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE")
     )
 
     hindi_markers = ["kya", "hai", "bhejo", "batao", "do", "kaha", "kha", "dobara", "phir", "fhrse", "mujhe", "konsa", "dega", "nhi", "nahi", "bhai", "dena"]
     has_hindi = any(w in text_lower for w in hindi_markers) or any("\u0900" <= ch <= "\u097F" for ch in text)
+
+    # ── Deterministic App Link Dispatcher ────────────────────────────────────
+    if _is_app_link:
+        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
+        arm_followup_timer(state, topic="app download")
+        await save_user_state_async(phone, state)
+
+        pkg_prefix_hi = f"Aapne {state.get('package')} package select kiya hai. 👍\n\n" if state.get("package") else ""
+        pkg_prefix_en = f"You've selected the {state.get('package')} package. 👍\n\n" if state.get("package") else ""
+
+        if has_hindi:
+            reply = (
+                f"{pkg_prefix_hi}"
+                "Ye rahe Sensationz App aur website portal ke direct download links 📱✨\n\n"
+                "📱 Android (Play Store): https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                "🍎 iOS (App Store): https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/\n\n"
+                "App download karein ya website visit karke apni profile complete karein. "
+                "Uske baad yahan *Done* ya *Yes* reply karein, aur main turant aapka special welcome discount coupon code yahan bhej dunga! 🎁"
+            )
+        else:
+            reply = (
+                f"{pkg_prefix_en}"
+                "Here are the download links for the Sensationz App and our website portal 📱✨\n\n"
+                "📱 Android (Play Store): https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                "🍎 iOS (App Store): https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/\n\n"
+                "Please download the app or visit our website, complete your profile, and once done, "
+                "reply *Done* or *Yes* here to receive your special welcome discount coupon code! 🎁"
+            )
+
+        reply = _format_for_whatsapp(reply)
+        await send_text_message_async(phone, reply)
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "ai", reply))
+        return
 
     is_frustrated_coupon_ask = (
         (not is_complaint_or_refund_msg)
@@ -1062,6 +1097,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     # In post-link stages or after profile creation, any affirmation / coupon request delivers the coupon banner immediately
     should_send_coupon_now = (
         (not is_complaint_or_refund_msg)
+        and (not _is_app_link)
         and not is_pure_question
         and (
             (_is_explicit_coupon_ask and (state.get("profile_created") or is_post_link_stage))
@@ -1132,7 +1168,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     # Resolve system action tags ([UNLOCK_COUPON]) and sync session state
     from src.state.chat_state import resolve_llm_reply_tags
     active_course = state.get("course") or "yoga"
-    did_unlock, full_reply = resolve_llm_reply_tags(full_reply, state, course_id=active_course)
+    did_unlock, full_reply = resolve_llm_reply_tags(full_reply, state, course_id=active_course, user_text=text)
 
     # Strip any "type agent" line the LLM generated, count it silently,
     # only resurface after 2 CONSECUTIVE flagged replies.
@@ -1174,19 +1210,12 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
 
     # Format full_reply and followup_separate for WhatsApp rendering
     full_reply = _format_for_whatsapp(full_reply)
-    if followup_separate:
-        followup_separate = _format_for_whatsapp(followup_separate)
-
-    # Compute sales follow-up question (independent of stage follow-up)
-    # get_sales_followup() handles all topic suppression internally (medical, refund, complaint, agent)
-    sales_followup_q = get_sales_followup(text, full_reply, state)
-
-    if followup_separate:
-        # followup_separate (enrollment step) takes priority over sales question
-        # on the same turn — avoid sending 3 messages when 2 are already enough.
-        sales_followup_q = None
-    if sales_followup_q:
-        sales_followup_q = _format_for_whatsapp(sales_followup_q)
+    # Compute dynamic contextual follow-up message (Message 2) with curiosity & questions
+    # to engage the customer, unless stage follow-up (e.g. package selection) is already active.
+    if not followup_separate:
+        dynamic_followup = await generate_contextual_followup_async(text, full_reply, history, state)
+        if dynamic_followup:
+            followup_separate = _format_for_whatsapp(dynamic_followup)
 
     t_send = time.perf_counter()
     if followup_separate:
@@ -1195,15 +1224,6 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         await send_text_message_async(phone, followup_separate)
         combined = full_reply + "\n\n" + followup_separate
         print(f"[TIMING] {phone} interakt_send (2-msg): {time.perf_counter() - t_send:.2f}s")
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging to Supabase and CSV without blocking user reply
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined, sources=rag_sources, retrieval_query=rag_retrieval_query))
-    elif sales_followup_q:
-        await send_text_message_async(phone, full_reply)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, sales_followup_q)
-        combined = full_reply + "\n\n" + sales_followup_q
         latency_sec = round(time.time() - start_time, 2) if start_time else None
         # Fire-and-forget background logging to Supabase and CSV without blocking user reply
         asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))

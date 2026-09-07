@@ -65,8 +65,7 @@ def test_prompt_generation():
     prompt_new = prompt.format_system_prompt({"stage": "NEW"})
     tokens_new = len(enc.encode(prompt_new))
     assert "Profile Created: PENDING" in prompt_new, "Profile should be PENDING for new users"
-    assert "OFFICIAL COURSE DATA" in prompt_new, "COURSE_DATA block missing"
-    assert "YOGA300" in prompt_new, "Course coupon codes should be provided dynamically"
+    assert "YOGA300" not in prompt_new, "Course coupon codes should be securely gated for new users"
     assert tokens_new < 5000, f"Prompt token count {tokens_new} exceeds 5,000 threshold"
     print(f"  -> New session prompt generated: {tokens_new} tokens (Under 5k budget, Profile PENDING).")
 

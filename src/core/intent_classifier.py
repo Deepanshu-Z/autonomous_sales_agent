@@ -35,7 +35,7 @@ def _get_classifier_llm():
     if _classifier_llm is None:
         from langchain_openai import ChatOpenAI
         _classifier_llm = ChatOpenAI(
-            model="gpt-4.1-nano",
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
             api_key=os.getenv("OPENAI_API_KEY"),
             temperature=0,
             timeout=10,
@@ -56,6 +56,62 @@ _COUPON_REGEX = re.compile(r"\b[ckq][aeou]{1,3}p[aeou]{0,2}n[a-z]{0,4}\b", re.IG
 
 # ── Unified Post-Link Classification Prompt ──────────────────────────────
 
+def is_app_link_request(text: str) -> bool:
+    """
+    Detects if the user is asking to receive or resend the app download link or website link.
+    e.g. 'Send me the app link', 'app link bhejo', 'link please', 'download link', 'where is the link'.
+    Guards against completions ('downloaded', 'install kar liya') and errors ('link not working').
+    """
+    if not text:
+        return False
+    t = text.lower().strip()
+
+    # Guard 1: Completion signals — NOT a request
+    if any(re.search(p, t) for p in [
+        r"\b(download|install)\s*(?:kar|kr)?\s*(?:liya|lia|diya|dia|li|di)\b",
+        r"\b(download|install)\s*ho\s*(?:gaya|gya|gayi|gai)\b",
+        r"\b(downloaded|installed)\b",
+        r"\b(app\s*done|app\s*download\s*done)\b"
+    ]):
+        return False
+
+    # Guard 2: Complaints / Not working / Error
+    if any(w in t for w in ["nahi chal raha", "nhi chal raha", "not working", "not opening", "error", "issue", "open nahi ho raha", "open nhi ho raha"]):
+        return False
+
+    # Explicit link request patterns
+    LINK_REQUEST_PATTERNS = [
+        # English / generic
+        r"\b(?:send|give|share|provide|need|want|get|resend)\b.*?\b(?:app\s*link|download\s*link|website\s*link|play\s*store\s*link|app\s*store\s*link|link|apk|url)\b",
+        r"\b(?:app\s*link|download\s*link|website\s*link|play\s*store\s*link|app\s*store\s*link)\b.*?\b(?:please|plz|send|give|share|provide)?\b",
+        r"\b(?:where\s*(?:is|can\s*i)\b.*?\b(?:app|link|download))\b",
+        r"\b(?:how\s*(?:to|can\s*i)\b.*?\b(?:download|install)\b.*?\b(?:app)?)\b",
+        # Hindi / Hinglish
+        r"\b(?:app|download|website|play\s*store|app\s*store)?\s*(?:ka|ki|ke)?\s*link\s*(?:bhejo|bhejo|bjhdo|bhej\s*do|do|de\s*do|dedo|send\s*karo|send\s*kardo|share\s*karo|share\s*kardo|please|plz|chahiye|mang\s*raha)\b",
+        r"\b(?:link|app\s*link)\s*(?:nahi|nhi)\s*(?:mila|aaya|aayi)\b",
+        r"\b(?:kahan|kha|kidhar)\s*(?:se|par)?\s*(?:download|install)\s*(?:karein|kare|kru|hoga)\b",
+        r"\b(?:download|install)\s*(?:kahan|kha|kidhar)\s*(?:se|par)?\s*(?:karein|kare|kru|hoga)\b",
+        r"\b(?:app|application)\s*(?:bhejo|bjhdo|bhej\s*do|send\s*karo|send\s*kardo|share\s*karo)\b",
+    ]
+
+    if any(re.search(p, t) for p in LINK_REQUEST_PATTERNS):
+        return True
+
+    # Standalone quick phrases
+    _EXACT_OR_SHORT = [
+        "app link", "app link please", "app link plz", "send link", "send app link",
+        "link bhejo", "link bjhdo", "link do", "link de do", "link please", "link plz",
+        "download link", "download link please", "website link", "web link",
+        "app ka link", "app ki link", "app link send", "link send", "link send karo",
+        "link send kar do", "link chahiye", "app download", "download app"
+    ]
+    words = re.findall(r"\w+", t)
+    if t in _EXACT_OR_SHORT or (len(words) <= 5 and any(phrase in t for phrase in ["app link", "download link", "link bhejo", "link do", "send link", "link please"])):
+        return True
+
+    return False
+
+
 _UNIFIED_CLASSIFIER_SYSTEM_PROMPT = """You classify incoming customer WhatsApp messages for Sensationz performing arts & wellness academy.
 The customer may write in Hindi, Hinglish, or English with typos, abbreviations, or informal slang.
 
@@ -64,7 +120,12 @@ The AI just sent app download & website links and instructed: "Download Sensatio
 
 TASK:
 Classify the customer's message into EXACTLY ONE primary intent:
-1. "COUPON_OR_PROFILE_DONE":
+1. "APP_LINK_REQUEST":
+   - Customer asks to receive, view, or resend the app download link or website link ("send me the app link", "app link bhejo", "link please", "download link", "play store link", "where is the app link", "kahan se download karein", "link do").
+2. "COUPON_OR_PROFILE_DONE":
+   - Customer states they completed the task/signup/profile ("hn hn hgya h", "krdia na", "done", "yes", "bana li", "ho gaya", "created", "sab kar diya").
+   - OR customer asks to receive/view their coupon code ("coupon to bjho", "code do", "send coupon", "1y ka coupon bjhdo", "konsa coupon rhga", "bhai code do").
+   - STRICT RULE: Requesting the app link or download link is "APP_LINK_REQUEST", NEVER "COUPON_OR_PROFILE_DONE"!
    - Customer states they completed the task/signup/profile/download ("hn hn hgya h", "krdia na", "done", "yes", "bana li", "ho gaya", "created", "sab kar diya").
    - OR customer asks to receive/view their coupon code ("coupon to bjho", "code do", "send coupon", "1y ka coupon bjhdo", "konsa coupon rhga", "bhai code do").
 2. "QUESTION":
@@ -81,7 +142,7 @@ Also extract course package duration if mentioned (e.g. "1 Month", "3 Months", "
 
 Return ONLY strict JSON:
 {
-    "intent": "COUPON_OR_PROFILE_DONE" | "QUESTION" | "DISINTEREST" | "AGENT" | "OTHER",
+    "intent": "APP_LINK_REQUEST" | "COUPON_OR_PROFILE_DONE" | "QUESTION" | "DISINTEREST" | "AGENT" | "OTHER",
     "is_coupon_request": bool,
     "is_profile_done": bool,
     "package": string | null
@@ -101,8 +162,11 @@ async def _llm_classify_unified(text: str, course_id: str = "yoga") -> dict:
         from src.core.coupons import normalize_package_name
         pkg_raw = data.get("package")
         resolved_pkg = normalize_package_name(pkg_raw, course_id=course_id) if pkg_raw else None
+        intent = str(data.get("intent", "OTHER"))
+        if intent == "APP_LINK_REQUEST":
+            return {"intent": "APP_LINK_REQUEST", "is_coupon_request": False, "is_profile_done": False, "package": None}
         return {
-            "intent": str(data.get("intent", "OTHER")),
+            "intent": intent,
             "is_coupon_request": bool(data.get("is_coupon_request", False)),
             "is_profile_done": bool(data.get("is_profile_done", False)),
             "package": resolved_pkg,
@@ -124,6 +188,16 @@ async def classify_coupon_and_profile_intent(
     """
     Hybrid intent classifier for backward compatibility and fast paths.
     """
+    # ── Fast Path: App link request ──
+    if is_app_link_request(text):
+        return {
+            "intent": "APP_LINK_REQUEST",
+            "is_coupon_request": False,
+            "is_profile_done": False,
+            "is_coupon_info": False,
+            "package": None,
+        }
+
     # ── Fast Path: If regex already clearly resolved profile or coupon request ──
     if regex_profile_result or regex_coupon_result:
         return {
@@ -152,9 +226,18 @@ async def classify_post_link_intent(
     regex_profile_result: bool = False,
 ) -> dict:
     """
-    Unified 2-path router after app links are sent:
-    Routes directly to COUPON_OR_PROFILE_DONE, QUESTION, DISINTEREST, or AGENT.
+    Unified router after app links are sent:
+    Routes directly to APP_LINK_REQUEST, COUPON_OR_PROFILE_DONE, QUESTION, DISINTEREST, or AGENT.
     """
+    # 0. Fast path: App link request
+    if is_app_link_request(text):
+        return {
+            "intent": "APP_LINK_REQUEST",
+            "is_coupon_request": False,
+            "is_profile_done": False,
+            "package": None,
+        }
+
     # 1. Fast path: If regex confirms profile done or coupon ask
     if regex_profile_result or regex_coupon_result:
         return {

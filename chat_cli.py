@@ -26,7 +26,7 @@ from src.core.coupons import detect_package_from_text
 
 # Initialize OpenAI LLM
 llm = ChatOpenAI(
-    model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
     api_key=os.getenv("OPENAI_API_KEY"),
     temperature=0.3,
     timeout=30,
@@ -160,7 +160,7 @@ async def chat_session():
             "INSTRUCTION:\n"
             "1. Analyze the customer's reply specifically in context of the AI's last message.\n"
             "2. Follow all welcome coupon and profile rules from the system prompt (if customer created/completed profile or registered, celebrate and include [UNLOCK_COUPON]).\n"
-            "3. STRICT LANGUAGE MATCHING: Match the language of Customer's Current Reply (English -> 100% English, Hindi -> Hindi, Hinglish -> Hinglish).\n"
+            "3. STRICT LANGUAGE & SCRIPT MATCHING: Match the exact language AND script of Customer's Current Reply. If English -> 100% English. If Hinglish (Roman alphabet) -> reply in natural conversational Hinglish using ONLY Latin/English alphabet (NEVER use Devanagari script). Use Devanagari Hindi ONLY if the customer explicitly wrote in Devanagari.\n"
             "4. Answer EVERY distinct question or topic thoroughly.\n"
             "5. Follow all formatting rules (*bold* with single asterisks, • bullets, raw links)."
         )
@@ -176,7 +176,7 @@ async def chat_session():
 
             # Resolve system action tags ([UNLOCK_COUPON]) and sync session state
             from src.state.chat_state import resolve_llm_reply_tags
-            did_unlock, full_reply = resolve_llm_reply_tags(raw_reply, state, course_id=active_course)
+            did_unlock, full_reply = resolve_llm_reply_tags(raw_reply, state, course_id=active_course, user_text=user_input)
             print(full_reply)
 
             latency = time.perf_counter() - t0

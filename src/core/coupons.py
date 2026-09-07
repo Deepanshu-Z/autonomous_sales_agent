@@ -232,10 +232,10 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             "    1. Warmly explain that coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
             "    2. Quote the official offer price for their package (e.g. 6 Months offer price is ₹1,000, 1 Month is ₹300).",
             "    3. Guide them to complete their profile on the Sensationz App or website: https://shop.sensationzperformingarts.com/",
-            "    4. DO NOT provide any coupon code string. Strictly maintain that the code will be sent after profile completion.",
-            "  - PROFILE COMPLETION TRIGGER (SEMANTIC RECOGNITION): If the customer indicates they have created/completed their profile or registered (in ANY phrasing, dialect, or slang, e.g. 'bnadi', 'bna di', 'ho gaya', 'done', 'account banaya', 'sign up kar liya'):",
-            "    CELEBRATE warmly and you MUST include the literal system action tag: [UNLOCK_COUPON] in your response (e.g. 'Congratulations! [UNLOCK_COUPON]'). The backend system will securely intercept this tag and deliver the real coupon code and checkout instructions.",
-            "",
+            "  - PROFILE COMPLETION TRIGGER (STRICT PAST TENSE AFFIRMATION ONLY):",
+            "    • Emit [UNLOCK_COUPON] ONLY IF the customer states they ALREADY finished/created/completed their profile or registered.",
+            "    • STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",
+            "    • CELEBRATE warmly and include [UNLOCK_COUPON] ONLY when they confirm completion (e.g. 'Congratulations! [UNLOCK_COUPON]').",
             "• OFFICIAL OFFER PRICES (Coupon codes are securely hidden until profile created):"
         ]
         for pkg in packages:

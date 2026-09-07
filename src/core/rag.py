@@ -49,15 +49,15 @@ try:
 except Exception as e:
     print(f"[rag.py] Could not connect to Qdrant, RAG will be disabled: {e}")
 
-# --- LLM Model ---
+_model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
 llm = ChatOpenAI(
-    model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    model=_model_name,
     api_key=os.getenv("OPENAI_API_KEY"),
     temperature=0.3,
     timeout=30,
     max_retries=2,
 )
-print(f"[rag.py] LLM initialized: gpt-4o-mini")
+print(f"[rag.py] LLM initialized: {_model_name}")
 
 from src.core import kb_loader
 
@@ -228,7 +228,7 @@ async def ask_rag_async(question: str, chat_history: list = None, state: dict = 
             "2. Read the customer's message carefully. It may contain multiple distinct questions or fragments of questions combined.\n"
             "3. Identify and answer EVERY distinct question or topic raised in the input. Do not skip any question.\n"
             "4. Reconstruct whether the input is one continued question, multiple separate ones, or a mix — then answer each reconstructed question fully.\n"
-            "5. STRICT LANGUAGE MATCHING: Match the language of 'Customer's Current Reply'. If English, reply ONLY in pure English (0% Hindi/Hinglish). If Hinglish, reply in Hinglish. If Hindi, reply in Hindi."
+            "5. STRICT LANGUAGE & SCRIPT MATCHING: Match the exact language AND script of Customer's Current Reply. If English -> pure English (0% Hindi). If Hinglish (Roman alphabet) -> reply in natural conversational Hinglish using ONLY the Latin/English alphabet (NEVER use Devanagari script). Use Devanagari Hindi ONLY if the customer explicitly wrote in Devanagari."
         )
 
         messages.append(HumanMessage(content=user_msg))

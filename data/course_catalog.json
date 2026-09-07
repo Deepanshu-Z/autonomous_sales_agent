@@ -2,7 +2,13 @@
     {
         "id": "yoga",
         "name": "Online Live Interactive Yoga",
-        "aliases": ["yoga", "yog", "asanas", "pranayama", "wellness"],
+        "aliases": [
+            "yoga",
+            "yog",
+            "asanas",
+            "pranayama",
+            "wellness"
+        ],
         "has_full_kb": true,
         "kb_file": "data/courses/yoga.json",
         "description": "Live interactive online yoga sessions with certified female instructors (Mon-Fri) across 10 flexible batch timings."
@@ -10,7 +16,11 @@
     {
         "id": "kathak",
         "name": "Kathak Classical Dance",
-        "aliases": ["kathak", "classical dance", "indian classical dance"],
+        "aliases": [
+            "kathak",
+            "classical dance",
+            "indian classical dance"
+        ],
         "has_full_kb": true,
         "kb_file": "data/courses/kathak.json",
         "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
@@ -18,63 +28,111 @@
     {
         "id": "dance",
         "name": "Western Dance & Choreography",
-        "aliases": ["dance", "western dance", "hip hop", "contemporary", "bollywood dance"],
+        "aliases": [
+            "dance",
+            "western dance",
+            "hip hop",
+            "contemporary",
+            "bollywood dance"
+        ],
         "has_full_kb": false,
         "description": "High-energy Western, Bollywood, and Contemporary dance styles for all age groups."
     },
     {
         "id": "fitness",
         "name": "Fitness, Zumba & Aerobics",
-        "aliases": ["fitness", "zumba", "aerobics", "cardio", "weight loss workout"],
+        "aliases": [
+            "fitness",
+            "zumba",
+            "aerobics",
+            "cardio",
+            "weight loss workout"
+        ],
         "has_full_kb": false,
         "description": "Full-body fitness, dynamic Zumba, and aerobic workouts for weight loss and stamina."
     },
     {
         "id": "music",
         "name": "Vocal Singing & Music",
-        "aliases": ["music", "singing", "vocal", "classical singing", "music classes"],
+        "aliases": [
+            "music",
+            "singing",
+            "vocal",
+            "classical singing",
+            "music classes"
+        ],
         "has_full_kb": false,
         "description": "Classical and semi-classical vocal training, voice modulation, and sur-taal mastery."
     },
     {
         "id": "guitar",
         "name": "Guitar Classes",
-        "aliases": ["guitar", "acoustic guitar", "strings"],
+        "aliases": [
+            "guitar",
+            "acoustic guitar",
+            "strings"
+        ],
         "has_full_kb": false,
         "description": "Beginner to advanced guitar courses covering chords, strumming patterns, and songs."
     },
     {
         "id": "keyboard",
         "name": "Keyboard & Piano",
-        "aliases": ["keyboard", "piano", "synthesizer", "keys"],
+        "aliases": [
+            "keyboard",
+            "piano",
+            "synthesizer",
+            "keys"
+        ],
         "has_full_kb": false,
         "description": "Keyboard notation, finger exercises, scale training, and popular compositions."
     },
     {
         "id": "drawing",
         "name": "Drawing & Fine Arts",
-        "aliases": ["drawing", "painting", "sketching", "art", "fine arts"],
+        "aliases": [
+            "drawing",
+            "painting",
+            "sketching",
+            "art",
+            "fine arts"
+        ],
         "has_full_kb": false,
         "description": "Creative drawing, sketching, watercolors, acrylics, and canvas painting."
     },
     {
         "id": "acting",
         "name": "Acting & Theatre Arts",
-        "aliases": ["acting", "theatre", "drama", "monologue"],
+        "aliases": [
+            "acting",
+            "theatre",
+            "drama",
+            "monologue"
+        ],
         "has_full_kb": false,
         "description": "Dramatic performance, voice projection, expression exercises, and camera acting."
     },
     {
         "id": "spoken_english",
         "name": "Spoken English & Communication",
-        "aliases": ["spoken english", "english speaking", "communication skills", "english"],
+        "aliases": [
+            "spoken english",
+            "english speaking",
+            "communication skills",
+            "english"
+        ],
         "has_full_kb": false,
         "description": "Conversational fluency, vocabulary enhancement, grammar foundation, and public speaking."
     },
     {
         "id": "face_yoga",
         "name": "Face Yoga",
-        "aliases": ["face yoga", "facial yoga", "jawline yoga", "anti aging yoga"],
+        "aliases": [
+            "face yoga",
+            "facial yoga",
+            "jawline yoga",
+            "anti aging yoga"
+        ],
         "has_full_kb": false,
         "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness (separate course)."
     }

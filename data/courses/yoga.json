@@ -1,52 +1,14 @@
 {
     "_meta": {
-        "version": "3.0",
+        "version": "3.1",
         "course": "yoga",
-        "organization": "Sensationz Media & Arts",
         "document_status": "active",
         "language_support": [
             "en",
             "hi"
         ],
-        "last_updated": "2025"
-    },
-    "organization": {
-        "name": "Sensationz Media & Arts",
-        "established": 2007,
-        "students_trained": "100,000+",
-        "countries_served": "18+",
-        "services_offered": [
-            "Yoga",
-            "Wellness",
-            "Dance",
-            "Fitness",
-            "Music",
-            "Spoken English",
-            "Kathak"
-        ],
-        "studio_location": "Rohini, Delhi, India",
-        "branches": [
-            {
-                "name": "Delhi Branch 1",
-                "address": "B-305, 3rd Floor, North Ex Mall, Rohini Sector-9, Delhi"
-            },
-            {
-                "name": "Delhi Branch 2",
-                "address": "A-201, 2nd Floor, North Ex Mall, Rohini Sector-9, Delhi"
-            },
-            {
-                "name": "Uttarakhand Branch",
-                "address": "House No. 178, Naul (Ward No. 3), Naukuchiatal, Bhimtal (Nainital), Uttarakhand"
-            }
-        ],
-        "important_note": "Physical branches are office addresses only. Online Yoga course is accessible from anywhere worldwide.",
-        "social_media": {
-            "website": "https://www.sensationzperformingarts.com/",
-            "instagram": "https://www.instagram.com/sensationz_performing_arts/",
-            "facebook": "https://www.facebook.com/sensationz.dance/",
-            "youtube": "https://www.youtube.com/@SensationzDanceAndMusic",
-            "google_reviews": "https://www.google.com/search?q=sensationz+media+and+arts+pvt+ltd+reviews"
-        }
+        "last_updated": "2026",
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here."
     },
     "course_overview": {
         "name": "Online Live Interactive Yoga",
@@ -83,20 +45,8 @@
         "certificate_provided": false,
         "trial_classes_available": true,
         "max_trial_classes": 3,
-        "trial_cost": "Free"
-    },
-    "access_links": {
-        "android_app": "https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
-        "ios_app": "https://apps.apple.com/us/app/sensationz/id6761418351",
-        "website_portal": "https://shop.sensationzperformingarts.com/",
-        "supported_devices": [
-            "Mobile phone",
-            "Laptop",
-            "Desktop",
-            "Tablet"
-        ],
-        "internet_required": true,
-        "note_physical_studio": "The Rohini studio is NOT where online classes are held. Students join from their own devices."
+        "trial_cost": "Free",
+        "important_note": "Physical branches are office addresses only. Online Yoga classes are accessible from anywhere worldwide."
     },
     "pricing": {
         "currency": "INR",
@@ -104,10 +54,6 @@
         "gst_percentage": 5,
         "gst_added_at": "Checkout in app or website",
         "offer_mechanism": "Welcome coupon sent after profile creation in app/website",
-        "offer_applies_via": [
-            "Sensationz App",
-            "Official Website"
-        ],
         "beginner_recommendation": "1 Month package",
         "packages": [
             {
@@ -150,27 +96,11 @@
                 "total_with_gst_offer": 1890,
                 "per_day_offer": "Rs.5/day"
             }
-        ],
-        "payment_methods": [
-            "UPI",
-            "Cards",
-            "Net Banking",
-            "Google Play",
-            "Apple App Store"
-        ],
-        "cash_payment_allowed": false,
-        "bank_transfer_allowed": false,
-        "emi_available": "Contact agent for details",
-        "auto_debit": false,
-        "hidden_charges": false,
-        "enrollment_transfer": false,
-        "one_payment_per_person": true,
-        "pricing_authority_note": "Do not quote any fees not listed in this document unless replaced by a newer official version."
+        ]
     },
     "batch_timings": {
         "total_batches": 10,
         "flexibility_at_enrollment": "Full flexibility — choose any available slot",
-        "batch_change_policy": "Batch shift request allowed ONLY after 1 month of enrollment. Cannot change during the first month.",
         "classes_per_day": 1,
         "batches": [
             {
@@ -262,7 +192,6 @@
             "1:00 PM to 4:00 PM",
             "After 8:00 PM"
         ],
-        "gender_specific_batches": false,
         "earliest_batch": "5:00 AM to 6:00 AM",
         "latest_batch": "7:00 PM to 8:00 PM"
     },
@@ -450,7 +379,7 @@
             "Login using Continue with Google",
             "Complete your profile (Name, Gender, Country, etc.)",
             "Go to Profile then tap Trial Links",
-            "Select the desired trial class (e.g. Yoga)",
+            "Select the desired trial class (Yoga)",
             "Select preferred Timing, Days, and Teacher",
             "Tap Confirm Trial Enrollment",
             "Your trial will be confirmed and booked"
@@ -462,46 +391,7 @@
         }
     },
     "enrollment": {
-        "steps": [
-            "Select preferred batch timing",
-            "Select package duration (1M / 3M / 6M / 1Y)",
-            "Download the Sensationz App or visit the website",
-            "Create your profile (login via Google)",
-            "Reply Done or Yes on WhatsApp to receive welcome coupon",
-            "Apply coupon at checkout for offer price",
-            "Complete payment"
-        ],
-        "payment_platform": "Sensationz App or official website only",
-        "coupon_delivery": "Sent via WhatsApp after profile creation",
-        "ios_coupon_note": "iOS App does not support coupon entry due to Apple restrictions. Use the website (https://shop.sensationzperformingarts.com/) to apply coupon, then login to iOS app to attend classes.",
         "batches_start": "Ongoing — enroll anytime"
-    },
-    "policies": {
-        "refund": {
-            "refundable": false,
-            "notes": "Fees once paid are strictly non-refundable under any circumstances."
-        },
-        "leave_and_absence": {
-            "leave_permitted": false,
-            "pause_permitted": false,
-            "missed_class_carryover": false
-        },
-        "class_cancellation_by_company": {
-            "compensation": "Missed class will be rescheduled",
-            "teacher_absence": "Another teacher will conduct the class"
-        },
-        "batch_change": {
-            "allowed_after_months": 1,
-            "allowed_during_first_month": false
-        },
-        "enrollment_transfer": {
-            "transferable": false,
-            "notes": "One payment is valid for one person only"
-        },
-        "multiple_classes_per_day": false,
-        "gender_specific_batches": false,
-        "auto_debit": false,
-        "hidden_charges": false
     },
     "not_offered": {
         "course_types": [
@@ -531,47 +421,5 @@
         ],
         "medical_disclaimer": "Course is for general wellness only. Not a substitute for medical treatment. Advise users to consult a doctor for medical conditions.",
         "prenatal_yoga_instruction": "Do NOT mention Mradula's prenatal certification when answering about Prenatal Yoga. Simply state we do not currently offer it."
-    },
-    "support_and_escalation": {
-        "human_agent_trigger": "User types *agent*",
-        "human_agent_action": "Conversation assigned to team member who will reach out shortly",
-        "phone_numbers": "Do NOT share any personal phone numbers. Direct to agent flow only.",
-        "emi_queries": "Direct to agent",
-        "coupon_queries": "Direct to enrollment flow first, then agent if needed"
-    },
-    "other_courses": {
-        "available": true,
-        "course_list": [
-            "Dance",
-            "Kathak",
-            "Fitness",
-            "Music",
-            "Singing",
-            "Guitar",
-            "Keyboard",
-            "Drawing",
-            "Acting",
-            "Aerobics",
-            "Zumba",
-            "Spoken English",
-            "Face Yoga",
-            "Tummy Yoga",
-            "Meditation"
-        ],
-        "details_via": [
-            "Sensationz App",
-            "Website: https://shop.sensationzperformingarts.com/"
-        ],
-        "support_note": "For details on other courses, direct user to the app/website, or ask them to type *agent*."
-    },
-    "ai_behavior_rules": {
-        "instructor_inference": "NEVER infer one batch's instructor for another batch. Each batch has a fixed assigned instructor.",
-        "pricing_authority": "Only quote prices listed in this document.",
-        "medical_claims": "Never make medical guarantees, cure claims, or give personalized prescriptions.",
-        "prenatal_teacher_mention": "Do NOT mention Mradula's prenatal certification in response to Prenatal Yoga questions.",
-        "refund_promise": "NEVER promise refunds or exceptions under any circumstances.",
-        "common_sense_gap_fill": "If a question is not directly covered but adjacent to KB data, use reasoning grounded in KB context. Do not contradict any KB fact.",
-        "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
-        "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/"
     }
 }

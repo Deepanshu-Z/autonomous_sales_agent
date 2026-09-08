@@ -20,7 +20,6 @@ from src.state.chat_state import mark_escalated_async, get_user_state_async, sav
 from src.state.chat_history import save_message_async
 from src.state.csv_logger import log_message_async
 from src.services.redis_client import get_redis_connection
-from src.services.agent_summary import send_agent_summary_async
 
 load_dotenv()
 
@@ -80,18 +79,10 @@ async def execute_agent_handoff_async(
     if user_reply_text:
         await send_text_message_async(phone, user_reply_text)
 
-    # 4. Assign chat in Interakt & notify agent
+    # 4. Assign chat in Interakt
     if agent:
         assignment_success = await assign_chat_to_agent_async(phone, agent)
         print(f"[agent_handoff] Interakt assignment to {agent}: {assignment_success}")
-        # Send Hinglish summary to the assigned agent's WhatsApp
-        asyncio.create_task(
-            send_agent_summary_async(
-                customer_phone=phone,
-                agent_index=agent_index,
-                escalation_reason=escalation_reason,
-            )
-        )
 
     # 5. Background logging (non-blocking)
     latency_sec = round(time.time() - start_time, 2) if start_time else None

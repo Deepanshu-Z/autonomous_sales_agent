@@ -29,7 +29,9 @@ from src.state.chat_state import (
     advance_stage,
 )
 from src.workers.batching import add_message_to_batch_async
-from src.workers.tasks import is_target_ad_or_message, get_next_agent_email, is_welcome_trigger
+from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email, is_welcome_trigger
+from src.core.lead_logger import log_lead_action, extract_lead_details
+from src.core.conversation_handler import handle_conversation_turn_async
 
 router = APIRouter()
 
@@ -49,22 +51,53 @@ async def view_chat_history(phone: str):
 @router.post("/webhook")
 async def receive_interakt_webhook(request: Request):
     raw_body = await request.body()
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    event_type = data.get("type", "unknown")
+    print(f"\n[api] 🔔 WEBHOOK HIT RECEIVED: event_type='{event_type}'")
 
     signature = request.headers.get("Interakt-Signature", "")
     if not verify_webhook_signature(raw_body, signature):
-        print("[api] Signature verification FAILED")
+        print(f"[api] ❌ Signature verification FAILED. Signature header: '{signature[:20]}...'")
+        log_lead_action(
+            lead_no="Unknown",
+            lead_details="N/A",
+            action_taken="IGNORED",
+            reason="Invalid Interakt-Signature header",
+        )
         return {"status": "invalid signature"}
 
-    event_type = data.get("type")
+    # Special handling for Interakt dashboard "Test Webhook" button
+    if event_type == "Webhook Test":
+        print("[api] ✅ Interakt 'Webhook Test' event verified successfully!")
+        return {"status": "ok", "message": "Webhook Test received"}
+
     if event_type != "message_received":
+        print(f"[api] Webhook event '{event_type}' ignored (non-lead event)")
         return {"status": "ignored"}
 
-    customer = data["data"]["customer"]
-    message = data["data"]["message"]
+    customer = data.get("data", {}).get("customer", {})
+    message = data.get("data", {}).get("message", {})
     phone = extract_phone(customer)
     text = message.get("message", "")
-    referral = message.get("referral", {})
+    referral = message.get("referral", {}) or {}
+
+    # Enrich referral with ad_tag from customer traits/tags/headline if missing
+    if isinstance(referral, dict):
+        traits = customer.get("traits", {}) if isinstance(customer, dict) else {}
+        ad_tag = (
+            referral.get("ad_tag")
+            or referral.get("tag")
+            or traits.get("ad_tag")
+            or traits.get("tag")
+            or (customer.get("tags")[0] if isinstance(customer.get("tags"), list) and customer.get("tags") else None)
+            or referral.get("headline")
+        )
+        if ad_tag and "ad_tag" not in referral:
+            referral["ad_tag"] = ad_tag
 
     await log_message_async(phone, "user", text)
 
@@ -81,13 +114,28 @@ async def receive_test_webhook(request: Request):
     """Test endpoint — skips signature verification."""
     data = await request.json()
     if data.get("type") != "message_received":
+        print(f"[api] Webhook event '{data.get('type')}' ignored (non-lead event)")
         return {"status": "ignored"}
 
     customer = data.get("data", {}).get("customer", {})
     message = data.get("data", {}).get("message", {})
     phone = extract_phone(customer)
     text = message.get("message", "")
-    referral = message.get("referral", {})
+    referral = message.get("referral", {}) or {}
+
+    # Enrich referral with ad_tag from customer traits/tags/headline if missing
+    if isinstance(referral, dict):
+        traits = customer.get("traits", {}) if isinstance(customer, dict) else {}
+        ad_tag = (
+            referral.get("ad_tag")
+            or referral.get("tag")
+            or traits.get("ad_tag")
+            or traits.get("tag")
+            or (customer.get("tags")[0] if isinstance(customer.get("tags"), list) and customer.get("tags") else None)
+            or referral.get("headline")
+        )
+        if ad_tag and "ad_tag" not in referral:
+            referral["ad_tag"] = ad_tag
 
     await log_message_async(phone, "user", text)
 
@@ -101,17 +149,34 @@ async def receive_test_webhook(request: Request):
 
 async def _process_fallback(phone: str, text: str, referral: dict, start_time: float):
     """Fallback processor when Redis or batching is unreachable."""
-    is_target = is_target_ad_or_message(text, referral, phone)
+    is_target, reason = check_target_ad(text, referral, phone)
+    lead_details = extract_lead_details(referral, phone=phone)
+
     if not is_target:
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="IGNORED",
+            reason=reason,
+        )
         return {"status": "ignored, not matching target ad"}
 
     try:
         state = await get_user_state_async(phone)
         if not state.get("is_target_ad"):
             state["is_target_ad"] = True
-            await save_user_state_async(phone, state)
+        if referral and isinstance(referral, dict):
+            ad_id = referral.get("ad_id") or referral.get("source_id")
+            if ad_id:
+                state["ad_id"] = str(ad_id)
+            ad_tag = referral.get("ad_tag") or referral.get("tag") or referral.get("headline")
+            if ad_tag:
+                state["ad_tag"] = str(ad_tag)
+        await save_user_state_async(phone, state)
     except Exception:
-        pass
+        state = {}
+
+    lead_details = extract_lead_details(referral, state=state, phone=phone)
 
     try:
         await save_message_async(phone, "user", text)
@@ -119,6 +184,12 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         pass
 
     if await is_escalated_async(phone):
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="IGNORED",
+            reason="Already escalated to human agent (AI staying out)",
+        )
         return {"status": "escalated"}
 
     agent, _agent_index = get_next_agent_email()
@@ -131,6 +202,12 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         await send_text_message_async(phone, reply)
         await mark_escalated_async(phone)
         await save_message_async(phone, "assistant", reply)
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="Customer requested human agent (Handed off to support team)",
+        )
         return {"status": "handed off"}
 
     if is_welcome_trigger(text):
@@ -156,6 +233,12 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         await send_text_message_async(phone, msg3)
         full_welcome = f"{msg1}\n{msg2}\n{msg3}"
         await save_message_async(phone, "assistant", full_welcome)
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason=f"{reason} — Welcome offer sent",
+        )
         return {"status": "offer sent"}
 
     try:
@@ -163,20 +246,11 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
     except Exception:
         history = []
 
-    state = await extract_and_update_slots(phone, text)
-    result = await ask_rag_async(text, chat_history=history, state=state)
-    reply_text = result["reply"] if isinstance(result, dict) else str(result)
-
-    if state.get("stage") == "READY_FOR_APP_LINK":
-        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
-        await save_user_state_async(phone, state)
-    elif state.get("stage") == "PROFILE_COMPLETED" and not state.get("coupon_sent"):
-        state["coupon_sent"] = True
-        state["stage"] = advance_stage(state["stage"], "COUPON_SENT")
-        await save_user_state_async(phone, state)
-
-    await send_text_message_async(phone, reply_text)
-    latency_sec = round(time.time() - start_time, 2)
-    await save_message_async(phone, "assistant", reply_text, response_time_sec=latency_sec)
-    await log_message_async(phone, "ai", reply_text)
+    turn_res = await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
+    log_lead_action(
+        lead_no=phone,
+        lead_details=lead_details,
+        action_taken="REPLIED",
+        reason=f"{reason} — AI turn completed ({turn_res.get('status')})",
+    )
     return {"status": "ok"}

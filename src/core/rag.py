@@ -12,44 +12,15 @@ from dotenv import load_dotenv
 # IMPORTANT: load_dotenv MUST be called before any client initialization
 load_dotenv()
 
-# from langchain_google_genai import ChatGoogleGenerativeAI
-from qdrant_client import QdrantClient
-from langchain_qdrant import QdrantVectorStore
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_openai import ChatOpenAI
 from src.core.prompt import format_system_prompt
 import json
 
-# --- Qdrant Vector DB Connection ---
+# Vector DB (Qdrant) search removed — knowledge is served directly from kb_loader + prompt.py
 retriever = None
-try:
-    client = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY"),
-        timeout=10,
-        check_compatibility=False,
-    )
 
-
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large",
-        api_key=os.getenv("OPENAI_API_KEY")
-    )
-
-    db = QdrantVectorStore(
-        client=client,
-        collection_name="knowledge_base",
-        embedding=embeddings,
-    )
-
-    retriever = db.as_retriever(
-        search_kwargs={"k": 8}
-    )
-    print("[rag.py] Qdrant vector DB connected successfully")
-except Exception as e:
-    print(f"[rag.py] Could not connect to Qdrant, RAG will be disabled: {e}")
-
-_model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+_model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 llm = ChatOpenAI(
     model=_model_name,
     api_key=os.getenv("OPENAI_API_KEY"),
@@ -57,7 +28,7 @@ llm = ChatOpenAI(
     timeout=30,
     max_retries=2,
 )
-print(f"[rag.py] LLM initialized: {_model_name}")
+print(f"[rag.py] LLM initialized: {_model_name} (Vector DB search removed)")
 
 from src.core import kb_loader
 
@@ -190,21 +161,10 @@ async def ask_rag_async(question: str, chat_history: list = None, state: dict = 
         sources_text = ""       # Qdrant source chunk previews for CSV
         retrieval_query_used = ""  # Exact query sent to Qdrant
 
-        # Run vector database search if retriever is loaded
-        if retriever is not None:
-            retrieval_query_used = _build_retrieval_query(question, chat_history)
-            t_retrieve = time.perf_counter()
-            try:
-                docs = await retriever.ainvoke(retrieval_query_used)
-            except Exception:
-                docs = await asyncio.to_thread(retriever.invoke, retrieval_query_used)
-            print(f"[TIMING] rag retrieval: {time.perf_counter() - t_retrieve:.2f}s ({len(docs)} docs)")
-            print(f"[PROMPT-DEBUG] RETRIEVAL_QUERY: {retrieval_query_used!r}")
-            context = "\n\n".join([doc.page_content for doc in docs])
-            sources_text = " | ".join([doc.page_content[:100].replace("\n", " ") for doc in docs]) if docs else ""
-        else:
-            print(f"[TIMING] rag retrieval: SKIPPED (transactional input)")
-            docs = []
+        # Vector DB search removed — all knowledge is injected directly via format_system_prompt
+        context = ""
+        sources_text = "prompt_kb"
+        docs = []
 
         # Construct message payload for LangChain OpenAI LLM
         messages = [SystemMessage(content=sys_prompt_content)]

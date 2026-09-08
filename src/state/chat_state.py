@@ -619,190 +619,162 @@ def sync_state_from_llm_reply(reply: str, state: dict, course_id: str = "yoga") 
 
 def is_profile_completed_signal(text: str, state: dict = None) -> bool:
     """
-    Deprecated: State changes are now detected from the LLM's output
-    (via sync_state_from_llm_reply) rather than fragile keyword matching on user input.
-    Preserved for backward compatibility.
+    Detects if user message indicates that they downloaded the app,
+    registered, or completed their profile.
+    Guards against questions, greetings, or repeat coupon triggers when already sent.
     """
-    if state and (state.get("profile_created") or state.get("coupon_sent")):
+    if not text:
+        return False
+    t = text.lower().strip()
+
+    # If coupon was already delivered, user is not completing profile again
+    if state and state.get("coupon_sent"):
+        return False
+
+    # 1. Guard against questions or how-to inquiries (not completion)
+    INQUIRY_MARKERS = [
+        r"\b(kaise|kese|how|kyun|kya)\b.*?\b(bana|create|kare|kru|download|register|fill|khol)",
+        r"\b(karna|krna|karni|krni|banana|banani)\s+h(ai)?\b",
+        r"\b(bnalo|banalo|bana\s*do|bna\s*do|kardo|krdo|kar\s*do|kr\s*do)\b",
+        r"\bkese\s+kru\b",
+        r"\bkaise\s+karein?\b",
+        r"\bhelp\s+chahiye\b",
+    ]
+    if any(re.search(p, t) for p in INQUIRY_MARKERS):
+        return False
+
+    # 2. Emphatic assertions
+    EMPHATIC_ASSERTION_PATTERNS = [
+        r"\b(kar|kr)\s+to\s+(liya|lia|diya|dia)\b",
+        r"\bho\s+to\s+(gaya|gya|gayi|gai)\b",
+        r"\b(already|pehle\s+se|pehle\s+hi)\s+(created|made|done|completed|registered|downloaded|installed|bana|banali|banayi)\b",
+        r"\bmaine\s+to\s+(bana|create)\b",
+    ]
+    if any(re.search(p, t) for p in EMPHATIC_ASSERTION_PATTERNS):
         return True
+
+    # 3. Standalone past-action completion verbs
+    STANDALONE_PAST_VERBS = [
+        r"\b(bnali|banali|bna\s*li|bana\s*li|banadi|bna\s*di|bana\s*diya|bna\s*diya|bana\s*liya|banaliya|bna\s*liya|bnaliya)\b",
+        r"\b(kardi|krdi|kardiya|krdiya|kar\s*li|kr\s*li|kar\s*diya|kr\s*diya)\b",
+        r"\b(ho\s*gaya|hogaya|ho\s*gya|hogya|ban\s*gaya|bangaya|ban\s*gya|bangya|ban\s*gayi|bangayi|ban\s*gai|bangai)\b",
+        r"\b(created|completed|registered|setup\s*done|all\s*done)\b",
+    ]
+    if any(re.search(p, t) for p in STANDALONE_PAST_VERBS):
+        return True
+
+    # 4. Direct noun + past-verb semantic combinations
+    NOUN_RE = r"(profile|profil|profl|account|acnt|acc|id|details?)"
+    PAST_VERB_RE = (
+        r"("
+        r"create\s*k(ar|r)\s*li|create\s*k(ar|r)\s*liya|create\s*k(ar|r)\s*di|create\s*k(ar|r)\s*diya|"
+        r"create\s*kiya|create\s*ho\s*g(aya|ya|yi|i)|created|"
+        r"bana\s*li|banali|bna\s*li|bnali|bana\s*diya|banadi|bna\s*diya|bnadi|bana\s*liya|banaliya|bna\s*liya|bnaliya|"
+        r"banaya|banayi|bna\s*di|banadi|"
+        r"bana\s*chuka|bna\s*chuka|ban\s*chuki|ban\s*chuka|"
+        r"ban\s*gayi|bangayi|ban\s*gai|bangai|ban\s*gya|bangya|ban\s*gaya|bangaya|"
+        r"kar\s*liya|kr\s*liya|kardiya|krdiya|kar\s*li|kr\s*li|karli|krli|kar\s*di|kr\s*di|kardi|krdi|"
+        r"ho\s*g(aya|ya|yi|i)|hog(aya|ya|yi|i)|"
+        r"ready|done|complete|completed|setup|set|registered"
+        r")"
+    )
+    if re.search(rf"\b{NOUN_RE}\b.*?{PAST_VERB_RE}", t) or re.search(rf"{PAST_VERB_RE}.*?\b{NOUN_RE}\b", t):
+        return True
+
+    # App download / install completion
+    APP_NOUN_RE = r"(app|application|sensationz)"
+    APP_PAST_VERB_RE = (
+        r"(download\s*k(ar|r)\s*li|download\s*k(ar|r)\s*liya|download\s*ho\s*g(aya|ya|yi|i)|downloaded|"
+        r"install\s*k(ar|r)\s*li|install\s*k(ar|r)\s*liya|install\s*ho\s*g(aya|ya|yi|i)|installed|"
+        r"khol\s*li|open\s*k(ar|r)\s*li)"
+    )
+    if re.search(rf"\b{APP_NOUN_RE}\b.*?{APP_PAST_VERB_RE}", t) or re.search(rf"{APP_PAST_VERB_RE}.*?\b{APP_NOUN_RE}\b", t):
+        return True
+
+    _EXPLICIT_COMPLETION_PHRASES = [
+        "profile created", "profile done", "profile complete", "created profile",
+        "profile ban gayi", "profile ban gai", "profile bana li", "profile banali",
+        "profile bna li", "profile bnali", "profile ready", "profile set",
+        "account created", "account ban gaya", "account bana liya", "profile setup",
+        "both done", "sab ho gaya", "sab ho gya", "dono ho gaya", "dono ho gya",
+        "download kar liya", "download kr liya", "install kar liya", "install kr liya",
+        "app done", "downloaded", "installed", "app installed", "app downloaded",
+        "setup done", "all done", "done profile created", "profile created done",
+        "done created", "yes created", "id bana li", "id banali", "id ban gayi",
+        "login kar liya", "login ho gaya", "signup kar liya", "sign up ho gaya",
+        "registered", "registered on app", "profile is ready", "profile is done",
+    ]
+    if any(p in t for p in _EXPLICIT_COMPLETION_PHRASES):
+        return True
+
+    # 5. Contextual Affirmations (strictly when in app link stage and profile not yet marked created)
+    current_stage = (state.get("stage") if state else "") or ""
+    if current_stage in ["APP_LINK_SENT", "READY_FOR_APP_LINK"] and not (state and state.get("profile_created")):
+        _AFFIRMATIVE_SIGNALS = [
+            "done", "yes", "haan", "haa", "han", "ji haan", "ji han", "bilkul",
+            "yes done", "haan done", "ok done", "done done", "kar diya", "kardiya",
+            "kr diya", "krdiya", "kar li", "krli", "ho gaya", "hogaya", "ho gya", "hogya",
+            "ban gaya", "bangaya", "ban gayi", "bangayi", "bnali", "banali", "bna li", "bana li",
+            "bna di", "banadi", "kardi", "krdi"
+        ]
+        words = re.findall(r"\w+", t)
+        if len(words) <= 4 and any(w in words for w in ["done", "yes", "haan", "bilkul"]):
+            return True
+        if any(p in t for p in _AFFIRMATIVE_SIGNALS) and len(words) <= 4:
+            return True
+
     return False
 
 
 async def extract_and_update_slots(phone: str, text: str, chat_history: list = None) -> dict:
     """
-    Analyzes incoming user message, extracts batch timing or package selection,
-    and updates funnel stage (NEW -> ENROLL_ASKED -> ENROLL_CONFIRMED -> TIMING_SELECTED -> PACKAGE_ASKED -> READY_FOR_APP_LINK).
+    Analyzes incoming user message using semantic extraction,
+    and updates funnel state without fragile hardcoded regexes.
     """
-    # Retrieve current session state for this phone number asynchronously
     state = await get_user_state_async(phone)
-    prev_stage = state.get("stage") or "NEW"
-    # Reset follow-up counter whenever customer is actively chatting
     state["follow_up_count"] = 0
 
+    from src.core.intent_classifier import extract_intent_and_state_changes
     from src.core import kb_loader
-    # Dynamically detect if user is referring to a specific course from catalog
-    detected_course = kb_loader.detect_course_from_text(text, default_course=None)
-    if detected_course:
-        state["course"] = detected_course
-    course_id = state.get("course") or "yoga"
-    is_course_keyword = bool(detected_course)
+    from src.core.coupons import normalize_package_name
 
-    text_lower = text.lower().strip()
-    is_q = is_user_asking_question(text)
+    extraction = await extract_intent_and_state_changes(text, state=state, history=chat_history)
 
-    # Keywords for initial contact vs confirmation vs slots
-    is_greeting = matches_any(text_lower, GREETING_WORDS)
-    is_confirmation = matches_any(text_lower, CONFIRMATION_WORDS)
+    active_course = state.get("course") or "yoga"
+    if extraction.get("selected_course"):
+        cand_course = extraction["selected_course"].lower()
+        if kb_loader.course_exists(cand_course):
+            state["course"] = cand_course
+            active_course = cand_course
 
-    # --- 0.1 Detect App Install & Profile Completion (High Priority Semantic Engine) ---
-    is_disinterest_pending = state.get("disinterest_asked_feedback", False)
-    is_profile_done = False
-    if not is_disinterest_pending:
-        is_profile_done = is_profile_completed_signal(text, state)
+    if extraction.get("selected_package"):
+        pkg = normalize_package_name(extraction["selected_package"], course_id=active_course)
+        if pkg:
+            state["package"] = pkg
+            course_pkgs = kb_loader.get_valid_packages(active_course)
+            state["fee"] = course_pkgs.get(pkg, state.get("fee"))
 
-    if is_profile_done:
-        state["app_installed"] = True
-        state["profile_created"] = True
-        state["stage"] = advance_stage(state["stage"], "PROFILE_COMPLETED")
-    elif any(w in text_lower for w in ["app download", "download ho gaya", "download ho gya", "app download kar"]) and not state.get("profile_created"):
-        state["app_installed"] = True
+    if extraction.get("selected_timing"):
+        state["timing"] = extraction["selected_timing"]
 
-    # Stage 0: Initial Greeting & Enrollment Confirmation Check (Only if profile not already confirmed)
-    if state["stage"] in ["NEW", "ENROLL_ASKED"] and not state.get("profile_created"):
-        has_enroll_intent = (is_confirmation or any(w in text_lower for w in ["price", "fees", "fee", "timing", "timings", "enroll", "join", "classes", "start", "how to", "kaise", "proceed"]))
-        if has_enroll_intent:
-            state["stage"] = advance_stage(state["stage"], "ENROLL_CONFIRMED")
-            state["timing"] = None
-            state["package"] = None
-            state["fee"] = None
-        elif is_greeting or is_course_keyword:
-            state["stage"] = advance_stage(state["stage"], "ENROLL_ASKED")
-            state["timing"] = None
-            state["package"] = None
-            state["fee"] = None
-
-    # --- 0.2 Detect Trial / Demo Request Intent ---
-    trial_intent_triggers = [
-        "trial", "demo", "demo class", "trial class", "free trial", "free demo",
-        "pehle trial", "pehle demo", "try class", "trial lena", "demo lena",
-        "after the demo", "after demo", "after trial", "after the trial",
-        "pick a package after", "choose after demo", "decide after demo",
-        "demo ke baad", "trial ke baad", "pehle try"
-    ]
-    if any(t in text_lower for t in trial_intent_triggers) and state.get("stage") not in ["PROFILE_COMPLETED", "COUPON_SENT"]:
+    if extraction.get("wants_trial"):
         state["wants_trial"] = True
-        if state.get("stage") not in ["TRIAL_STEPS_SENT", "READY_FOR_APP_LINK", "APP_LINK_SENT"]:
-            state["stage"] = "TRIAL_REQUESTED"
 
-    # --- 0.5 Detect Intent to Change / Remove Slots ---
-    change_kws = ["change", "remove", "galat", "wrong", "dusra", "delete", "nahi chahiye", "cancel"]
-    if any(kw in text_lower for kw in change_kws) and state["stage"] != "NEW":
-        changed = False
-        if any(w in text_lower for w in ["timing", "time", "batch", "slot", "baje"]):
-            state["timing"] = None
-            if state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED", "PACKAGE_SELECTED", "READY_FOR_APP_LINK", "APP_LINK_SENT"]:
-                state["stage"] = "ENROLL_CONFIRMED"
-            changed = True
-        
-        if any(w in text_lower for w in ["package", "plan", "duration", "month", "months", "year", "mahina"]):
-            state["package"] = None
-            state["fee"] = None
-            if state["stage"] in ["PACKAGE_SELECTED", "READY_FOR_APP_LINK", "APP_LINK_SENT"]:
-                state["stage"] = "TIMING_SELECTED"
-            changed = True
-            
-        if not changed and ("remove it" in text_lower or "change it" in text_lower or "change" in text_lower):
-            # General fallback if ambiguous
-            state["timing"] = None
-            state["package"] = None
-            state["fee"] = None
-            if state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED", "PACKAGE_SELECTED", "READY_FOR_APP_LINK", "APP_LINK_SENT"]:
-                state["stage"] = "ENROLL_CONFIRMED"
+    app_stated = extraction.get("app_installed_stated", "unmentioned")
+    if app_stated == "confirmed":
+        state["app_installed"] = True
+    elif app_stated == "denied":
+        state["app_installed"] = False
 
-    # --- 1. Detect Batch Timing Slot ---
-    timing_found = False
-    if not state.get("timing") and not is_q:  # Only detect if timing not already set and user is NOT asking a question
-        # Check pending ambiguous timing resolution (e.g. user was asked to clarify '5:00' -> AM or PM)
-        pending_amb = state.get("pending_ambiguous_timing")
-        if pending_amb:
-            tokens = [w.strip(".,!?:;\"'") for w in text_lower.split()]
-            is_am = any(w in ["am", "subah", "morning", "mrng", "morng", "sawere", "savere"] for w in tokens) or any(w in text_lower for w in ["subah", "morning", "sawere", "savere"]) or text_lower in ["am", "subah", "morning"]
-            is_pm = any(w in ["pm", "shaam", "evening", "evng", "night", "raat", "sham"] for w in tokens) or any(w in text_lower for w in ["shaam", "evening", "night", "raat", "sham"]) or text_lower in ["pm", "shaam", "evening"]
-            
-            resolved_timing = None
-            course_timings = kb_loader.get_valid_timings(course_id)
-            amb_nums = re.findall(r"\d+", pending_amb)
-            amb_hr = int(amb_nums[0]) if amb_nums else None
+    profile_stated = extraction.get("profile_created_stated", "unmentioned")
+    if profile_stated == "confirmed":
+        state["profile_created"] = True
+        state["app_installed"] = True
+        state["stage"] = advance_stage(state.get("stage", "NEW"), "PROFILE_COMPLETED")
+    elif profile_stated == "denied":
+        state["profile_created"] = False
 
-            if amb_hr:
-                target_merid = "am" if (is_am and not is_pm) else ("pm" if (is_pm and not is_am) else None)
-                if target_merid:
-                    for vt in course_timings:
-                        m_vt = re.search(r"(\d{1,2})(?::\d{2})?\s*(?:to|-|–|\u2013)\s*(\d{1,2})(?::\d{2})?\s*(AM|PM)", vt, re.I)
-                        if m_vt and int(m_vt.group(1)) == amb_hr and m_vt.group(3).lower() == target_merid:
-                            resolved_timing = vt
-                            break
-
-            if resolved_timing:
-                state["timing"] = resolved_timing
-                state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
-                state.pop("pending_ambiguous_timing", None)
-                state.pop("ambiguous_timing_range", None)
-                timing_found = True
-
-        if not timing_found:
-            timing_str, is_ambiguous, ambiguous_range = detect_timing_from_text(text, course_id=course_id)
-            if timing_str:
-                state["timing"] = timing_str
-                state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
-                timing_found = True
-                state.pop("ambiguous_timing_range", None)  # clear any pending ambiguity
-                state.pop("pending_ambiguous_timing", None)
-            elif is_ambiguous:
-                state["ambiguous_timing_range"] = ambiguous_range
-                timing_found = True  # Prevents LLM fallback from executing and overriding ambiguous timings
-
-    # --- 2. Detect Package / Duration Slot ---
-    course_pkgs = kb_loader.get_valid_packages(course_id)
-    detected_pkg = detect_package_from_text(text, course_id=course_id)
-
-    is_package_detected = False
-
-    # Whenever a package duration is mentioned or asked about, immediately update active package slot
-    if detected_pkg:
-        state["package"] = detected_pkg
-        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
-        is_package_detected = True
-    elif not is_q:
-        # Fallback for bare price numbers in package stage from course registry
-        coupons = kb_loader.get_course_coupons(course_id)
-        tokens = [w.strip(".,!?:;₹") for w in text_lower.replace(",", "").split()]
-        for pkg_name, data in coupons.items():
-            b_str = str(data.get("base_price", ""))
-            o_str = str(data.get("offer_price", ""))
-            if any(tok in [b_str, o_str] for tok in tokens if tok):
-                state["package"] = pkg_name
-                state["fee"] = course_pkgs.get(pkg_name, state.get("fee"))
-                is_package_detected = True
-                break
-
-    needs_llm_fallback = (
-        not timing_found and not is_package_detected
-        and not is_greeting
-        and not is_q
-        and len(text_lower) >= 1
-        and state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED", "PACKAGE_SELECTED", "ENROLL_CONFIRMED"]
-    )
-    if needs_llm_fallback:
-        slot_result = await extract_slot_llm(text, chat_history, course_id=course_id)
-        if slot_result["timing"] and not state.get("timing"):
-            state["timing"] = slot_result["timing"]
-            state["stage"] = advance_stage(state["stage"], "TIMING_SELECTED")
-        if slot_result["package"] and not state.get("package"):
-            state["package"] = slot_result["package"]
-            state["fee"] = course_pkgs.get(slot_result["package"], "")
-        
-    # Update funnel stage dynamically based on timing and package availability
+    # Funnel stage progression based on slots
     if state.get("timing") and state.get("package"):
         state["stage"] = advance_stage(state["stage"], "READY_FOR_APP_LINK")
     elif state.get("timing"):
@@ -810,12 +782,5 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
     elif state.get("package"):
         state["stage"] = advance_stage(state["stage"], "PACKAGE_SELECTED")
 
-    # Stage Transition when user confirms timing -> ask for package duration
-    if state["stage"] == "TIMING_SELECTED" and is_confirmation and not is_q and not state.get("package"):
-        state["stage"] = advance_stage(state["stage"], "PACKAGE_ASKED")
-
-
-    # Persist updated session state asynchronously
     await save_user_state_async(phone, state)
     return state
-

@@ -50,9 +50,10 @@ from src.core.coupons import (
     format_coupon_banner, get_all_coupon_codes, get_coupon_details,
     detect_package_from_text
 )
-from src.core.intent_classifier import classify_coupon_and_profile_intent, classify_post_link_intent, is_app_link_request
+from src.core.conversation_handler import handle_conversation_turn_async
 import re
 from src.core import kb_loader
+from src.core.lead_logger import log_lead_action, extract_lead_details
 
 
 load_dotenv()
@@ -351,36 +352,35 @@ def is_welcome_trigger(text: str) -> bool:
 # ---------------------------------------------------------------------------
 # Target ad verification
 # ---------------------------------------------------------------------------
-def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = None) -> bool:
+def check_target_ad(text: str, referral_data: dict = None, phone: str = None) -> tuple[bool, str]:
     """
-    Checks if a message qualifies for bot response.
+    Evaluates whether an incoming message qualifies for bot response.
+    Returns: (is_target: bool, reason: str)
     1. Already-verified user (state flag: is_target_ad=True) → PASS
     2. First message: Match exact Ad ID from ENV (TARGET_AD_ID) in referral data → PASS
-    3. Otherwise → FAIL (no reply, no assignment)
+    3. Whitelist / TEST_MODE → PASS
+    4. Otherwise → FAIL
     """
     if phone:
         try:
             state = get_user_state(phone)
             if state.get("is_target_ad") is True:
-                print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: Already verified customer (is_target_ad=True)")
-                return True
+                return True, "Already verified customer (is_target_ad=True)"
         except Exception:
             pass
 
     # Check TEST_MODE / ALLOWED_TEST_NUMBERS bypass for direct WhatsApp testing
     if os.getenv("TEST_MODE", "").strip().lower() in ("true", "1", "yes"):
-        print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: TEST_MODE is enabled in environment")
-        return True
+        return True, "TEST_MODE is enabled in environment"
 
     allowed_raw = os.getenv("ALLOWED_TEST_NUMBERS", "").strip()
     if allowed_raw and phone:
         allowed_test = [p.strip().replace("+", "") for p in allowed_raw.split(",") if p.strip()]
         clean_phone = phone.replace("+", "").strip()
         if clean_phone in allowed_test:
-            print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: Whitelisted in ALLOWED_TEST_NUMBERS")
-            return True
+            return True, "Whitelisted in ALLOWED_TEST_NUMBERS"
 
-    target_ad = (TARGET_AD_ID or os.getenv("TARGET_AD_ID") or "").strip()
+    target_ad = (os.getenv("TARGET_AD_ID") or TARGET_AD_ID or "").strip()
 
     if isinstance(referral_data, str):
         try:
@@ -395,18 +395,24 @@ def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = 
         ad_id = str(referral_data.get("ad_id") or "").strip()
 
         if source_id == target_ad or ad_id == target_ad or target_ad in source_url:
-            print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: Ad ID match '{source_id or ad_id}' == '{target_ad}'")
-            return True
+            return True, f"Target Ad ID matched: '{source_id or ad_id}'"
         else:
-            print(f"[2] 🎯 DECISION : {phone} -> WILL NOT REPLY | Reason: Ad ID MISMATCH — source_id='{source_id}' vs TARGET='{target_ad}'")
-            return False
+            return False, f"Ad ID MISMATCH — received '{source_id or ad_id}' vs TARGET '{target_ad}'"
 
     if not referral_data:
-        print(f"[2] 🎯 DECISION : {phone} -> WILL NOT REPLY | Reason: No referral data (organic / non-ad message)")
+        return False, "No referral data (organic / non-ad message)"
     else:
-        print(f"[2] 🎯 DECISION : {phone} -> WILL NOT REPLY | Reason: TARGET_AD_ID not set in environment")
+        return False, "TARGET_AD_ID not set in environment"
 
-    return False
+
+def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = None) -> bool:
+    """Checks if a message qualifies for bot response."""
+    is_target, reason = check_target_ad(text, referral_data, phone)
+    if is_target:
+        print(f"[2] 🎯 DECISION : {phone} -> WILL REPLY | Reason: {reason}")
+    else:
+        print(f"[2] 🎯 DECISION : {phone} -> WILL NOT REPLY | Reason: {reason}")
+    return is_target
 
 
 
@@ -683,7 +689,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     t0 = time.perf_counter()
 
     # Developer/tester reset command
-    if text.strip().lower() in ["#reset", "/reset", "reset chat", "reset session"]:
+    if text.strip().lower() in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
         await reset_user_state_async(phone)
         reply = "🔄 Session reset successfully! You can now test from the beginning as a new customer. How can I help you? 😊"
         await send_text_message_async(phone, reply)
@@ -723,517 +729,8 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         asyncio.create_task(log_message_async(phone, "ai", full_welcome))
         return
 
-    # Fetch previous state stage before slot extraction ok ok
-    try:
-        pre_state = await get_user_state_async(phone)
-        prev_stage = pre_state.get("stage") or "NEW"
-    except Exception:
-        prev_stage = "NEW"
-
-    t_slots = time.perf_counter()
-    state = await extract_and_update_slots(phone, text, history)
-    is_q = is_user_asking_question(text)
-    print(f"[TIMING] {phone} slot_extraction: {time.perf_counter() - t_slots:.2f}s")
-
-    # --- Handle Ambiguous Timing (requires AM/PM clarification from user) ---
-    if state.get("ambiguous_timing_range") and not state.get("timing"):
-        amb = state.get("ambiguous_timing_range")
-        state["pending_ambiguous_timing"] = amb
-        state["ambiguous_timing_range"] = None
-        await save_user_state_async(phone, state)
-        reply = (
-            f"Aap {amb} ki timing chahte hain — subah (AM) ya shaam (PM)? 😊\n"
-            f"• Subah ke liye likhein: '{amb} AM'\n"
-            f"• Shaam ke liye likhein: '{amb} PM'"
-        )
-        await send_text_message_async(phone, reply)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply))
-        return
-
-    # Define flags for fresh transitions and confirmations/greetings
-    text_lower = text.lower().strip()
-    GREETING_WORDS = ["hi", "hii", "hello", "hey", "namaste", "good morning", "good evening", "good afternoon"]
-    CONFIRMATION_WORDS = [
-        "yes", "yeah", "yep", "sure", "ok", "okay", "enroll", "join",
-        # NOTE: 'interested' removed — it matches inside 'not interested'. Use full phrases instead:
-        "i am interested", "mujhe interested", "i want to join", "haan", "han",
-        "karna hai", "kar do", "haan ji", "proceed", "done", "thik", "thik hai",
-        "accha", "acha", "theek", "theek hai", "sahi", "sahi hai", "got it", "understood", "fine"
-    ]
-    is_greeting = matches_any(text_lower, GREETING_WORDS)
-    # Disinterest takes priority — never let it be treated as confirmation
-    is_disinterest = is_disinterest_signal(text)
-    is_confirmation = (not is_disinterest) and matches_any(text_lower, CONFIRMATION_WORDS)
-
-    is_fresh_enroll_confirmed = (prev_stage != "ENROLL_CONFIRMED" and state["stage"] == "ENROLL_CONFIRMED")
-    is_fresh_package_asked = (prev_stage != "PACKAGE_ASKED" and state["stage"] == "PACKAGE_ASKED")
-    is_fresh_timing_selected = (prev_stage != "TIMING_SELECTED" and state["stage"] == "TIMING_SELECTED")
-    is_fresh_package_selected = (prev_stage != "PACKAGE_SELECTED" and state["stage"] == "PACKAGE_SELECTED")
-
-    # ── INTELLIGENT REFUSAL, RISK & RESOLUTION EVALUATION ───────────────────────
-    # Reusable component: checks for course refusal, asks missing reason, resolves via KB,
-    # or immediately triggers agent handoff if legal risk, safety risk, or unresolvable.
-    refusal_eval = await evaluate_refusal_async(text, history, state)
-    res_type = refusal_eval.get("resolution_type")
-
-    if res_type == "ESCALATE_TO_AGENT":
-        reply_msg = _format_for_whatsapp(
-            refusal_eval.get("reply_message")
-            or "We have listened to your query and understand your concern. Connecting you with our support team specialist..."
-        )
-        esc_reason = refusal_eval.get("escalation_reason") or "Customer refusal / risk"
-        state["awaiting_refusal_reason"] = False
-        await save_user_state_async(phone, state)
-        await execute_agent_handoff_async(phone, user_reply_text=reply_msg, escalation_reason=esc_reason, start_time=start_time)
-        return
-    elif res_type == "ASK_REASON":
-        state["awaiting_refusal_reason"] = True
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        reply_msg = _format_for_whatsapp(refusal_eval.get("reply_message") or "")
-        await send_text_message_async(phone, reply_msg)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        asyncio.create_task(save_message_async(phone, "assistant", reply_msg, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply_msg))
-        return
-    elif res_type == "PROVIDE_SOLUTION":
-        state["awaiting_refusal_reason"] = False
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        reply_msg = _format_for_whatsapp(refusal_eval.get("reply_message") or "")
-        await send_text_message_async(phone, reply_msg)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        asyncio.create_task(save_message_async(phone, "assistant", reply_msg, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply_msg))
-        return
-    # ── TRIAL / DEMO REQUEST HANDLER (Pure procedural requests only; informational queries go to RAG) ──
-    _PURE_TRIAL_BOOKING_KWS = [
-        "trial book", "book trial", "trial lena hai", "demo lena hai", "trial kaise book karein",
-        "trial kaise book kare", "send trial link", "trial link do", "trial link bhejo", "book my trial"
-    ]
-    is_pure_trial_req = (
-        not is_q
-        and not is_info_intent(text)
-        and matches_any(text_lower, _PURE_TRIAL_BOOKING_KWS)
-    )
-    if is_pure_trial_req and state.get("stage") != "TRIAL_STEPS_SENT" and state.get("stage") not in ["PROFILE_COMPLETED", "COUPON_SENT"]:
-        state["wants_trial"] = True
-        state["stage"] = "TRIAL_STEPS_SENT"
-
-        hindi_markers = ["kya", "hai", "mujhe", "batao", "chahiye", "ka", "ki", "ke", "nahi", "haan", "se", "bhi", "kab", "kaise", "kitna", "subah", "shaam", "pehle", "baad"]
-        has_hindi = any(w in text_lower for w in hindi_markers) or any("\u0900" <= ch <= "\u097F" for ch in text)
-        active_course = state.get("course") or "yoga"
-        demo_block = kb_loader.format_demo_videos_display(active_course)
-        demo_sec = f"\n\n🎥 *Sample / Demo Videos:*\n{demo_block}" if demo_block else ""
-
-        app_links = kb_loader.format_app_links_display()
-        if has_hindi:
-            msg1 = (
-                f"Aap bilkul pehle demo videos dekh sakte hain aur free live trial class attend kar sakte hain! 😊 Har student ko 3 free live trial classes milti hain.{demo_sec}"
-            )
-            msg2 = (
-                "📲 *Live Trial Book Karne Ke Simple Steps:*\n"
-                "1️⃣ Sensationz App download karein ya website visit karein\n"
-                "2️⃣ Profile create karke 'Trial Links' par tap karein\n"
-                f"3️⃣ Apna preferred batch timing choose karein aur live trial confirm karein!\n\n{app_links}"
-            )
-        else:
-            msg1 = (
-                f"You can watch our sample demo videos and attend free live trial classes first! 😊 Up to 3 free live trial classes are allowed per student.{demo_sec}"
-            )
-            msg2 = (
-                "📲 *Steps to Book Your Live Trial:*\n"
-                "1️⃣ Download the Sensationz App or visit our website\n"
-                "2️⃣ Create your profile and tap on 'Trial Links'\n"
-                f"3️⃣ Select your preferred batch timing and confirm your live trial!\n\n{app_links}"
-            )
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        msg1 = _format_for_whatsapp(msg1)
-        msg2 = _format_for_whatsapp(msg2)
-        await send_text_message_async(phone, msg1)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg2)
-        combined = msg1 + "\n\n" + msg2
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined))
-        return
-
-    # --- DETERMINISTIC STAGE GUARDS ---
-
-    if not is_q and not is_info_intent(text) and state["stage"] == "ENROLL_CONFIRMED" and (is_fresh_enroll_confirmed or is_confirmation or is_greeting):
-        reply = get_flow_followup(state)
-        if reply:
-            reply = _format_for_whatsapp(reply.strip())
-            arm_followup_timer(state, topic=text)
-            await save_user_state_async(phone, state)
-            await send_text_message_async(phone, reply)
-            latency_sec = round(time.time() - start_time, 2) if start_time else None
-            # Fire-and-forget background logging
-            asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-            asyncio.create_task(log_message_async(phone, "ai", reply))
-            return
-
-    if not is_q and not is_info_intent(text) and state["stage"] == "PACKAGE_ASKED" and (is_fresh_package_asked or is_confirmation or is_greeting):
-        reply = get_flow_followup(state)
-        if reply:
-            reply = _format_for_whatsapp(reply.strip())
-            arm_followup_timer(state, topic=text)
-            await save_user_state_async(phone, state)
-            await send_text_message_async(phone, reply)
-            latency_sec = round(time.time() - start_time, 2) if start_time else None
-            # Fire-and-forget background logging
-            asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-            asyncio.create_task(log_message_async(phone, "ai", reply))
-            return
-
-    if not is_q and state["stage"] in ["TIMING_SELECTED", "PACKAGE_ASKED"] and not state.get("package") and (is_fresh_timing_selected or ((is_confirmation or is_greeting) and not is_info_intent(text))):
-        active_course = state.get("course") or "yoga"
-        fees_block = kb_loader.format_package_fees_display(active_course)
-        msg2 = (
-            "Which package duration would you like to start with? 😊\n\n"
-            f"Fees:\n{fees_block}\n\n"
-            "*Note:* Offer price will be only applicable through app and welcome coupon. Once the app is downloaded and the profile is created, the welcome coupon will be sent here."
-        )
-        state["stage"] = advance_stage(state["stage"], "PACKAGE_ASKED")
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        if msg1:
-            msg1 = _format_for_whatsapp(msg1)
-            msg2 = _format_for_whatsapp(msg2)
-            await send_text_message_async(phone, msg1)
-            await asyncio.sleep(1)
-            await send_text_message_async(phone, msg2)
-            combined = msg1 + "\n\n" + msg2
-        else:
-            msg2 = _format_for_whatsapp(msg2)
-            await send_text_message_async(phone, msg2)
-            combined = msg2
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined))
-        return
-
-    if not is_q and state["stage"] == "PACKAGE_SELECTED" and not state.get("timing") and (is_fresh_package_selected or ((is_confirmation or is_greeting) and not is_info_intent(text))):
-        active_course = state.get("course") or "yoga"
-        timings_block = kb_loader.format_batch_timings_display(active_course)
-        msg1 = f"You've selected the {state.get('package')} package. 👍"
-        msg2 = (
-            "Which timing would you prefer for your classes? 😊\n"
-            f"{timings_block}"
-        )
-        state["stage"] = advance_stage(state["stage"], "ENROLL_CONFIRMED")
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        msg1 = _format_for_whatsapp(msg1)
-        msg2 = _format_for_whatsapp(msg2)
-        await send_text_message_async(phone, msg1)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg2)
-        combined = msg1 + "\n\n" + msg2
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined))
-        return
-
-
-    # ── Deterministic Coupon Unlock & Resend Handlers ────────────────────────
-
-
-    active_course = state.get("course") or "yoga"
-    course_pkgs = kb_loader.get_valid_packages(active_course)
-    detected_pkg = detect_package_from_text(text, course_id=active_course)
-    if detected_pkg:
-        state["package"] = detected_pkg
-        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
-
-    if not is_q and not is_info_intent(text) and (
-        state["stage"] == "READY_FOR_APP_LINK"
-        or (state["stage"] == "APP_LINK_SENT" and not state.get("profile_created") and (detected_pkg or is_fresh_package_selected))
-    ):
-        package = state.get("package") or (list(course_pkgs.keys())[0] if course_pkgs else "1 Month")
-        fee = state.get("fee") or course_pkgs.get(package, "")
-        fee_str = f" ({fee})" if fee else ""
-        app_links = kb_loader.format_app_links_display()
-        msg1 = f"You've selected the {package} package{fee_str}. 👍"
-        msg2 = (
-            "To continue, please download the Sensationz App (or access via website) and create your profile. "
-            "Once that's done, just reply *Done* or *Yes* here, and I'll send you a special welcome coupon code 🎁 "
-            f"that you can use to unlock your offer price during checkout in the app or website.\n\n{app_links}"
-        )
-        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        msg1 = _format_for_whatsapp(msg1)
-        msg2 = _format_for_whatsapp(msg2)
-        await send_text_message_async(phone, msg1)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg2)
-        combined = msg1 + "\n\n" + msg2
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined))
-        return
-
-    # ── Deterministic Coupon Unlock, Resend & Profile Completion Handlers ────
-    is_complaint_or_refund_msg = is_complaint_or_refund(text)
-
-    # --- Hybrid Intent Classification (Regex Fast-Path + LLM Fallback) ---
-    # Step 1: Run regex detectors (fast, zero cost)
-    _regex_profile = (not is_complaint_or_refund_msg) and is_profile_completed_signal(text, state)
-    _regex_coupon = (not is_complaint_or_refund_msg) and is_coupon_request(text_lower)
-    _regex_coupon_info = is_coupon_info_question(text)
-
-    # In post-link stages, run unified router
-    is_post_link_stage = bool(
-        state.get("stage") in ["APP_LINK_SENT", "READY_FOR_APP_LINK", "PROFILE_COMPLETED", "COUPON_SENT"]
-        or state.get("profile_created")
-        or state.get("app_installed")
-        or state.get("coupon_sent")
-    )
-
-    if is_post_link_stage:
-        _intent = await classify_post_link_intent(
-            text, state,
-            regex_coupon_result=_regex_coupon,
-            regex_profile_result=_regex_profile,
-        )
-    else:
-        _intent = await classify_coupon_and_profile_intent(
-            text, state,
-            regex_coupon_result=_regex_coupon,
-            regex_profile_result=_regex_profile,
-            regex_coupon_info_result=_regex_coupon_info,
-        )
-
-    # Synchronize package if extracted by classifier
-    active_course = state.get("course") or "yoga"
-    course_pkgs = kb_loader.get_valid_packages(active_course)
-    if _intent.get("package") and _intent["package"] in course_pkgs:
-        state["package"] = _intent["package"]
-        state["fee"] = course_pkgs[_intent["package"]]
-    elif detected_pkg:
-        state["package"] = detected_pkg
-        state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
-
-    _is_app_link = is_app_link_request(text) or (_intent.get("intent") == "APP_LINK_REQUEST")
-
-    profile_just_completed = (not is_complaint_or_refund_msg) and (not _is_app_link) and (
-        _intent.get("is_profile_done") or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE" and not _intent.get("is_coupon_request"))
-    )
-    if profile_just_completed:
-        state["app_installed"] = True
-        state["profile_created"] = True
-        state["stage"] = advance_stage(state["stage"], "PROFILE_COMPLETED")
-
-    _is_explicit_coupon_ask = (not is_complaint_or_refund_msg) and (not _is_app_link) and (
-        _intent.get("is_coupon_request") or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE")
-    )
-
-    hindi_markers = ["kya", "hai", "bhejo", "batao", "do", "kaha", "kha", "dobara", "phir", "fhrse", "mujhe", "konsa", "dega", "nhi", "nahi", "bhai", "dena"]
-    has_hindi = any(w in text_lower for w in hindi_markers) or any("\u0900" <= ch <= "\u097F" for ch in text)
-
-    # ── Deterministic App Link Dispatcher ────────────────────────────────────
-    if _is_app_link:
-        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
-        arm_followup_timer(state, topic="app download")
-        await save_user_state_async(phone, state)
-
-        pkg_prefix_hi = f"Aapne {state.get('package')} package select kiya hai. 👍\n\n" if state.get("package") else ""
-        pkg_prefix_en = f"You've selected the {state.get('package')} package. 👍\n\n" if state.get("package") else ""
-
-        if has_hindi:
-            reply = (
-                f"{pkg_prefix_hi}"
-                "Ye rahe Sensationz App aur website portal ke direct download links 📱✨\n\n"
-                "📱 Android (Play Store): https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                "🍎 iOS (App Store): https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/\n\n"
-                "App download karein ya website visit karke apni profile complete karein. "
-                "Uske baad yahan *Done* ya *Yes* reply karein, aur main turant aapka special welcome discount coupon code yahan bhej dunga! 🎁"
-            )
-        else:
-            reply = (
-                f"{pkg_prefix_en}"
-                "Here are the download links for the Sensationz App and our website portal 📱✨\n\n"
-                "📱 Android (Play Store): https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                "🍎 iOS (App Store): https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                "💻 Website / PC / Laptop: https://shop.sensationzperformingarts.com/\n\n"
-                "Please download the app or visit our website, complete your profile, and once done, "
-                "reply *Done* or *Yes* here to receive your special welcome discount coupon code! 🎁"
-            )
-
-        reply = _format_for_whatsapp(reply)
-        await send_text_message_async(phone, reply)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply))
-        return
-
-    is_frustrated_coupon_ask = (
-        (not is_complaint_or_refund_msg)
-        and any(phrase in text_lower for phrase in [
-            "coupon dega ya nahi", "coupon dega yaa nahi", "coupon dega ki nahi",
-            "coupon kyu nahi de raha", "coupon kyun nahi de raha", "kab doge coupon",
-            "code dega ya nahi", "code kyu nahi de raha", "fake coupon", "fraud coupon",
-            "dhokha coupon"
-        ])
-        and (
-            is_post_link_stage
-            or profile_just_completed
-        )
-    )
-
-    is_pure_question = (_intent.get("intent") == "QUESTION") and not (_intent.get("is_profile_done") or _intent.get("is_coupon_request"))
-
-    # Condition to trigger coupon delivery:
-    # In post-link stages or after profile creation, any affirmation / coupon request delivers the coupon banner immediately
-    should_send_coupon_now = (
-        (not is_complaint_or_refund_msg)
-        and (not _is_app_link)
-        and not is_pure_question
-        and (
-            (_is_explicit_coupon_ask and (state.get("profile_created") or is_post_link_stage))
-            or is_frustrated_coupon_ask
-            or profile_just_completed
-            or (_intent.get("intent") == "COUPON_OR_PROFILE_DONE")
-        )
-    )
-
-    if should_send_coupon_now:
-        state["profile_created"] = True
-        state["app_installed"] = True
-        state["coupon_sent"] = True
-        state["stage"] = advance_stage(state["stage"], "COUPON_SENT")
-
-        reply = format_coupon_banner(
-            state.get("package"),
-            language="hindi" if has_hindi else "english",
-            is_frustrated=is_frustrated_coupon_ask
-        )
-        arm_followup_timer(state, topic="coupon activation")
-        await save_user_state_async(phone, state)
-        await send_text_message_async(phone, reply)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply))
-        return
-
-    elif _is_explicit_coupon_ask:
-        active_course = state.get("course") or "yoga"
-        course_pkgs = kb_loader.get_valid_packages(active_course)
-        detected_pkg = detect_package_from_text(text, course_id=active_course)
-        if detected_pkg:
-            state["package"] = detected_pkg
-            state["fee"] = course_pkgs.get(detected_pkg, state.get("fee"))
-
-        app_links = kb_loader.format_app_links_display()
-        # Stage A: User has NOT selected timing/package or reached app links -> Explain unlock requirement with app links
-        reply = (
-            "Aapka special welcome discount coupon code app ya website par profile banane ke baad unlock hota hai 🎁\n\n"
-            "1️⃣ Sensationz App download karein ya website visit karein\n"
-            "2️⃣ Profile complete karein\n"
-            "3️⃣ Yahan *Done* ya *Yes* reply karein\n\n"
-            f"Aur main turant aapka coupon code yahan bhej dunga!\n\n{app_links}"
-        )
-        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
-        arm_followup_timer(state, topic=text)
-        await save_user_state_async(phone, state)
-        await send_text_message_async(phone, reply)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging
-        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", reply))
-        return
-    # ─────────────────────────────────────────────────────────────────────────
-
-
-
-    # --- Genuine question / off-flow topic — goes to RAG ---
-    t_rag = time.perf_counter()
-    rag_result = await ask_rag_async(text, chat_history=history, state=state)
-    full_reply = rag_result["reply"].strip()
-    rag_sources = rag_result.get("sources", "")
-    rag_retrieval_query = rag_result.get("retrieval_query", "")
-    print(f"[TIMING] {phone} rag_query: {time.perf_counter() - t_rag:.2f}s")
-
-    # Resolve system action tags ([UNLOCK_COUPON]) and sync session state
-    from src.state.chat_state import resolve_llm_reply_tags
-    active_course = state.get("course") or "yoga"
-    did_unlock, full_reply = resolve_llm_reply_tags(full_reply, state, course_id=active_course, user_text=text)
-
-    # Strip any "type agent" line the LLM generated, count it silently,
-    # only resurface after 2 CONSECUTIVE flagged replies.
-    flagged_this_turn = bool(AGENT_SUGGEST_PATTERN.search(full_reply))
-    full_reply = AGENT_SUGGEST_PATTERN.sub("", full_reply).strip()
-
-    # Redact / sanitize any leaked coupon codes if user has not completed profile setup
-    full_reply = _sanitize_locked_coupons(full_reply, state)
-
-    if flagged_this_turn:
-        state["low_confidence_count"] = state.get("low_confidence_count", 0) + 1
-    else:
-        state["low_confidence_count"] = 0
-
-    followup_separate = None  # Will be sent as a second WhatsApp message if set
-
-    if state.get("low_confidence_count", 0) >= 2:
-        # Only suggest agent if the reply was genuinely short/unhelpful (< 60 words)
-        if len(full_reply.split()) < 60:
-            full_reply += _agent_nudge(text)
-        state["low_confidence_count"] = 0  # reset after nudging
-    else:
-        followup = get_flow_followup(state)
-        if followup and not should_skip_followup(text, full_reply, state.get("stage")):
-            # Issue 4: Two-message stream — answer first, stage question separately
-            followup_separate = followup.strip()
-
-    # Clean trailing LLM-generated questions so full_reply is purely the direct answer (Message 1)
-    full_reply = _strip_trailing_questions(full_reply)
-
-    # Post-LLM State Transitions
-    if state.get("stage") == "READY_FOR_APP_LINK":
-        state["stage"] = advance_stage(state["stage"], "APP_LINK_SENT")
-
-    # Only keep nudging the customer if the flow isn't finished yet
-    # if state.get("stage") not in ["COUPON_SENT"]:
-    arm_followup_timer(state, topic=text)
-    await save_user_state_async(phone, state)
-
-    # Format full_reply and followup_separate for WhatsApp rendering
-    full_reply = _format_for_whatsapp(full_reply)
-    # Compute dynamic contextual follow-up message (Message 2) with curiosity & questions
-    # to engage the customer, unless stage follow-up (e.g. package selection) is already active.
-    if not followup_separate:
-        dynamic_followup = await generate_contextual_followup_async(text, full_reply, history, state)
-        if dynamic_followup:
-            followup_separate = _format_for_whatsapp(dynamic_followup)
-
-    t_send = time.perf_counter()
-    if followup_separate:
-        await send_text_message_async(phone, full_reply)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, followup_separate)
-        combined = full_reply + "\n\n" + followup_separate
-        print(f"[TIMING] {phone} interakt_send (2-msg): {time.perf_counter() - t_send:.2f}s")
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging to Supabase and CSV without blocking user reply
-        asyncio.create_task(save_message_async(phone, "assistant", combined, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", combined, sources=rag_sources, retrieval_query=rag_retrieval_query))
-    else:
-        await send_text_message_async(phone, full_reply)
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        # Fire-and-forget background logging to Supabase and CSV without blocking user reply
-        asyncio.create_task(save_message_async(phone, "assistant", full_reply, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", full_reply, sources=rag_sources, retrieval_query=rag_retrieval_query))
+    # Steps 3–7: All subsequent turns handled dynamically by Two-Step Semantic Architecture (zero hardcoded values)
+    await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
 # ---------------------------------------------------------------------------
 # Main processing pipeline (NO per-phone Redis lock — debouncer handles it)
 # ---------------------------------------------------------------------------
@@ -1247,24 +744,41 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
     print(f"[1] 📩 INCOMING : {phone} -> {repr(text)}")
 
     # Log 2: Target check & decision
-    is_target = is_target_ad_or_message(text, referral, phone)
+    is_target, target_reason = check_target_ad(text, referral, phone)
+    lead_details = extract_lead_details(referral, phone=phone)
 
     if not is_target:
         # Log 3: Ignored action
         print(f"[3] 🚫 ACTION   : {phone} -> Ignored (No reply sent)")
         print("="*80 + "\n")
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="IGNORED",
+            reason=target_reason,
+        )
         return
 
-    # Persist target flag
+    # Persist target flag and ad details in state
     try:
         state = await get_user_state_async(phone)
         if not state.get("is_target_ad"):
             state["is_target_ad"] = True
-            await save_user_state_async(phone, state)
+        if referral and isinstance(referral, dict):
+            ad_id = referral.get("ad_id") or referral.get("source_id")
+            if ad_id:
+                state["ad_id"] = str(ad_id)
+            ad_tag = referral.get("ad_tag") or referral.get("tag") or referral.get("headline")
+            if ad_tag:
+                state["ad_tag"] = str(ad_tag)
+        await save_user_state_async(phone, state)
     except Exception as e:
         state = {}
     reset_follow_up_timer(state)
     await save_user_state_async(phone, state)
+
+    # Re-extract lead details with populated state
+    lead_details = extract_lead_details(referral, state=state, phone=phone)
 
     # Fetch history
     try:
@@ -1281,12 +795,18 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     # Developer / Tester control commands
     cmd = text.strip().lower()
-    if cmd in ["#reset", "/reset", "reset chat", "reset session"]:
+    if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
         await reset_user_state_async(phone)
         reply = "🔄 Session reset successfully! Escalation cleared and AI re-enabled. How can I help you? 😊"
         await send_text_message_async(phone, reply)
         print(f"[3] 🔄 ACTION   : {phone} -> Reset session & unescalated")
         print("="*80 + "\n")
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="Session reset command executed",
+        )
         return
     elif cmd in ["#unescalate", "/unescalate", "#bot", "#ai", "#enable", "unescalate"]:
         from src.state.chat_state import clear_escalation_async
@@ -1295,12 +815,24 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         await send_text_message_async(phone, reply)
         print(f"[3] 🤖 ACTION   : {phone} -> Unescalated & AI re-enabled")
         print("="*80 + "\n")
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="AI re-enabled command executed",
+        )
         return
 
     # Check escalation
     if await is_escalated_async(phone):
         print(f"[3] 👤 ACTION   : {phone} -> Already escalated to agent (AI staying out)")
         print("="*80 + "\n")
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="IGNORED",
+            reason="Already escalated to human agent (AI staying out)",
+        )
         return
 
     # Round-robin agent assignment (async, non-blocking)
@@ -1316,12 +848,24 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         await handle_agent_handoff_async(phone, start_time)
         print(f"[3] 👤 ACTION   : {phone} -> Handed off to human agent")
         print("="*80 + "\n")
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="Customer requested human agent (Handed off to support team)",
+        )
         return
 
     # AI reply
     await handle_ai_reply_async(phone, text, history, start_time)
     print(f"[3] 🤖 ACTION   : {phone} -> AI Reply sent successfully (Message 1 + Message 2)")
     print("="*80 + "\n")
+    log_lead_action(
+        lead_no=phone,
+        lead_details=lead_details,
+        action_taken="REPLIED",
+        reason=f"{target_reason} — AI response sent",
+    )
 
 
 

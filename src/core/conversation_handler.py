@@ -1,0 +1,212 @@
+"""
+conversation_handler.py — Orchestrates one customer turn end-to-end.
+
+    incoming message
+          |
+          v
+   extract_intent_and_state_changes()  <- intent_classifier.py (silent JSON)
+          |
+          v
+   apply_extraction_to_state()         <- pure state merge, no LLM
+          |
+          v
+   format_system_prompt()              <- prompt.py, reads the UPDATED state
+          |
+          v
+   reply LLM call                      <- writes the actual customer-facing text
+          |
+          v
+   persist new state + return reply
+
+Step 1 in your flow (the 3 fixed ad-triggered welcome messages) happens
+entirely BEFORE this handler runs — that's a WhatsApp template/flow
+trigger, not an AI decision, so it's out of scope here by design. Every
+turn from your step 3 onward goes through this pipeline.
+"""
+
+import os
+import time
+import asyncio
+import re
+from typing import Any, Dict, List, Optional
+
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+from src.core import intent_classifier
+from src.core import prompt as prompt_module
+from src.services.interakt import send_text_message_async
+from src.services.agent_handoff import execute_agent_handoff_async
+from src.state.chat_history import save_message_async
+from src.state.csv_logger import log_message_async
+from src.state.chat_state import (
+    get_user_state_async,
+    save_user_state_async,
+    reset_user_state_async,
+    clear_escalation_async,
+    arm_followup_timer,
+)
+
+_reply_llm = None
+
+
+def _get_reply_llm():
+    global _reply_llm
+    if _reply_llm is None:
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        if openrouter_key:
+            model_name = os.getenv("OPENROUTER_REPLY_MODEL", "openai/gpt-4o-mini")
+            _reply_llm = ChatOpenAI(
+                model=model_name,
+                api_key=openrouter_key,
+                base_url="https://openrouter.ai/api/v1",
+                temperature=0.4,
+            )
+        else:
+            openai_key = os.getenv("OPENAI_API_KEY")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            _reply_llm = ChatOpenAI(
+                model=model_name,
+                api_key=openai_key,
+                temperature=0.4,
+            )
+    return _reply_llm
+
+
+async def handle_incoming_message(
+    user_message: str,
+    session_state: Dict[str, Any],
+    conversation_history: List[Dict[str, str]],
+    course_id: str = "yoga",
+) -> Dict[str, Any]:
+    """
+    Returns {"reply": str, "new_state": dict} — the caller persists
+    new_state and appends both messages to history.
+    """
+    # 1. Silent semantic extraction — any language, no keyword matching.
+    flags = await intent_classifier.extract_intent_and_state_changes(
+        text=user_message,
+        state=session_state,
+        history=conversation_history,
+    )
+
+    # 2. Pure state merge.
+    new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
+
+    # A customer can switch topics mid-conversation ("what about Kathak
+    # timings?") — if they did, that becomes the active course for THIS
+    # reply's primary KB section. Persisting it long-term is your call.
+    effective_course_id = new_state.get("course") or course_id
+
+    # 3. Build the system prompt with the freshly-understood state.
+    system_prompt = prompt_module.format_system_prompt(new_state, course_id=effective_course_id)
+
+    # 4. Generate the actual reply, with conversation history for coherence.
+    messages = [SystemMessage(content=system_prompt)]
+    for t in conversation_history[-12:]:
+        msg_cls = HumanMessage if t["role"] == "user" else AIMessage
+        messages.append(msg_cls(content=t["content"]))
+    messages.append(HumanMessage(content=user_message))
+
+    llm = _get_reply_llm()
+    response = await llm.ainvoke(messages)
+    reply_text = response.content
+
+    # Coupon-sent bookkeeping is a plain state flag, decided from what we
+    # KNOW (profile just confirmed + eligible this turn) — never by
+    # scanning the model's reply text for the coupon string.
+    if new_state.get("profile_created") and new_state.get("stage") == "PROFILE_COMPLETED":
+        new_state["stage"] = "COUPON_SENT"
+        new_state["coupon_sent"] = True
+
+    return {"reply": reply_text, "new_state": new_state}
+
+
+def _format_for_whatsapp(text: str) -> str:
+    """Cleans up markdown formatting for native WhatsApp rendering."""
+    if not text:
+        return text
+    text = re.sub(r"^(?:#{1,6})\s+(.+)$", r"*\1*", text, flags=re.MULTILINE)
+    text = re.sub(r"\*\*(.*?)\*\*", r"*\1*", text)
+    text = re.sub(r"^\s*\*\s+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^•\s*-\s*", "• ", text, flags=re.MULTILINE)
+    return text.strip()
+
+
+async def handle_conversation_turn_async(
+    phone: str,
+    text: str,
+    history: Optional[List[dict]] = None,
+    start_time: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Coordinates an entire conversational turn from tasks.py / routes.py:
+    1. Loads session state for the phone number.
+    2. Handles tester commands (reset, unescalate).
+    3. Executes handle_incoming_message (Two-Step Semantic Extraction + Prompt Generation).
+    4. Handles Agent Handoff if extraction flagged requests_human_agent.
+    5. Sends the generated reply via WhatsApp (send_text_message_async).
+    6. Persists updated state and logs messages asynchronously.
+    """
+    start_time = start_time or time.time()
+    state = await get_user_state_async(phone)
+    text_clean = (text or "").strip()
+    cmd = text_clean.lower()
+
+    # ── Control Commands (Tester / Dev Reset & Unescalate) ────────────────────
+    if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
+        await reset_user_state_async(phone)
+        await clear_escalation_async(phone)
+        reply = "🔄 Session reset successfully! Escalation cleared and AI re-enabled. How can I help you? 😊"
+        await send_text_message_async(phone, reply)
+        latency_sec = round(time.time() - start_time, 2)
+        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
+        return {"status": "reset", "reply": reply}
+
+    if cmd in ["#unescalate", "/unescalate", "#bot", "#ai", "#enable", "unescalate"]:
+        await clear_escalation_async(phone)
+        reply = "🤖 AI Assistant re-enabled for this number! How can I help you? 😊"
+        await send_text_message_async(phone, reply)
+        latency_sec = round(time.time() - start_time, 2)
+        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
+        return {"status": "unescalated", "reply": reply}
+
+    # ── Orchestrate Customer Turn via handle_incoming_message ─────────────────
+    active_course = state.get("course") or "yoga"
+    result = await handle_incoming_message(
+        user_message=text_clean,
+        session_state=state,
+        conversation_history=history or [],
+        course_id=active_course,
+    )
+
+    reply_text = result.get("reply", "")
+    new_state = result.get("new_state", state)
+    last_turn = new_state.get("_last_turn", {})
+
+    # Check for Human Agent Escalation
+    if last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST":
+        await execute_agent_handoff_async(
+            phone,
+            user_reply_text=reply_text,
+            escalation_reason=f"Customer requested agent: {last_turn.get('question_summary') or text_clean[:50]}",
+            start_time=start_time,
+        )
+        return {"status": "handed_off", "reply": reply_text}
+
+    # Clean formatting for WhatsApp
+    clean_reply = _format_for_whatsapp(reply_text)
+
+    # Deliver reply to customer on WhatsApp
+    await send_text_message_async(phone, clean_reply)
+
+    # Persist updated session state
+    arm_followup_timer(new_state, topic=text_clean)
+    await save_user_state_async(phone, new_state)
+
+    # Save to history & CSV
+    latency_sec = round(time.time() - start_time, 2)
+    asyncio.create_task(save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec))
+    asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+
+    return {"status": "answered", "reply": clean_reply}

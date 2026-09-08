@@ -119,7 +119,7 @@ async def chat_session():
         active_course = state.get("course", "yoga")
 
         # Detect package from text to update state
-        # Detect timing from text to update state
+        
         from src.state.chat_state import detect_timing_from_text
         t_str, is_amb, amb_r = detect_timing_from_text(user_input, course_id=active_course)
         if t_str:

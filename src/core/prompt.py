@@ -26,7 +26,7 @@ Act as a warm, knowledgeable, and professional Course Counsellor.
 - STRICT LANGUAGE & SCRIPT MATCHING RULE (NON-NEGOTIABLE):
   • Match the exact language AND script of the customer's LATEST message.
   • English input -> Reply ONLY in 100% pure English. Do NOT mix any Hindi/Hinglish words.
-  • Hinglish input (Hindi words written in Latin/English alphabet, e.g. "fees ky rhgi", "kya", "hai", "timing btao", "bhejo") -> 
+  • Hinglish input (Hindi words written in Latin/English alphabet, e.g. "fees ky rhgi", "kya", "hai", "timing btao", "bhejo") ->
     Reply ONLY in natural conversational Hinglish using the LATIN/ENGLISH ALPHABET (e.g. "Hamare yoga classes ki fees...", "Morning batches ka timing...").
     CRITICAL SCRIPT RESTRICTION: NEVER use Devanagari script (कभी भी देवनागरी लिपि का प्रयोग न करें) when the customer writes in Latin/English alphabet!
   • Devanagari Hindi input (e.g. "नमस्ते", "फीस कितनी है") -> Reply in Devanagari Hindi. Use Devanagari script ONLY if the customer explicitly typed in Devanagari!
@@ -42,11 +42,11 @@ Act as a warm, knowledgeable, and professional Course Counsellor.
 - MEDICAL BOUNDARIES: Never make medical guarantees, cure claims (e.g. curing slipped disc, PCOS, diabetes), or prescribe medical exercise treatments. Classes are for general wellness only. Advise consulting a doctor for acute medical conditions.
 - HUMAN ESCALATION: If the customer asks for a phone call, human agent, personal staff contact, or EMI options, guide them to type *agent* so a support coordinator can reach out. Never share personal phone numbers.
 - PHYSICAL BRANCH POLICY: Physical branches are administrative offices only. Online classes are attended from home. Offline/cash payments are strictly not accepted.
-- OTHER COURSES: Sensationz offers a wide variety of courses (Dance, Kathak, Yoga, Fitness, Music, Singing, Guitar, Keyboard, Drawing, Acting, Zumba, Spoken English, Face Yoga, etc.). If a customer asks about any course other than the currently active one:
-  • Confirm that Sensationz DOES offer it!
-  • If that course's details are in the course catalog, you may share what you know.
-  • Explain that detailed batch schedules and fees can be checked in the Sensationz App or website (https://shop.sensationzperformingarts.com/), or they can type *agent* so a coordinator can assist them.
-  • NEVER deny or contradict that Sensationz offers these courses.
+- OTHER COURSES & MULTI-COURSE INQUIRIES:
+  • Sensationz offers many courses beyond the one currently active — see the full catalog in COURSE DATA below.
+  • COURSES WITH FULL DETAILS ({full_kb_course_names}): Sensationz has complete fee structures, batch timings, and demo videos for these. Whenever a customer asks about any of them — even mid-inquiry about another course — ALWAYS quote the exact fees/timings directly in chat (see section 7 below if it isn't the currently active course). NEVER refuse to provide fees or redirect to the app for these.
+  • ANY OTHER COURSE: Confirm Sensationz DOES offer it, share general details from the course catalog, and explain that detailed batch schedules and fees can be checked in the Sensationz App or website (https://shop.sensationzperformingarts.com/), or they can type *agent* so a coordinator can assist them.
+  • NEVER deny or contradict that Sensationz offers any course listed in the catalog.
 
 ════════════════════════════════════════
 4. WHATSAPP FORMATTING & URLS
@@ -62,17 +62,20 @@ Act as a warm, knowledgeable, and professional Course Counsellor.
 {state_context}
 
 ════════════════════════════════════════
-6. OFFICIAL COURSE DATA (SOURCE OF TRUTH)
+6. OFFICIAL COURSE DATA (SOURCE OF TRUTH — ACTIVE COURSE: {course_id_title})
 ════════════════════════════════════════
 {course_data}
+{additional_course_reference}
 """
 
 
 def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str = "yoga") -> str:
     """
     Dynamically constructs the system prompt:
-    1. Loads clean structured course data from kb_loader (eliminating hardcoded python text).
+    1. Loads clean structured course data from kb_loader (global_rules + course file merged).
     2. Injects customer session state (coupon access lock/unlock, selected timing/package).
+    3. Injects compact pricing/timings for EVERY OTHER full-KB course (driven by
+       course_catalog.json's has_full_kb flag — not hardcoded to a specific pair).
     """
     s = state or {"stage": "NEW"}
 
@@ -81,7 +84,6 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
     fee_str = s.get("fee") or "N/A"
     stage_str = s.get("stage") or "NEW"
     app_str = "CONFIRMED" if s.get("app_installed") else "PENDING"
-    profile_str = "CONFIRMED" if s.get("profile_created") else "PENDING"
 
     profile_confirmed = bool(
         s.get("profile_created")
@@ -93,6 +95,7 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
     coupon_instruction = build_coupon_context(s, course_id=course_id)
 
     state_context = (
+        f"- Active Course Session: {course_id.title()}\n"
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
         f"- Package Fee: {fee_str}\n"
@@ -102,16 +105,45 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
 
-    # Fetch minified JSON string of the active course (coupon codes securely redacted if not confirmed)
     course_json_str = kb_loader.get_course_prompt_str(
-        course_id,
-        minified=True,
-        include_coupons=profile_confirmed
+        course_id, minified=True, include_coupons=profile_confirmed
+    )
+
+    # Cross-course reference: loop over EVERY other full-KB course, not a
+    # hardcoded pair. Add a third full-KB course later and this — and
+    # section 3's course list below — both pick it up with zero edits here.
+    other_ids = kb_loader.full_kb_course_ids(exclude=course_id)
+    if other_ids:
+        blocks = []
+        for oid in other_ids:
+            summary = kb_loader.get_pricing_and_timings_summary(oid)
+            blocks.append(
+                f"- {summary['name']}:\n"
+                f"    Packages & Fees: {summary['packages']}\n"
+                f"    Batch Timings: {', '.join(summary['timings'])}"
+            )
+        add_ref = (
+            "\n════════════════════════════════════════\n"
+            "7. ADDITIONAL FULL-KB COURSE REFERENCE\n"
+            "════════════════════════════════════════\n"
+            "If the customer asks about any of these, answer directly using these exact details "
+            "(coupon codes are intentionally NOT included here — only reveal a coupon for the "
+            "customer's active/confirmed enrollment course):\n" + "\n".join(blocks)
+        )
+    else:
+        add_ref = ""
+
+    full_kb_names = ", ".join(
+        (kb_loader.get_catalog_entry(cid) or {}).get("name", cid.title())
+        for cid in kb_loader.full_kb_course_ids()
     )
 
     return BASE_SYSTEM_TEMPLATE.format(
         state_context=state_context,
-        course_data=course_json_str
+        course_data=course_json_str,
+        additional_course_reference=add_ref,
+        course_id_title=course_id.title(),
+        full_kb_course_names=full_kb_names,
     )
 
 

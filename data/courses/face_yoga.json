@@ -1,0 +1,217 @@
+{
+    "_meta": {
+        "version": "3.1",
+        "course": "face_yoga",
+        "document_status": "active",
+        "language_support": [
+            "en",
+            "hi"
+        ],
+        "last_updated": "2026",
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here."
+    },
+    "course_overview": {
+        "name": "Online Live Interactive Face Yoga",
+        "mode": "Online Only",
+        "platform": "Sensationz App",
+        "class_format": "Live and interactive",
+        "class_days": "Monday to Friday (5 days per week)",
+        "weekend_classes": false,
+        "session_duration_minutes": 60,
+        "minimum_age_years": 8,
+        "prior_experience_required": false,
+        "batch_size_range": "30 to 50 students (varies per batch, not confirmed)",
+        "class_language": [
+            "Hindi",
+            "Hinglish"
+        ],
+        "all_teachers_female": null,
+        "teacher_gender_constraint": "NA",
+        "suitable_for": [
+            "Anyone wanting to focus on facial health"
+        ],
+        "duration_options": [
+            "1 Month",
+            "3 Months",
+            "6 Months",
+            "1 Year"
+        ],
+        "available_from_anywhere": true,
+        "recordings_available": false,
+        "certificate_provided": false,
+        "trial_classes_available": true,
+        "max_trial_classes": 3,
+        "trial_cost": "Free",
+        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
+        "important_note": "Not provided"
+    },
+    "pricing": {
+        "currency": "INR",
+        "gst_included_in_listed_price": false,
+        "gst_percentage": 5,
+        "gst_added_at": "Checkout in app or website",
+        "offer_mechanism": "Coupon code applied at checkout",
+        "beginner_recommendation": "Not specified",
+        "packages": [
+            {
+                "duration": "1 Month",
+                "duration_code": "1M",
+                "base_price": 500,
+                "offer_price": 300,
+                "coupon_code": "FACE300",
+                "gst_on_offer": null,
+                "total_with_gst_offer": null,
+                "per_day_offer": "Not provided"
+            },
+            {
+                "duration": "3 Months",
+                "duration_code": "3M",
+                "base_price": 1500,
+                "offer_price": 1000,
+                "coupon_code": "FACE1000",
+                "gst_on_offer": null,
+                "total_with_gst_offer": null,
+                "per_day_offer": "Not provided"
+            },
+            {
+                "duration": "6 Months",
+                "duration_code": "6M",
+                "base_price": 2100,
+                "offer_price": 1200,
+                "coupon_code": "FACE1200",
+                "gst_on_offer": null,
+                "total_with_gst_offer": null,
+                "per_day_offer": "Not provided"
+            },
+            {
+                "duration": "1 Year",
+                "duration_code": "1Y",
+                "base_price": 3600,
+                "offer_price": 2000,
+                "coupon_code": "FACE2000",
+                "gst_on_offer": null,
+                "total_with_gst_offer": null,
+                "per_day_offer": "Not provided"
+            }
+        ],
+        "note": "Offer price and GST amount on offer price were not provided in the source data; base_price is exclusive of the 5% GST."
+    },
+    "batch_timings": {
+        "total_batches": 4,
+        "flexibility_at_enrollment": "Client can change timing and teacher but not the course",
+        "classes_per_day": 1,
+        "batches": [
+            {
+                "slot": "Morning",
+                "time_24h": "07:00-08:00",
+                "time_12h": "7:00 AM to 8:00 AM",
+                "instructors": [
+                    "Parul mam"
+                ]
+            },
+            {
+                "slot": "Afternoon",
+                "time_24h": "12:00-13:00",
+                "time_12h": "12:00 PM to 1:00 PM",
+                "instructors": [
+                    "Sonali mam"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "16:00-17:00",
+                "time_12h": "4:00 PM to 5:00 PM",
+                "instructors": [
+                    "Sonali mam"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "18:00-19:00",
+                "time_12h": "6:00 PM to 7:00 PM",
+                "instructors": [
+                    "Parul mam"
+                ]
+            }
+        ],
+        "unavailable_slots": [
+            "Not explicitly provided"
+        ],
+        "earliest_batch": "7:00 AM to 8:00 AM",
+        "latest_batch": "6:00 PM to 7:00 PM"
+    },
+    "teachers": [
+        {
+            "name": "Parul mam",
+            "experience_years": "Not provided",
+            "qualifications": "Not provided",
+            "certifications": "Not provided",
+            "specialization": "Not provided",
+            "assigned_batches": [
+                "7:00 AM to 8:00 AM",
+                "6:00 PM to 7:00 PM"
+            ],
+            "demo_video": null
+        },
+        {
+            "name": "Sonali mam",
+            "experience_years": "Not provided",
+            "qualifications": "Not provided",
+            "certifications": "Not provided",
+            "specialization": "Not provided",
+            "assigned_batches": [
+                "12:00 PM to 1:00 PM",
+                "4:00 PM to 5:00 PM"
+            ],
+            "demo_video": null
+        }
+    ],
+    "syllabus": {
+        "note": "Not provided in source data — stages and topics need to be filled in once curriculum details are available."
+    },
+    "course_benefits": {
+        "focus_areas": [
+            "Not provided"
+        ],
+        "disclaimer": "These are course focus areas only, not guaranteed results — individual outcomes vary based on consistency of practice."
+    },
+    "what_to_keep_ready": [
+        "Nothing"
+    ],
+    "trial_class": {
+        "available": true,
+        "cost": "Free",
+        "max_trials": 3,
+        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
+        "booking_platform": "Sensationz App",
+        "booking_steps": [
+            "Open the Sensationz App",
+            "Go to the Profile section",
+            "Select the Trial Links option",
+            "Tap the + icon in the top right corner",
+            "Select the desired trial"
+        ]
+    },
+    "enrollment": {
+        "batches_start": "Not provided"
+    },
+    "not_offered": {
+        "course_types": [
+            "1-on-1 private classes",
+            "Offline / in-person classes",
+            "Home tuition"
+        ],
+        "other": [
+            "Recordings of live classes",
+            "Refunds",
+            "Certificate"
+        ]
+    },
+    "health_and_medical": {
+        "covered_topics": [
+            "Facial health"
+        ],
+        "medical_disclaimer": "This course is not a substitute for medical or dermatological treatment. Consult a doctor or dermatologist if you have a facial/skin medical condition.",
+        "sensitive_topic_instruction": "Not provided"
+    }
+}

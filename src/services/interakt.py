@@ -65,11 +65,9 @@ async def send_text_message_async(phone: str, message: str):
             json=payload,
         )
         elapsed = time.perf_counter() - t0
-        print(f"[interakt] send_text_message_async: {response.status_code} ({elapsed:.2f}s)")
         return response
     except httpx.TimeoutException:
         elapsed = time.perf_counter() - t0
-        print(f"[interakt] send_text_message_async TIMEOUT after {elapsed:.2f}s")
         return None
     except Exception as e:
         elapsed = time.perf_counter() - t0

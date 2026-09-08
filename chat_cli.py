@@ -34,9 +34,7 @@ llm = ChatOpenAI(
 
 
 def print_banner():
-    print("=" * 65)
     print("  🧘‍♀️ SENSATIONZ AI ASSISTANT — INTERACTIVE TERMINAL TESTER 🧘‍♀️")
-    print("=" * 65)
     print("Commands:")
     print("  • Type your question and press Enter to chat")
     print("  • 'reset'        -> Clear chat history & start fresh session")

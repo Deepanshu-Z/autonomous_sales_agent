@@ -57,7 +57,6 @@ async def receive_interakt_webhook(request: Request):
         data = {}
 
     event_type = data.get("type", "unknown")
-    print(f"\n[api] 🔔 WEBHOOK HIT RECEIVED: event_type='{event_type}'")
 
     signature = request.headers.get("Interakt-Signature", "")
     if not verify_webhook_signature(raw_body, signature):
@@ -212,8 +211,31 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
 
     if is_welcome_trigger(text):
         from src.core import kb_loader
-        detected_c = kb_loader.detect_course_from_text(text, default_course="yoga")
-        active_course = detected_c or "yoga"
+        detected_c = kb_loader.detect_course_from_text(text, default_course=None)
+        active_course = detected_c
+
+        if not active_course:
+            catalog = kb_loader.get_course_catalog()
+            c_names = ", ".join(c.get("name", c.get("id", "").title()) for c in catalog)
+            msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
+            msg2 = f"We offer Online Live Interactive classes with certified expert instructors across: {c_names}."
+            msg3 = "Which course are you interested in exploring today? 😊"
+
+            await send_text_message_async(phone, msg1)
+            await asyncio.sleep(1)
+            await send_text_message_async(phone, msg2)
+            await asyncio.sleep(1)
+            await send_text_message_async(phone, msg3)
+            full_welcome = f"{msg1}\n{msg2}\n{msg3}"
+            await save_message_async(phone, "assistant", full_welcome)
+            log_lead_action(
+                lead_no=phone,
+                lead_details=lead_details,
+                action_taken="REPLIED",
+                reason="Welcome message sent (course selection prompted)",
+            )
+            return {"status": "welcome sent"}
+
         course_data = kb_loader.get_course_data(active_course)
         course_name = course_data.get("course", active_course.title())
         pkgs = course_data.get("pricing", {}).get("packages", [])

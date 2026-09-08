@@ -537,7 +537,9 @@ def get_flow_followup(state: dict) -> str:
     if state.get("wants_trial") or state.get("stage") in ["TRIAL_STEPS_SENT", "TRIAL_REQUESTED"]:
         return None
 
-    active_course = state.get("course") or "yoga"
+    active_course = state.get("course")
+    if not active_course:
+        return None
 
     # 2. If timing is selected but package is missing -> ALWAYS prompt for package duration
     if state.get("timing") and not state.get("package"):
@@ -663,10 +665,11 @@ def _sanitize_locked_coupons(reply: str, state: dict) -> str:
         for c in kb_loader.get_course_coupons(cid).values():
             if c.get("code"):
                 all_codes.add(c["code"])
-    course_id = state.get("course") or "yoga"
-    for c in kb_loader.get_course_coupons(course_id).values():
-        if c.get("code"):
-            all_codes.add(c["code"])
+    course_id = state.get("course")
+    if course_id:
+        for c in kb_loader.get_course_coupons(course_id).values():
+            if c.get("code"):
+                all_codes.add(c["code"])
 
     coupon_patterns = [rf"\*?{re.escape(c)}\*?" for c in all_codes if c]
     cleaned = reply
@@ -696,10 +699,33 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         return
 
     if is_welcome_trigger(text):
-        detected_c = kb_loader.detect_course_from_text(text, default_course="yoga")
-        active_course = detected_c or "yoga"
+        detected_c = kb_loader.detect_course_from_text(text, default_course=None)
+        active_course = detected_c
         state = await get_user_state_async(phone)
         state["course"] = active_course
+
+        if not active_course:
+            catalog = kb_loader.get_course_catalog()
+            c_names = ", ".join(c.get("name", c.get("id", "").title()) for c in catalog)
+            msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
+            msg2 = f"We offer Online Live Interactive classes with certified expert instructors across: {c_names}."
+            msg3 = "Which course are you interested in exploring today? 😊"
+
+            await send_text_message_async(phone, msg1)
+            await asyncio.sleep(1)
+            await send_text_message_async(phone, msg2)
+            await asyncio.sleep(1)
+            await send_text_message_async(phone, msg3)
+
+            arm_followup_timer(state, topic="welcome message")
+            await save_user_state_async(phone, state)
+
+            latency_sec = round(time.time() - start_time, 2) if start_time else None
+            full_welcome = f"{msg1}\n{msg2}\n{msg3}"
+            asyncio.create_task(save_message_async(phone, "assistant", full_welcome, response_time_sec=latency_sec))
+            asyncio.create_task(log_message_async(phone, "ai", full_welcome))
+            return
+
         course_data = kb_loader.get_course_data(active_course)
         course_name = course_data.get("course", active_course.title())
         pkgs = course_data.get("pricing", {}).get("packages", [])
@@ -741,7 +767,7 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     # Log 1: Incoming message
     print("\n" + "="*80)
-    print(f"[1] 📩 INCOMING : {phone} -> {repr(text)}")
+
 
     # Log 2: Target check & decision
     is_target, target_reason = check_target_ad(text, referral, phone)
@@ -749,7 +775,6 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     if not is_target:
         # Log 3: Ignored action
-        print(f"[3] 🚫 ACTION   : {phone} -> Ignored (No reply sent)")
         print("="*80 + "\n")
         log_lead_action(
             lead_no=phone,
@@ -813,8 +838,6 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         await clear_escalation_async(phone)
         reply = "🤖 AI Assistant re-enabled for this number! How can I help you? 😊"
         await send_text_message_async(phone, reply)
-        print(f"[3] 🤖 ACTION   : {phone} -> Unescalated & AI re-enabled")
-        print("="*80 + "\n")
         log_lead_action(
             lead_no=phone,
             lead_details=lead_details,
@@ -858,8 +881,6 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     # AI reply
     await handle_ai_reply_async(phone, text, history, start_time)
-    print(f"[3] 🤖 ACTION   : {phone} -> AI Reply sent successfully (Message 1 + Message 2)")
-    print("="*80 + "\n")
     log_lead_action(
         lead_no=phone,
         lead_details=lead_details,

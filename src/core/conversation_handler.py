@@ -77,7 +77,7 @@ async def handle_incoming_message(
     user_message: str,
     session_state: Dict[str, Any],
     conversation_history: List[Dict[str, str]],
-    course_id: str = "yoga",
+    course_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Returns {"reply": str, "new_state": dict} — the caller persists
@@ -96,7 +96,7 @@ async def handle_incoming_message(
     # A customer can switch topics mid-conversation ("what about Kathak
     # timings?") — if they did, that becomes the active course for THIS
     # reply's primary KB section. Persisting it long-term is your call.
-    effective_course_id = new_state.get("course") or course_id
+    effective_course_id = new_state.get("course") or course_id or ""
 
     # 3. Build the system prompt with the freshly-understood state.
     system_prompt = prompt_module.format_system_prompt(new_state, course_id=effective_course_id)
@@ -172,7 +172,7 @@ async def handle_conversation_turn_async(
         return {"status": "unescalated", "reply": reply}
 
     # ── Orchestrate Customer Turn via handle_incoming_message ─────────────────
-    active_course = state.get("course") or "yoga"
+    active_course = state.get("course")
     result = await handle_incoming_message(
         user_message=text_clean,
         session_state=state,

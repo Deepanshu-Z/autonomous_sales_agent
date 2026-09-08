@@ -81,12 +81,20 @@ def get_course_catalog() -> List[Dict[str, Any]]:
 
 def get_catalog_entry(course_id: str) -> Optional[Dict[str, Any]]:
     cid = (course_id or "").lower().strip()
-    return next((c for c in get_course_catalog() if c.get("id") == cid), None)
+    # Check id OR aliases (e.g. 'zumba' -> matches 'fitness' catalog entry)
+    return next(
+        (c for c in get_course_catalog() 
+         if c.get("id") == cid or cid in [a.lower() for a in c.get("aliases", [])]), 
+        None
+    )
 
 
 def full_kb_course_ids(exclude: Optional[str] = None) -> List[str]:
     """Every course_id with has_full_kb == true, optionally excluding one."""
     exclude_cid = (exclude or "").lower().strip()
+    entry = get_catalog_entry(exclude_cid)
+    if entry:
+        exclude_cid = entry.get("id", exclude_cid)
     return [c["id"] for c in get_course_catalog() if c.get("has_full_kb") and c["id"] != exclude_cid]
 
 
@@ -95,38 +103,54 @@ def course_exists(course_id: str) -> bool:
     if not course_id:
         return False
     cid = course_id.lower().strip()
-    if os.path.exists(os.path.join(_COURSES_DIR, f"{cid}.json")):
+    if get_catalog_entry(cid) is not None:
         return True
-    return get_catalog_entry(cid) is not None
+    return os.path.exists(os.path.join(_COURSES_DIR, f"{cid}.json"))
 
 
 def _load_course_file(course_id: str) -> Optional[Dict[str, Any]]:
-    cid = (course_id or "yoga").lower().strip()
+    if not course_id:
+        return None
+    cid = course_id.lower().strip()
     if cid in _COURSES_CACHE:
         return _COURSES_CACHE[cid]
-    path = os.path.join(_COURSES_DIR, f"{cid}.json")
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        _COURSES_CACHE[cid] = data
-        return data
-    except Exception as e:
-        print(f"[kb_loader] Error reading {path}: {e}")
-        return None
+
+    # Check catalog entry for explicit kb_file first
+    catalog_entry = get_catalog_entry(cid)
+    candidates = []
+    if catalog_entry and catalog_entry.get("kb_file"):
+        candidates.append(os.path.join(_BASE_DIR, catalog_entry["kb_file"]))
+        candidates.append(os.path.join(_DATA_DIR, catalog_entry["kb_file"]))
+    candidates.extend([
+        os.path.join(_COURSES_DIR, f"{cid}.json"),
+        os.path.join(_COURSES_DIR, f"{cid.replace(' ', '_')}.json"),
+        os.path.join(_COURSES_DIR, f"{cid.replace('_', '')}.json"),
+    ])
+
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                _COURSES_CACHE[cid] = data
+                return data
+            except Exception as e:
+                print(f"[kb_loader] Error reading {path}: {e}")
+                return None
+    return None
 
 
-def get_course_data(course_id: str = "yoga") -> Dict[str, Any]:
+def get_course_data(course_id: str = "") -> Dict[str, Any]:
     """
     Returns the MERGED payload for a course: global_rules fields + either
     the full course file (if has_full_kb) or a lightweight catalog-derived
     stub. Every other function in this module reads from here, so nothing
     downstream needs to special-case whether a course has a dedicated file.
     """
-    cid = (course_id or "yoga").lower().strip()
+    raw_cid = (course_id or "").lower().strip()
     g = get_global_rules()
-    catalog_entry = get_catalog_entry(cid)
+    catalog_entry = get_catalog_entry(raw_cid)
+    cid = catalog_entry.get("id", raw_cid) if catalog_entry else raw_cid
 
     shared = {
         "organization": g.get("organization", {}),
@@ -142,9 +166,10 @@ def get_course_data(course_id: str = "yoga") -> Dict[str, Any]:
         ],
     }
 
-    course_file = _load_course_file(cid)
-    if course_file is not None:
-        return {**shared, **course_file}
+    if cid:
+        course_file = _load_course_file(cid)
+        if course_file is not None:
+            return {**shared, **course_file}
 
     if catalog_entry is not None:
         name = catalog_entry.get("name", cid.title())
@@ -162,11 +187,21 @@ def get_course_data(course_id: str = "yoga") -> Dict[str, Any]:
             },
         }
 
-    # Unknown course_id entirely — fall back to yoga rather than return a
-    # broken/empty payload that could make the assistant hallucinate.
-    if cid != "yoga":
-        return get_course_data("yoga")
-    return shared
+    # Unknown or unselected course — do NOT silently fall back to yoga!
+    catalog_courses = [c.get("name", c.get("id", "").title()) for c in get_course_catalog()]
+    return {
+        **shared,
+        "course_overview": {
+            "name": "Course Not Selected",
+            "available_courses": catalog_courses,
+            "instruction": (
+                "The customer has not selected a specific course yet, or asked about a course not in our catalog. "
+                "DO NOT assume, invent, or default to Yoga, Kathak, or any specific course! "
+                "Politely ask the customer which course they are interested in from our official offerings: "
+                f"{', '.join(catalog_courses)}."
+            ),
+        },
+    }
 
 
 def _redact_coupon_codes(data: Any) -> Any:
@@ -179,9 +214,9 @@ def _redact_coupon_codes(data: Any) -> Any:
     return data
 
 
-def get_course_prompt_str(course_id: str = "yoga", minified: bool = True, include_coupons: bool = True) -> str:
+def get_course_prompt_str(course_id: Optional[str] = None, minified: bool = True, include_coupons: bool = True) -> str:
     """Merged global + course JSON, ready for system-prompt injection."""
-    cid = (course_id or "yoga").lower().strip()
+    cid = (course_id or "").lower().strip()
     cache_key = f"{cid}_{minified}_{include_coupons}"
     if cache_key in _PROMPT_STR_CACHE:
         return _PROMPT_STR_CACHE[cache_key]
@@ -198,8 +233,10 @@ def get_course_prompt_str(course_id: str = "yoga", minified: bool = True, includ
     return prompt_str
 
 
-def get_valid_timings(course_id: str = "yoga") -> List[str]:
+def get_valid_timings(course_id: Optional[str] = None) -> List[str]:
     """Dynamically extracts valid batch timings straight from the course JSON — never a hand-typed list."""
+    if not course_id:
+        return []
     data = get_course_data(course_id)
     batches = data.get("batch_timings", {}).get("batches", [])
     valid_timings = []
@@ -216,14 +253,29 @@ def get_valid_timings(course_id: str = "yoga") -> List[str]:
     return valid_timings
 
 
-def get_valid_packages(course_id: str = "yoga") -> Dict[str, str]:
+def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
     """Dynamically extracts package names + formatted fee strings from the course JSON."""
+    if not course_id:
+        return {}
     data = get_course_data(course_id)
     packages = data.get("pricing", {}).get("packages", [])
-    return {
-        p["duration"]: f"₹{p.get('base_price', 0):,} (Offer Price: ₹{p.get('offer_price', 0):,})"
-        for p in packages if p.get("duration")
-    }
+    valid_pkgs = {}
+    for p in packages:
+        duration = p.get("duration")
+        if not duration:
+            continue
+        base = p.get("base_price")
+        offer = p.get("offer_price")
+        coupon = p.get("coupon_code")
+        if base is not None and offer is not None:
+            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,})"
+        elif base is not None and coupon:
+            valid_pkgs[duration] = f"₹{base:,} (Coupon: {coupon})"
+        elif base is not None:
+            valid_pkgs[duration] = f"₹{base:,}"
+        elif offer is not None:
+            valid_pkgs[duration] = f"Offer Price: ₹{offer:,}"
+    return valid_pkgs
 
 
 def get_pricing_and_timings_summary(course_id: str) -> Dict[str, Any]:
@@ -239,27 +291,32 @@ def get_pricing_and_timings_summary(course_id: str) -> Dict[str, Any]:
     }
 
 
-def get_course_coupons(course_id: str = "yoga") -> Dict[str, Dict[str, Any]]:
+def get_course_coupons(course_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """Dynamically extracts coupon codes per package duration — zero hardcoded codes."""
+    if not course_id:
+        return {}
     data = get_course_data(course_id)
     packages = data.get("pricing", {}).get("packages", [])
-    cid_upper = (course_id or "yoga").upper()
+    cid_upper = course_id.upper().replace(" ", "_")
     coupons = {}
     for pkg in packages:
         duration = pkg.get("duration")
         if not duration:
             continue
-        offer = pkg.get("offer_price", 0)
+        offer = pkg.get("offer_price")
+        base = pkg.get("base_price", 0)
         coupons[duration] = {
-            "code": pkg.get("coupon_code") or f"{cid_upper}{offer}",
-            "base_price": pkg.get("base_price", 0),
-            "offer_price": offer,
+            "code": pkg.get("coupon_code") or f"{cid_upper}{offer if offer is not None else base}",
+            "base_price": base,
+            "offer_price": offer if offer is not None else base,
             "duration": duration,
         }
     return coupons
 
 
-def format_batch_timings_display(course_id: str = "yoga") -> str:
+def format_batch_timings_display(course_id: Optional[str] = None) -> str:
+    if not course_id:
+        return ""
     data = get_course_data(course_id)
     batches = data.get("batch_timings", {}).get("batches", [])
     slots: Dict[str, List[str]] = {}
@@ -270,11 +327,15 @@ def format_batch_timings_display(course_id: str = "yoga") -> str:
     return "\n".join(f"• {slot}: " + ", ".join(t for t in times if t) for slot, times in slots.items())
 
 
-def format_package_fees_display(course_id: str = "yoga") -> str:
+def format_package_fees_display(course_id: Optional[str] = None) -> str:
+    if not course_id:
+        return ""
     return "\n".join(f"• {pkg}: {fee}" for pkg, fee in get_valid_packages(course_id).items())
 
 
-def format_demo_videos_display(course_id: str = "yoga") -> str:
+def format_demo_videos_display(course_id: Optional[str] = None) -> str:
+    if not course_id:
+        return ""
     data = get_course_data(course_id)
     demos = data.get("trial_class", {}).get("demo_videos", {})
     return "\n".join(f"• Trainer {name}: {url}" for name, url in demos.items() if url)
@@ -300,8 +361,8 @@ def format_app_links_display() -> str:
 def _normalize_consonants(word: str) -> str:
     return re.sub(r"[^bcdfghjklmnpqrstvwxyz]", "", word.lower())
 
-
-def detect_course_from_text_fallback(text: str, default_course: Optional[str] = "yoga") -> Optional[str]:
+# DEFAULT TO NONE FOR TESTING
+def detect_course_from_text_fallback(text: str, default_course: Optional[str] = None) -> Optional[str]:
     """Deterministic keyword/fuzzy course-name matcher. FALLBACK ONLY."""
     if not text:
         return default_course
@@ -332,3 +393,7 @@ def is_app_link_request_fallback(text: str) -> bool:
     """Deterministic keyword check. FALLBACK ONLY."""
     t = (text or "").lower()
     return any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
+
+
+# Backward-compatible alias for existing test suites and modules
+detect_course_from_text = detect_course_from_text_fallback

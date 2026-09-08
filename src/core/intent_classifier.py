@@ -175,7 +175,7 @@ async def extract_intent_and_state_changes(
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
-        f"- Active Course: {s.get('course', 'yoga')}\n"
+        f"- Active Course: {s.get('course') or 'None (Not Selected)'}\n"
         f"- Selected Package: {s.get('package') or 'None'}\n"
         f"- Selected Timing: {s.get('timing') or 'None'}\n"
         f"- App Installed in State: {bool(s.get('app_installed'))}\n"

@@ -43,9 +43,15 @@ Act as a warm, knowledgeable, and professional Course Counsellor.
 - HUMAN ESCALATION: If the customer asks for a phone call, human agent, personal staff contact, or EMI options, guide them to type *agent* so a support coordinator can reach out. Never share personal phone numbers.
 - PHYSICAL BRANCH POLICY: Physical branches are administrative offices only. Online classes are attended from home. Offline/cash payments are strictly not accepted.
 - OTHER COURSES & MULTI-COURSE INQUIRIES:
-  • Sensationz offers many courses beyond the one currently active — see the full catalog in COURSE DATA below.
-  • COURSES WITH FULL DETAILS ({full_kb_course_names}): Sensationz has complete fee structures, batch timings, and demo videos for these. Whenever a customer asks about any of them — even mid-inquiry about another course — ALWAYS quote the exact fees/timings directly in chat (see section 7 below if it isn't the currently active course). NEVER refuse to provide fees or redirect to the app for these.
-  • ANY OTHER COURSE: Confirm Sensationz DOES offer it, share general details from the course catalog, and explain that detailed batch schedules and fees can be checked in the Sensationz App or website (https://shop.sensationzperformingarts.com/), or they can type *agent* so a coordinator can assist them.
+  • COURSES WITH FULL DETAILS ({full_kb_course_names}): Sensationz has complete fee structures, batch timings, and demo videos ONLY for these specific courses. Whenever a customer asks specifically about Yoga, Kathak, or Face Yoga, quote their respective fees/timings directly in chat (see section 7 below if not active).
+  • NON-DIGITIZED COURSES (e.g. Zumba, Fitness, Western Dance, Music, Guitar, Singing, Keyboard, Drawing, Acting, Spoken English):
+    - Confirm Sensationz DOES offer the course!
+    - ABSOLUTE PROHIBITION: You do NOT have fees, packages, or batch schedules for Zumba, Dance, Guitar, etc. in chat. NEVER invent fees or timings for them, and NEVER use Yoga or Kathak fees/timings for Zumba or Dance!
+    - Direct the customer to check the Sensationz App or website (https://shop.sensationzperformingarts.com/) for the current schedule and fees, or type *agent* so our team can assist.
+  • NO COURSE SPECIFIED / UNKNOWN COURSE:
+    - If the customer asks a general question without specifying a course (e.g. "fees kitni hai", "timing kya hai"), DO NOT guess, list fees for, or default to Yoga!
+    - Do NOT output any package prices or fee structures yet.
+    - Simply ask the customer which course they are interested in from our offerings: ({full_kb_course_names}, Dance, Fitness/Zumba, Music, Guitar, Drawing, etc.).
   • NEVER deny or contradict that Sensationz offers any course listed in the catalog.
 
 ════════════════════════════════════════
@@ -69,7 +75,7 @@ Act as a warm, knowledgeable, and professional Course Counsellor.
 """
 
 
-def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str = "yoga") -> str:
+def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: Optional[str] = None) -> str:
     """
     Dynamically constructs the system prompt:
     1. Loads clean structured course data from kb_loader (global_rules + course file merged).
@@ -78,6 +84,8 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
        course_catalog.json's has_full_kb flag — not hardcoded to a specific pair).
     """
     s = state or {"stage": "NEW"}
+    cid = (course_id if course_id is not None else s.get("course")) or ""
+    cid = cid.lower().strip()
 
     timing_str = s.get("timing") or "NOT SELECTED"
     package_str = s.get("package") or "NOT SELECTED"
@@ -92,10 +100,13 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
     )
 
     from src.core.coupons import build_coupon_context
-    coupon_instruction = build_coupon_context(s, course_id=course_id)
+    coupon_instruction = build_coupon_context(s, course_id=cid)
+
+    catalog_entry = kb_loader.get_catalog_entry(cid)
+    active_title = catalog_entry.get("name") if catalog_entry else (cid.title() if cid else "Not Selected")
 
     state_context = (
-        f"- Active Course Session: {course_id.title()}\n"
+        f"- Active Course Session: {active_title}\n"
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
         f"- Package Fee: {fee_str}\n"
@@ -106,13 +117,13 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
     )
 
     course_json_str = kb_loader.get_course_prompt_str(
-        course_id, minified=True, include_coupons=profile_confirmed
+        cid, minified=True, include_coupons=profile_confirmed
     )
 
     # Cross-course reference: loop over EVERY other full-KB course, not a
     # hardcoded pair. Add a third full-KB course later and this — and
     # section 3's course list below — both pick it up with zero edits here.
-    other_ids = kb_loader.full_kb_course_ids(exclude=course_id)
+    other_ids = kb_loader.full_kb_course_ids(exclude=cid)
     if other_ids:
         blocks = []
         for oid in other_ids:
@@ -142,7 +153,7 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: str 
         state_context=state_context,
         course_data=course_json_str,
         additional_course_reference=add_ref,
-        course_id_title=course_id.title(),
+        course_id_title=active_title,
         full_kb_course_names=full_kb_names,
     )
 

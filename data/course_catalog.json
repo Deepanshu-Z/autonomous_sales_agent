@@ -133,7 +133,8 @@
             "jawline yoga",
             "anti aging yoga"
         ],
-        "has_full_kb": false,
-        "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness (separate course)."
+        "has_full_kb": true,
+        "kb_file": "data/courses/face_yoga.json",
+        "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness."
     }
 ]

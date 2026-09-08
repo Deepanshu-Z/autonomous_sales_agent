@@ -128,7 +128,7 @@ def get_default_state(phone: str) -> dict:
         "coupon_sent": False,         # Boolean flag indicating if welcome coupon code was delivered
         "wants_trial": False,         # Boolean flag indicating if user preferred a demo/trial class first
         "is_escalated": False,        # Escalation flag to hand off to human agent
-        "course": "yoga",             # Active course context (e.g. "yoga", "kathak")
+        "course": None,               # Active course context (e.g. "yoga", "kathak", None until selected)
 
         "is_target_ad": False,        # Whether user verified via secret string (AI enabled)
         "low_confidence_count": 0,     # Consecutive unanswered / low-confidence query count
@@ -740,22 +740,23 @@ async def extract_and_update_slots(phone: str, text: str, chat_history: list = N
 
     extraction = await extract_intent_and_state_changes(text, state=state, history=chat_history)
 
-    active_course = state.get("course") or "yoga"
+    active_course = state.get("course")
     if extraction.get("selected_course"):
         cand_course = extraction["selected_course"].lower()
         if kb_loader.course_exists(cand_course):
             state["course"] = cand_course
             active_course = cand_course
 
-    if extraction.get("selected_package"):
+    if active_course and extraction.get("selected_package"):
         pkg = normalize_package_name(extraction["selected_package"], course_id=active_course)
         if pkg:
             state["package"] = pkg
             course_pkgs = kb_loader.get_valid_packages(active_course)
             state["fee"] = course_pkgs.get(pkg, state.get("fee"))
 
-    if extraction.get("selected_timing"):
-        state["timing"] = extraction["selected_timing"]
+    if active_course and extraction.get("selected_timing"):
+        detected_t, _, _ = detect_timing_from_text(extraction["selected_timing"], course_id=active_course)
+        state["timing"] = detected_t or extraction["selected_timing"]
 
     if extraction.get("wants_trial"):
         state["wants_trial"] = True

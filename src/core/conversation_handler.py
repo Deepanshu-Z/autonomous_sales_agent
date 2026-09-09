@@ -101,9 +101,26 @@ async def handle_incoming_message(
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
 
     # A customer can switch topics mid-conversation ("what about Kathak
-    # timings?") — if they did, that becomes the active course for THIS
-    # reply's primary KB section. Persisting it long-term is your call.
-    effective_course_id = new_state.get("course") or course_id or ""
+    # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
+    # reply's primary KB section.
+    from src.core import kb_loader
+
+    # Dynamic course switch: if customer mentions any course from the catalog, switch to it for this turn
+    course_in_msg = kb_loader.detect_course_from_text(user_message, default_course=None) if user_message else None
+    effective_course_id = course_in_msg or new_state.get("course") or session_state.get("course") or course_id or ""
+
+    if not effective_course_id and conversation_history:
+        hist_text = " ".join((t.get("content") or "") for t in conversation_history[-10:])
+        detected_c = kb_loader.detect_course_from_text(hist_text, default_course=None)
+        if detected_c:
+            effective_course_id = detected_c
+
+    if effective_course_id:
+        entry = kb_loader.get_catalog_entry(effective_course_id)
+        if entry:
+            effective_course_id = entry["id"]
+        new_state["course"] = effective_course_id
+        session_state["course"] = effective_course_id
 
     # 3. Build the system prompt with the freshly-understood state.
     system_prompt = prompt_module.format_system_prompt(new_state, course_id=effective_course_id)
@@ -111,8 +128,11 @@ async def handle_incoming_message(
     # 4. Generate the actual reply, with conversation history for coherence.
     messages = [SystemMessage(content=system_prompt)]
     for t in conversation_history[-24:]:
-        msg_cls = HumanMessage if t["role"] == "user" else AIMessage
-        messages.append(msg_cls(content=t["content"]))
+        content = (t.get("content") or "").strip()
+        if not content:
+            continue
+        msg_cls = HumanMessage if t.get("role") == "user" else AIMessage
+        messages.append(msg_cls(content=content))
     messages.append(HumanMessage(content=user_message))
 
     llm = _get_reply_llm()
@@ -146,6 +166,9 @@ async def handle_incoming_message(
             main_reply = raw_content
             followup_msg = None
 
+    # Enforce exact coupons directly from the active course's JSON (zero hallucination, zero hardcode)
+    main_reply = _enforce_json_coupons(main_reply, new_state, effective_course_id)
+
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.
@@ -154,6 +177,48 @@ async def handle_incoming_message(
         new_state["coupon_sent"] = True
 
     return {"reply": main_reply, "followup": followup_msg, "new_state": new_state}
+
+
+def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional[str]) -> str:
+    """
+    100% dynamic, zero-hardcode coupon validation directly from course JSON.
+    Reads valid codes from kb_loader.get_course_coupons(course_id).
+    If the LLM outputs any uppercase code not in the course's valid codes,
+    it dynamically swaps it with the official code for the customer's package from the JSON.
+    """
+    if not reply or not course_id:
+        return reply
+
+    from src.core import kb_loader
+    from src.core.coupons import get_coupon_details
+
+    profile_confirmed = bool(
+        state.get("profile_created")
+        or state.get("coupon_sent")
+        or state.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
+    )
+
+    coupons = kb_loader.get_course_coupons(course_id)
+    valid_codes = {c.get("code").upper() for c in coupons.values() if c.get("code")}
+
+    if not profile_confirmed:
+        # If profile not confirmed, redact any leaked or fabricated coupon code pattern
+        reply = re.sub(r"\*?\b[A-Z]{3,12}\d{2,5}\b\*?", "welcome discount coupon", reply)
+        return reply
+
+    # If profile is confirmed:
+    selected_pkg = state.get("package")
+    details = get_coupon_details(selected_pkg, course_id=course_id) if selected_pkg else None
+    official_code = details["code"] if details else None
+
+    # Replace any hallucinated code tokens not found in the course JSON
+    tokens = re.findall(r"\b([A-Z]{3,12}\d{2,5})\b", reply)
+    for token in tokens:
+        if token.upper() not in valid_codes:
+            replacement = f"*{official_code}*" if official_code else "welcome discount coupon"
+            reply = re.sub(rf"\b{re.escape(token)}\b", replacement, reply)
+
+    return reply
 
 
 def _strip_trailing_question(text: str) -> str:
@@ -177,6 +242,33 @@ def _format_for_whatsapp(text: str) -> str:
     text = re.sub(r"^\s*\*\s+", "• ", text, flags=re.MULTILINE)
     text = re.sub(r"^•\s*-\s*", "• ", text, flags=re.MULTILINE)
     return text.strip()
+
+
+OFFICIAL_PLATFORM_LINKS_BLOCK = (
+    "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+    "🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+    "💻 Website: https://shop.sensationzperformingarts.com/"
+)
+
+
+def _ensure_app_website_links(text: str) -> str:
+    """Guarantees that whenever app or website is mentioned, official links are present."""
+    if not text:
+        return text
+    t_lower = text.lower()
+    has_links = (
+        "play.google.com" in t_lower
+        or "shop.sensationzperformingarts.com" in t_lower
+        or "apps.apple.com" in t_lower
+    )
+    if has_links:
+        return text
+    mentions_platform = bool(
+        re.search(r"\b(app|apps|application|website|web site|portal|platform|platforms|playstore|play store|appstore|app store)\b", t_lower)
+    )
+    if mentions_platform:
+        return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
+    return text
 
 
 async def handle_conversation_turn_async(
@@ -280,16 +372,20 @@ async def handle_conversation_turn_async(
             followup_msg = parts[1].strip() or None
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply)) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_reply = _ensure_app_website_links(clean_reply)
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
+    if clean_followup and "play.google.com" not in clean_reply:
+        clean_followup = _ensure_app_website_links(clean_followup)
 
     # Deliver main reply to customer on WhatsApp (Message 1)
-    await send_text_message_async(phone, clean_reply)
-    latency_sec = round(time.time() - start_time, 2)
-    await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
-    asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+    if clean_reply and clean_reply.strip():
+        await send_text_message_async(phone, clean_reply)
+        latency_sec = round(time.time() - start_time, 2)
+        await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
+        asyncio.create_task(log_message_async(phone, "ai", clean_reply))
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
-    if clean_followup:
+    if clean_followup and clean_followup.strip():
         await asyncio.sleep(1)
         await send_text_message_async(phone, clean_followup)
         await save_message_async(phone, "assistant", clean_followup)

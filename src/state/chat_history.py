@@ -23,7 +23,11 @@ def _cache_key(phone: str) -> str:
 
 
 def save_message(phone: str, role: str, text: str, response_time_sec: float = None):
-    payload = {"phone": phone, "role": role, "message": text}
+    text_clean = (text or "").strip()
+    if not text_clean:
+        return
+
+    payload = {"phone": phone, "role": role, "message": text_clean}
     if response_time_sec is not None:
         payload["response_time_sec"] = response_time_sec
         print(f"[chat_history] {phone} ({role}) - Response Time: {response_time_sec}s")
@@ -34,7 +38,7 @@ def save_message(phone: str, role: str, text: str, response_time_sec: float = No
         except Exception as e:
             if response_time_sec is not None:
                 try:
-                    supabase.table("chat_history").insert({"phone": phone, "role": role, "message": text}).execute()
+                    supabase.table("chat_history").insert({"phone": phone, "role": role, "message": text_clean}).execute()
                 except Exception as ex:
                     print(f"[chat_history] Supabase insert failed: {ex}")
             else:
@@ -42,7 +46,7 @@ def save_message(phone: str, role: str, text: str, response_time_sec: float = No
 
     try:
         key = _cache_key(phone)
-        cache_item = {"role": role, "content": text}
+        cache_item = {"role": role, "content": text_clean}
         if response_time_sec is not None:
             cache_item["response_time_sec"] = response_time_sec
         redis_conn.rpush(key, json.dumps(cache_item))
@@ -58,7 +62,8 @@ def get_recent_history(phone: str, limit: int = HISTORY_CACHE_LIMIT):
     try:
         cached = redis_conn.lrange(key, -limit, -1)
         if cached:
-            return [json.loads(item) for item in cached]
+            parsed = [json.loads(item) for item in cached]
+            return [turn for turn in parsed if (turn.get("content") or "").strip()]
     except Exception as e:
         print(f"[chat_history] Redis cache read failed, falling back to Supabase: {e}")
 
@@ -74,7 +79,11 @@ def get_recent_history(phone: str, limit: int = HISTORY_CACHE_LIMIT):
             .limit(limit)
             .execute()
         )
-        history = [{"role": row["role"], "content": row["message"]} for row in reversed(result.data)]
+        history = [
+            {"role": row["role"], "content": row["message"]}
+            for row in reversed(result.data)
+            if (row.get("message") or "").strip()
+        ]
     except Exception as e:
         print(f"[chat_history] Supabase fetch history failed: {e}")
         return []

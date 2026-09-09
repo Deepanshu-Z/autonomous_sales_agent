@@ -243,10 +243,19 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
         ]
         for pkg in packages:
             lines.append(f"  • {pkg.get('duration')}: Offer Price ₹{pkg.get('offer_price')} (Regular: ₹{pkg.get('base_price')}) — [Code locked until profile created]")
+        if not packages:
+            lines.append("  (No course selected yet — once customer selects a course, offer prices and locked codes will be shown.)")
         return "\n".join(lines)
 
     else:
         selected = s.get("package")
+        if not packages:
+            return (
+                "• WELCOME DISCOUNT — PROFILE CONFIRMED (UNLOCKED):\n"
+                "  - Profile is confirmed but no course is selected yet. Coupon codes are course-specific.\n"
+                "  - DO NOT output any coupon code. Once the customer selects their course and package, share the exact code from COURSE_DATA.\n"
+                "  - ZERO FABRICATION RULE: NEVER invent, guess, or make up any coupon code string!"
+            )
         lines = [
             "• WELCOME DISCOUNT — PROFILE CONFIRMED (UNLOCKED):",
             "  - Customer's profile registration is CONFIRMED. Welcome coupons are UNLOCKED.",

@@ -100,7 +100,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - Package duration selected or mentioned by user ("1 Month", "3 Months", "6 Months", "1 Year"), else null.
 
 5. "selected_course":
-   - Course mentioned by user ("yoga", "kathak", "dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
+   - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
 
 6. "wants_trial":
    - boolean: true if customer asks for demo, trial class, free trial, or wanting to try before enrolling.
@@ -199,6 +199,12 @@ async def extract_intent_and_state_changes(
         for k in clean:
             if k in data:
                 clean[k] = data[k]
+
+        # Deterministic course detection from user text overrides ambiguous LLM extraction
+        from src.core import kb_loader
+        text_course = kb_loader.detect_course_from_text(text, default_course=None)
+        if text_course:
+            clean["selected_course"] = text_course
 
         return clean
     except Exception as e:

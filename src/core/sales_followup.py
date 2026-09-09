@@ -26,7 +26,7 @@ _SUPPRESS_ON_USER_KWS = [
     "arthritis", "tumour", "tumor", "chemo", "chemotherapy", "patient",
     "dawa", "hospital", "bimari", "bimar",
     # Unoffered services
-    "kids yoga", "face yoga", "1-on-1", "one on one", "private class",
+    "kids yoga",  "1-on-1", "one on one", "private class",
     "home tutor", "personal class",
     # Refund / Support / Complaint / Legal / Disputes
     "refund", "cancel", "cancellation", "complaint", "dispute", "police",

@@ -17,6 +17,11 @@ _csv_lock = threading.Lock()
 _schema_ready = False
 
 
+# CSV logging is disabled by default to prevent large file writes and git changes.
+# Set ENABLE_CSV_LOGGING=true in your environment to re-enable if ever needed.
+ENABLE_CSV_LOGGING = os.getenv("ENABLE_CSV_LOGGING", "false").lower() in ("true", "1", "yes")
+
+
 def _ensure_csv_exists():
     global _schema_ready
     if _schema_ready:
@@ -56,6 +61,9 @@ def _ensure_csv_exists():
 
 
 def log_message(phone: str, role: str, message: str, sources: str = "", retrieval_query: str = ""):
+    if not ENABLE_CSV_LOGGING:
+        return
+
     _ensure_csv_exists()
 
     row = {
@@ -74,4 +82,6 @@ def log_message(phone: str, role: str, message: str, sources: str = "", retrieva
 
 
 async def log_message_async(phone: str, role: str, message: str, sources: str = "", retrieval_query: str = ""):
+    if not ENABLE_CSV_LOGGING:
+        return
     return await asyncio.to_thread(log_message, phone, role, message, sources, retrieval_query)

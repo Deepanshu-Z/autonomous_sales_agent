@@ -150,6 +150,10 @@ def get_course_data(course_id: str = "") -> Dict[str, Any]:
     raw_cid = (course_id or "").lower().strip()
     g = get_global_rules()
     catalog_entry = get_catalog_entry(raw_cid)
+    if not catalog_entry and raw_cid:
+        detected = detect_course_from_text(raw_cid)
+        if detected:
+            catalog_entry = get_catalog_entry(detected)
     cid = catalog_entry.get("id", raw_cid) if catalog_entry else raw_cid
 
     shared = {
@@ -373,11 +377,18 @@ def detect_course_from_text_fallback(text: str, default_course: Optional[str] = 
     except ImportError:
         return default_course
 
-    for item in get_course_catalog():
+    catalog = get_course_catalog()
+    # 1. Multi-word alias matches across the catalog (e.g. "face yoga", "spoken english")
+    for item in catalog:
         cid = item.get("id")
         for alias in item.get("aliases", []) + [cid]:
             if " " in alias and alias in q:
                 return cid
+
+    # 2. Single-word exact and fuzzy matches
+    for item in catalog:
+        cid = item.get("id")
+        for alias in item.get("aliases", []) + [cid]:
             alias_cons = _normalize_consonants(alias)
             for w in words:
                 if w == alias:

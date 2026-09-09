@@ -85,7 +85,7 @@ EXTRACTION FIELDS:
    - "unmentioned": Not stated.
 
 2. "profile_created_stated":
-   - "confirmed": Customer states/confirms they created their profile, account, or finished signup ("profile bana li", "done", "yes done", "banadi", "created", "account ban gaya", "sab kar diya", "haan ho gaya"). Note: If the customer replies "done" or "yes" after the bot asked them to create their profile, this is "confirmed".
+   - "confirmed": Customer states/confirms they created their profile, account, or finished signup ("profile bana li", "done", "yes done", "banadi", "created", "account ban gaya", "sab kar diya", "haan ho gaya", "krlia"). Note: If the customer replies "done", "yes", or "krlia" after the bot asked them to create their profile or install the app, this is "confirmed".
    - "denied": Customer states they have NOT created their profile or skipped it ("profile abhi nahi", "profile skip kar diya", "profile nahi banayi", "haven't done profile yet").
    - "unmentioned": Not stated.
 
@@ -248,7 +248,18 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["package"] = flags["selected_package"]
 
     if flags.get("selected_course"):
-        new_state["course"] = flags["selected_course"]
+        from src.core import kb_loader
+        raw_c = flags["selected_course"]
+        entry = kb_loader.get_catalog_entry(raw_c)
+        if entry:
+            new_state["course"] = entry["id"]
+        else:
+            detected = kb_loader.detect_course_from_text(raw_c)
+            if detected:
+                new_state["course"] = detected
+
+    if flags.get("wants_trial"):
+        new_state["wants_trial"] = True
 
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),

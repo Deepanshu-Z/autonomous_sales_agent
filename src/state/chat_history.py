@@ -15,7 +15,7 @@ load_dotenv()
 redis_conn = get_redis_connection()
 
 HISTORY_CACHE_TTL = 60 * 30    # 30 minutes
-HISTORY_CACHE_LIMIT = 10       # recent turns for prompt context
+HISTORY_CACHE_LIMIT = 24       # retain last ~8-10 conversational turns (1 user + 2 assistant messages per turn)
 
 
 def _cache_key(phone: str) -> str:

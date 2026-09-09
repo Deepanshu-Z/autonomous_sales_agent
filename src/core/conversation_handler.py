@@ -28,13 +28,18 @@ import os
 import time
 import asyncio
 import re
+import json
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from src.core import intent_classifier
 from src.core import prompt as prompt_module
+from src.core.refusal_engine import evaluate_refusal_async
 from src.services.interakt import send_text_message_async
 from src.services.agent_handoff import execute_agent_handoff_async
 from src.state.chat_history import save_message_async
@@ -60,7 +65,8 @@ def _get_reply_llm():
                 model=model_name,
                 api_key=openrouter_key,
                 base_url="https://openrouter.ai/api/v1",
-                temperature=0.4,
+                temperature=0.2,
+                model_kwargs={"response_format": {"type": "json_object"}},
             )
         else:
             openai_key = os.getenv("OPENAI_API_KEY")
@@ -68,7 +74,8 @@ def _get_reply_llm():
             _reply_llm = ChatOpenAI(
                 model=model_name,
                 api_key=openai_key,
-                temperature=0.4,
+                temperature=0.2,
+                model_kwargs={"response_format": {"type": "json_object"}},
             )
     return _reply_llm
 
@@ -103,14 +110,41 @@ async def handle_incoming_message(
 
     # 4. Generate the actual reply, with conversation history for coherence.
     messages = [SystemMessage(content=system_prompt)]
-    for t in conversation_history[-12:]:
+    for t in conversation_history[-24:]:
         msg_cls = HumanMessage if t["role"] == "user" else AIMessage
         messages.append(msg_cls(content=t["content"]))
     messages.append(HumanMessage(content=user_message))
 
     llm = _get_reply_llm()
     response = await llm.ainvoke(messages)
-    reply_text = response.content
+    raw_content = (response.content or "").strip()
+
+    main_reply = raw_content
+    followup_msg = None
+
+    try:
+        clean_json_str = raw_content
+        if clean_json_str.startswith("```json"):
+            clean_json_str = clean_json_str[7:]
+        elif clean_json_str.startswith("```"):
+            clean_json_str = clean_json_str[3:]
+        if clean_json_str.endswith("```"):
+            clean_json_str = clean_json_str[:-3]
+        clean_json_str = clean_json_str.strip()
+
+        parsed = json.loads(clean_json_str)
+        if isinstance(parsed, dict):
+            main_reply = parsed.get("reply", "") or ""
+            followup_msg = parsed.get("followup") or None
+    except Exception as exc:
+        logger.warning(f"Failed to parse LLM2 JSON output: {exc}. Using fallback.")
+        if "[FOLLOW_UP]" in raw_content:
+            parts = raw_content.split("[FOLLOW_UP]", 1)
+            main_reply = parts[0].strip()
+            followup_msg = parts[1].strip() or None
+        else:
+            main_reply = raw_content
+            followup_msg = None
 
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
@@ -119,7 +153,19 @@ async def handle_incoming_message(
         new_state["stage"] = "COUPON_SENT"
         new_state["coupon_sent"] = True
 
-    return {"reply": reply_text, "new_state": new_state}
+    return {"reply": main_reply, "followup": followup_msg, "new_state": new_state}
+
+
+def _strip_trailing_question(text: str) -> str:
+    """If the main reply accidentally ended with a trailing question line,
+    strip it so Message 1 remains purely informative without duplicating
+    the dedicated follow-up question sent as Message 2."""
+    if not text:
+        return text
+    lines = text.strip().split("\n")
+    if len(lines) > 1 and lines[-1].strip().endswith("?"):
+        return "\n".join(lines[:-1]).strip()
+    return text.strip()
 
 
 def _format_for_whatsapp(text: str) -> str:
@@ -181,6 +227,7 @@ async def handle_conversation_turn_async(
     )
 
     reply_text = result.get("reply", "")
+    followup_msg = result.get("followup")
     new_state = result.get("new_state", state)
     last_turn = new_state.get("_last_turn", {})
 
@@ -194,19 +241,62 @@ async def handle_conversation_turn_async(
         )
         return {"status": "handed_off", "reply": reply_text}
 
-    # Clean formatting for WhatsApp
-    clean_reply = _format_for_whatsapp(reply_text)
+    # ── Refusal / Objection Handling ───────────────────────────────────────
+    # When the customer declines or expresses disinterest, route through the
+    # refusal engine so the reply is empathetic and either asks for the reason,
+    # offers a knowledge-backed solution, or escalates to a human — instead of a
+    # generic "nice bot" answer.
+    if last_turn.get("is_disinterested"):
+        eval_res = await evaluate_refusal_async(
+            text_clean, history=history or [], state=new_state
+        )
+        resolution = (eval_res or {}).get("resolution_type", "NOT_A_REFUSAL")
+        refusal_msg = (eval_res or {}).get("reply_message")
+        if refusal_msg:
+            reply_text = refusal_msg
+            clean_reply = _format_for_whatsapp(reply_text)
+            # Escalate when the concern is unresolvable or carries legal/medical risk.
+            if resolution == "ESCALATE_TO_AGENT":
+                await execute_agent_handoff_async(
+                    phone,
+                    user_reply_text=clean_reply,
+                    escalation_reason=(eval_res or {}).get("escalation_reason")
+                    or f"Refusal with unresolvable/risk concern: {text_clean[:50]}",
+                    start_time=start_time,
+                )
+                await send_text_message_async(phone, clean_reply)
+                latency_sec = round(time.time() - start_time, 2)
+                await save_user_state_async(phone, new_state)
+                asyncio.create_task(save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec))
+                asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+                return {"status": "handed_off_refusal", "reply": clean_reply}
 
-    # Deliver reply to customer on WhatsApp
+    # ── Separate Message #1 and Message #2 (Strict JSON with fallback) ───────
+    main_reply = reply_text
+    if "[FOLLOW_UP]" in main_reply:
+        parts = main_reply.split("[FOLLOW_UP]", 1)
+        main_reply = parts[0].strip()
+        if not followup_msg:
+            followup_msg = parts[1].strip() or None
+
+    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply)) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
+
+    # Deliver main reply to customer on WhatsApp (Message 1)
     await send_text_message_async(phone, clean_reply)
+    latency_sec = round(time.time() - start_time, 2)
+    await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
+    asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+
+    # Deliver the follow-up as a whole different message (Message 2) after a brief pause
+    if clean_followup:
+        await asyncio.sleep(1)
+        await send_text_message_async(phone, clean_followup)
+        await save_message_async(phone, "assistant", clean_followup)
+        asyncio.create_task(log_message_async(phone, "ai", clean_followup))
 
     # Persist updated session state
     arm_followup_timer(new_state, topic=text_clean)
     await save_user_state_async(phone, new_state)
 
-    # Save to history & CSV
-    latency_sec = round(time.time() - start_time, 2)
-    asyncio.create_task(save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec))
-    asyncio.create_task(log_message_async(phone, "ai", clean_reply))
-
-    return {"status": "answered", "reply": clean_reply}
+    return {"status": "answered", "reply": clean_reply, "followup": clean_followup}

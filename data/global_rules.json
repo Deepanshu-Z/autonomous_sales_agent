@@ -77,6 +77,11 @@
             "allowed_after_months": 1,
             "allowed_during_first_month": false
         },
+        "flexible_timings": {
+            "allowed_after_months": false,
+            "allowed_during_first_month": false,
+            "substitute_option": "they can shift their batch timing after 1 month of enrollment"
+        },
         "multiple_classes_per_day": false,
         "gender_specific_batches": false
     },

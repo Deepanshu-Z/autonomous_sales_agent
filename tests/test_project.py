@@ -25,7 +25,12 @@ from tasks import (
     AGENT_TRIGGER_WORDS,
 )
 from batching import add_message_to_batch_async
-from rag import ask_rag_async
+from conversation_handler import handle_incoming_message
+
+async def ask_rag_async(query: str, state: dict = None):
+    return await handle_incoming_message(
+        user_message=query, session_state=state or {"stage": "NEW"}, conversation_history=[], course_id="yoga"
+    )
 
 results = {}
 

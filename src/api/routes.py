@@ -18,7 +18,6 @@ from src.state.chat_history import (
     get_recent_history_async,
     get_full_history_for_agent_async,
 )
-from src.core.rag import ask_rag_async
 from src.state.chat_state import (
     is_escalated_async,
     mark_escalated_async,

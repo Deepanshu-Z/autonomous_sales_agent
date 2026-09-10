@@ -98,8 +98,12 @@ async def generate_contextual_followup_async(
     if should_suppress_followup(user_text, ai_reply, state):
         return None
 
-    course_id = state.get("course") or "yoga"
-    course_name = course_id.title()
+    course_id = (state.get("course") or "").strip()
+    if not course_id and history:
+        from src.core import kb_loader
+        hist_text = " ".join((t.get("content") or "") for t in history[-6:])
+        course_id = kb_loader.detect_course_from_text(hist_text, default_course=None) or ""
+    course_name = course_id.title() if course_id else "General"
 
     # Summarize recent turns for context
     recent_context = []

@@ -65,16 +65,30 @@ async def sweep_once():
         try:
             if count == 0:
                 from src.state.chat_state import get_user_state
+                from src.state.chat_history import get_recent_history
                 from src.core import kb_loader
                 state = get_user_state(phone)
-                course_id = state.get("course") or "yoga"
-                course_data = kb_loader.get_course_data(course_id)
-                course_name = course_data.get("course", course_id.title())
+                course_id = (state.get("course") or "").strip()
+                if not course_id:
+                    hist = get_recent_history(phone, limit=6)
+                    if hist:
+                        hist_text = " ".join((t.get("content") or "") for t in hist)
+                        detected_c = kb_loader.detect_course_from_text(hist_text, default_course=None)
+                        if detected_c:
+                            course_id = detected_c
 
-                reply = (
-                    f"Hi again! 😊 Just checking in — were you still interested in "
-                    f"knowing more about our {course_name} classes? Happy to help whenever you're ready!"
-                )
+                if course_id:
+                    course_data = kb_loader.get_course_data(course_id)
+                    course_name = course_data.get("course", course_id.title())
+                    reply = (
+                        f"Hi again! 😊 Just checking in — were you still interested in "
+                        f"knowing more about our {course_name} classes? Happy to help whenever you're ready!"
+                    )
+                else:
+                    reply = (
+                        "Hi again! 😊 Just checking in — were you still interested in "
+                        "exploring our classes? Happy to help whenever you're ready!"
+                    )
                 await send_text_message_async(phone, reply)
                 await save_message_async(phone, "assistant", reply)
                 await log_message_async(phone, "ai", reply)

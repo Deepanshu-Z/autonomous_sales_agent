@@ -39,7 +39,6 @@ from src.state.chat_state import (
     matches_any,
     advance_stage,
 )
-from src.core.rag import ask_rag_async, stream_rag
 from src.services.redis_client import get_redis_connection
 from src.core.sales_followup import get_sales_followup
 from src.services.agent_summary import send_agent_summary_async

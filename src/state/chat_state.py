@@ -8,7 +8,6 @@ import os
 import re
 from dotenv import load_dotenv
 from supabase import create_client
-from src.core.rag import extract_slot_llm
 import asyncio
 from rapidfuzz import fuzz
 # Load environment variables (.env file)
@@ -187,7 +186,15 @@ def get_user_state(phone: str) -> dict:
         try:
             res = supabase.table("user_session_state").select("*").eq("phone", phone).limit(1).execute()
             if res.data and len(res.data) > 0:
-                state.update(res.data[0])
+                row = dict(res.data[0])
+                raw_topic = row.get("last_topic") or ""
+                if isinstance(raw_topic, str) and raw_topic.startswith("COURSE:"):
+                    parts = raw_topic.split("||", 1)
+                    c_id = parts[0].replace("COURSE:", "").strip()
+                    if c_id:
+                        row["course"] = c_id
+                    row["last_topic"] = parts[1] if len(parts) > 1 else ""
+                state.update(row)
         except Exception as e:
             print(f"[chat_state] Supabase get_user_state read failed: {e}")
 
@@ -227,6 +234,10 @@ def save_user_state(phone: str, state: dict):
             }
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
             db_state["phone"] = phone
+            course_val = state.get("course") or ""
+            topic_val = str(state.get("last_topic") or "")
+            if course_val:
+                db_state["last_topic"] = f"COURSE:{course_val}||{topic_val}"[:200]
             if "next_followup_due_at" in db_state and db_state["next_followup_due_at"] is not None:
                 val = db_state["next_followup_due_at"]
                 if isinstance(val, (int, float)):

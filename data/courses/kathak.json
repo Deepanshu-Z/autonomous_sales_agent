@@ -43,7 +43,7 @@
         "recordings_available": false,
         "certificate_provided": true,
         "trial_classes_available": true,
-        "max_trial_classes": 1,
+        "max_trial_classes": 3,
         "trial_cost": "Free",
         "important_note": "Physical branches are office addresses only. Online Kathak classes are accessible from anywhere worldwide."
     },
@@ -285,7 +285,6 @@
             "Refunds",
             "Ghungroo or costume provision"
         ],
-        "face_yoga_note": "Face Yoga is a separate course and not included in Kathak.",
         "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
     },
     "health_and_medical": {

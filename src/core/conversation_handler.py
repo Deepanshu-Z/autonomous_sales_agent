@@ -127,7 +127,7 @@ async def handle_incoming_message(
 
     # 4. Generate the actual reply, with conversation history for coherence.
     messages = [SystemMessage(content=system_prompt)]
-    for t in conversation_history[-24:]:
+    for t in conversation_history[-5:]:
         content = (t.get("content") or "").strip()
         if not content:
             continue
@@ -386,7 +386,7 @@ async def handle_conversation_turn_async(
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
     if clean_followup and clean_followup.strip():
-        await asyncio.sleep(1)
+        await asyncio.sleep(2.5)
         await send_text_message_async(phone, clean_followup)
         await save_message_async(phone, "assistant", clean_followup)
         asyncio.create_task(log_message_async(phone, "ai", clean_followup))

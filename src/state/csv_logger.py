@@ -11,7 +11,7 @@ import asyncio
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CSV_PATH = os.path.join(_PROJECT_ROOT, "chat_data.csv")
-FIELDNAMES = ["timestamp", "phone", "role", "message", "qdrant_sources", "retrieval_query"]
+FIELDNAMES = ["timestamp", "phone", "role", "message", "sources", "retrieval_query"]
 
 _csv_lock = threading.Lock()
 _schema_ready = False
@@ -71,7 +71,7 @@ def log_message(phone: str, role: str, message: str, sources: str = "", retrieva
         "phone": phone,
         "role": role,
         "message": message,
-        "qdrant_sources": sources,
+        "sources": sources,
         "retrieval_query": retrieval_query,
     }
 

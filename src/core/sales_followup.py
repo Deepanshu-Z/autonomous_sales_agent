@@ -358,8 +358,9 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
         return None
 
     stage = state.get("stage", "NEW")
-    from src.core import kb_loader
-    active_course = state.get("course") or "yoga"
+    active_course = (state.get("course") or "").strip()
+    if not active_course:
+        return None
 
     if stage == "PACKAGE_ASKED":
         fees_block = kb_loader.format_package_fees_display(active_course)

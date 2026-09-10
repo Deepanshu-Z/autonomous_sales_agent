@@ -88,6 +88,13 @@ DECISION OUTCOMES:
   -> `resolution_type` = "PROVIDE_SOLUTION"
   -> `reply_message`: Warm, empathetic message offering our knowledge-based solution (e.g. flexible batch, free trial, starter package) without being pushy. Keep it inviting.
 
+STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
+- When generating `reply_message` for PROVIDE_SOLUTION:
+  • You MUST strictly quote the Active Course Name and its exact fees/packages provided in the ACTIVE COURSE CONTEXT.
+  • NEVER assume, invent, or mention 'Yoga' or '₹300' unless the active course is explicitly Yoga.
+  • If the user objects to price/fees, mention the active course's starter package duration and offer price, and invite them to attend a free trial class.
+  • If no active course is known: DO NOT quote fees or specific course names. Warmly ask which course they are exploring.
+
 STRICT LANGUAGE & SCRIPT MATCHING FOR `reply_message`:
 - English input -> Pure English.
 - Hinglish input (Latin alphabet) -> Natural Conversational Hinglish using ONLY the Latin alphabet (NEVER output Devanagari script).
@@ -114,11 +121,41 @@ async def evaluate_refusal_async(
 ) -> Dict[str, Any]:
     """
     Evaluates incoming text for course refusal, risk, and solution feasibility.
-    Returns structured decision dictionary. Zero hardcoded regex or static strings.
+    Returns structured decision dictionary. Grounded in active course data.
     """
     state = state or {}
     awaiting_reason = bool(state.get("awaiting_refusal_reason", False))
-    course_id = state.get("course") or "yoga"
+    
+    # Resolve active course dynamically from state or history (never hardcoded 'yoga')
+    course_id = (state.get("course") or state.get("active_course") or "").strip()
+    if not course_id and history:
+        from src.core import kb_loader
+        hist_text = " ".join((t.get("content") or "") for t in history[-6:])
+        course_id = kb_loader.detect_course_from_text(hist_text, default_course=None) or ""
+
+    course_context_str = "No active course specified. Do NOT guess fees or course names."
+    if course_id:
+        from src.core import kb_loader
+        course_data = kb_loader.get_course_data(course_id)
+        if course_data:
+            course_name = course_data.get("course", course_id.title())
+            pkgs = course_data.get("pricing", {}).get("packages", [])
+            starter = pkgs[0] if pkgs else {}
+            starter_str = (
+                f"{starter.get('duration')}: ₹{starter.get('offer_price', starter.get('base_price')):,} "
+                f"(Regular: ₹{starter.get('base_price', 0):,})" if starter else "N/A"
+            )
+            all_pkgs = ", ".join(f"{p.get('duration')}: ₹{p.get('offer_price', p.get('base_price', 0)):,}" for p in pkgs)
+            trial_info = course_data.get("trial_classes", {})
+            not_offered = course_data.get("not_offered", {})
+            course_context_str = (
+                f"ACTIVE COURSE CONTEXT (SOURCE OF TRUTH):\n"
+                f"- Course Name: {course_name}\n"
+                f"- Starter Package: {starter_str}\n"
+                f"- All Package Offer Prices: {all_pkgs}\n"
+                f"- Free Trial Available: Up to {trial_info.get('max_trial_classes', 1)} free trial class(es)\n"
+                f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
+            )
 
     # Quick pre-filter: if text is empty, ignore
     if not text or not text.strip():
@@ -144,7 +181,7 @@ async def evaluate_refusal_async(
     history_snippet = "\n".join(recent_context) if recent_context else "No prior history."
 
     user_payload = (
-        f"Active Course: {course_id}\n"
+        f"{course_context_str}\n"
         f"Awaiting Refusal Reason from previous turn: {awaiting_reason}\n"
         f"Customer Message: \"{text}\"\n\n"
         f"Recent History:\n{history_snippet}\n\n"

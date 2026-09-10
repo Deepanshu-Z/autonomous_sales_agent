@@ -205,11 +205,9 @@
             ],
             "certifications": [
                 "Yoga Volunteering Program (Ministry of AYUSH)",
-                "Prenatal and Postnatal Yoga and Garbhasanskar Teaching Training (Dr. Malati's Ayuryog Centre, Delhi)"
+                "Teaching Training (Dr. Malati's Ayuryog Centre, Delhi)"
             ],
             "specialization": [
-                "Prenatal and Postnatal Yoga",
-                "Garbhasanskar",
                 "Mindful movement",
                 "Wellness"
             ],
@@ -408,7 +406,6 @@
             "Refunds",
             "Diet plans (general suggestions may be given by teachers)"
         ],
-        "face_yoga_note": "Face Yoga is a separate course and not included in the general online Yoga classes.",
         "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
     },
     "health_and_medical": {

@@ -63,3 +63,29 @@ def get_redis_connection():
 
     url = REDIS_URL or "redis://localhost:6379"
     return StandardRedis.from_url(url, decode_responses=True)
+
+
+_async_redis_client = None
+
+
+def get_async_redis_connection():
+    """
+    Returns non-blocking Async Redis connection (redis.asyncio) for high-concurrency webhook ingestion.
+    Reuses singleton connection pool across coroutines.
+    """
+    global _async_redis_client
+    if _async_redis_client is not None:
+        return _async_redis_client
+
+    from redis.asyncio import Redis as AsyncRedis
+
+    if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+        host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
+        tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
+        _async_redis_client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
+        return _async_redis_client
+
+    url = REDIS_URL or "redis://localhost:6379"
+    _async_redis_client = AsyncRedis.from_url(url, decode_responses=True)
+    return _async_redis_client
+

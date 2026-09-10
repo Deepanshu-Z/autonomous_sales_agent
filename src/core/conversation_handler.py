@@ -141,6 +141,7 @@ async def handle_incoming_message(
 
     main_reply = raw_content
     followup_msg = None
+    buttons = []
 
     try:
         clean_json_str = raw_content
@@ -156,6 +157,8 @@ async def handle_incoming_message(
         if isinstance(parsed, dict):
             main_reply = parsed.get("reply", "") or ""
             followup_msg = parsed.get("followup") or None
+            raw_b = parsed.get("buttons")
+            buttons = [str(b).strip() for b in raw_b if str(b).strip()] if isinstance(raw_b, list) else []
     except Exception as exc:
         logger.warning(f"Failed to parse LLM2 JSON output: {exc}. Using fallback.")
         if "[FOLLOW_UP]" in raw_content:
@@ -176,7 +179,7 @@ async def handle_incoming_message(
         new_state["stage"] = "COUPON_SENT"
         new_state["coupon_sent"] = True
 
-    return {"reply": main_reply, "followup": followup_msg, "new_state": new_state}
+    return {"reply": main_reply, "followup": followup_msg, "buttons": buttons, "new_state": new_state}
 
 
 def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional[str]) -> str:
@@ -387,7 +390,12 @@ async def handle_conversation_turn_async(
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
     if clean_followup and clean_followup.strip():
         await asyncio.sleep(2.5)
-        await send_text_message_async(phone, clean_followup)
+        raw_buttons = result.get("buttons") or []
+        try:
+            from src.services.quick_reply_service import send_followup_with_buttons_async
+            await send_followup_with_buttons_async(phone, clean_followup, buttons=raw_buttons)
+        except ImportError:
+            await send_text_message_async(phone, clean_followup)
         await save_message_async(phone, "assistant", clean_followup)
         asyncio.create_task(log_message_async(phone, "ai", clean_followup))
 
@@ -395,4 +403,4 @@ async def handle_conversation_turn_async(
     arm_followup_timer(new_state, topic=text_clean)
     await save_user_state_async(phone, new_state)
 
-    return {"status": "answered", "reply": clean_reply, "followup": clean_followup}
+    return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": result.get("buttons", [])}

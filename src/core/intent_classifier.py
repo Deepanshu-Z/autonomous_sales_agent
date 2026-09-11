@@ -109,7 +109,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 7. "requests_human_agent":
    - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
-   - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
+   - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "need help", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
 
 8. "is_coupon_requested":
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").

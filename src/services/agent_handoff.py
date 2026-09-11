@@ -75,19 +75,45 @@ async def execute_agent_handoff_async(
     except Exception as e:
         print(f"[agent_handoff] Error updating state for {phone}: {e}")
 
+    HANDOFF_CONNECTING_MESSAGE = (
+        "Connecting you with one of our team members now! 🙏\n\n"
+        "Aapki request humari team tak pahunch gayi hai. Someone from our team will be with you shortly 😊"
+    )
+
     # 3. Deliver customer notification message
-    if user_reply_text:
-        await send_text_message_async(phone, user_reply_text)
+    if user_reply_text and user_reply_text.strip():
+        await send_text_message_async(phone, user_reply_text.strip())
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", user_reply_text.strip(), response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "agent_handoff", user_reply_text.strip()))
+
+        # If the reply didn't already inform them of the handoff to team members, send the connecting notice
+        reply_lower = user_reply_text.lower()
+        already_has_handoff_notice = any(
+            phrase in reply_lower
+            for phrase in [
+                "team member", "support team", "connecting you",
+                "connect karenge", "someone will be with you", "reach out to you"
+            ]
+        )
+        if not already_has_handoff_notice:
+            await asyncio.sleep(0.5)
+            await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
+            asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE))
+            asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
+    else:
+        await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
 
     # 4. Assign chat in Interakt
     if agent:
         assignment_success = await assign_chat_to_agent_async(phone, agent)
         print(f"[agent_handoff] Interakt assignment to {agent}: {assignment_success}")
-
-    # 5. Background logging (non-blocking)
-    latency_sec = round(time.time() - start_time, 2) if start_time else None
-    if user_reply_text:
-        asyncio.create_task(save_message_async(phone, "assistant", user_reply_text, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "agent_handoff", user_reply_text))
+        from src.services.agent_summary import send_agent_summary_async
+        asyncio.create_task(
+            send_agent_summary_async(phone, agent_index, escalation_reason=escalation_reason)
+        )
 
     return True

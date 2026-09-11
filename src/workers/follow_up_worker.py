@@ -9,6 +9,11 @@ queue worker) with: python followup_worker.py
 """
 
 import os
+import sys
+# Ensure project root is in sys.path when executed directly as a script
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True, encoding="utf-8")
 import time
 import asyncio
 from dotenv import load_dotenv

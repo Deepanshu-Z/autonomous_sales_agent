@@ -3,6 +3,7 @@ routes.py — FastAPI route definitions for WhatsApp Webhook and Admin endpoints
 """
 
 import time
+import json
 import asyncio
 from fastapi import APIRouter, Request
 
@@ -35,6 +36,45 @@ from src.core.conversation_handler import handle_conversation_turn_async
 router = APIRouter()
 
 AGENT_TRIGGER_WORDS = ["agent", "human", "talk to someone", "real person", "representative", "support"]
+
+
+def _extract_message_text(message: dict) -> str:
+    """Extract clean text from message dict, handling text, button replies, or interactive objects."""
+    if not isinstance(message, dict):
+        return str(message or "")
+
+    # 1. Check direct button_reply or interactive dict
+    if "button_reply" in message and isinstance(message["button_reply"], dict):
+        return message["button_reply"].get("title") or message["button_reply"].get("id") or ""
+
+    interactive = message.get("interactive")
+    if isinstance(interactive, dict):
+        btn = interactive.get("button_reply") or interactive.get("list_reply")
+        if isinstance(btn, dict):
+            return btn.get("title") or btn.get("id") or ""
+
+    raw = message.get("message", "")
+    if isinstance(raw, dict):
+        btn = raw.get("button_reply") or raw.get("interactive", {}).get("button_reply")
+        if isinstance(btn, dict):
+            return btn.get("title") or btn.get("id") or ""
+        return raw.get("title") or raw.get("text") or ""
+
+    # If raw is a string, check if it's JSON encoded button payload
+    if isinstance(raw, str):
+        trimmed = raw.strip()
+        if trimmed.startswith("{") and trimmed.endswith("}"):
+            try:
+                parsed = json.loads(trimmed)
+                if isinstance(parsed, dict):
+                    btn = parsed.get("button_reply") or parsed.get("interactive", {}).get("button_reply")
+                    if isinstance(btn, dict):
+                        return btn.get("title") or btn.get("id") or trimmed
+            except Exception:
+                pass
+        return raw
+
+    return str(raw or "")
 
 
 @router.get("/health")
@@ -80,7 +120,7 @@ async def receive_interakt_webhook(request: Request):
     customer = data.get("data", {}).get("customer", {})
     message = data.get("data", {}).get("message", {})
     phone = extract_phone(customer)
-    text = message.get("message", "")
+    text = _extract_message_text(message)
     referral = message.get("referral", {}) or {}
 
     # Enrich referral with ad_tag from customer traits/tags/headline if missing
@@ -118,7 +158,7 @@ async def receive_test_webhook(request: Request):
     customer = data.get("data", {}).get("customer", {})
     message = data.get("data", {}).get("message", {})
     phone = extract_phone(customer)
-    text = message.get("message", "")
+    text = _extract_message_text(message)
     referral = message.get("referral", {}) or {}
 
     # Enrich referral with ad_tag from customer traits/tags/headline if missing

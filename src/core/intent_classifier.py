@@ -106,7 +106,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - boolean: true if customer asks for demo, trial class, free trial, or wanting to try before enrolling.
 
 7. "requests_human_agent":
-   - boolean: true if customer requests to speak with a human, agent, customer support, representative, or wants a phone call.
+   - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
+   - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
 
 8. "is_coupon_requested":
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").
@@ -125,7 +126,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
-    - "AGENT_REQUEST": Customer wants human support / phone call.
+    - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
     - "DISINTEREST": Customer declines enrollment ("not interested", "nahi chahiye", "cancel").
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.

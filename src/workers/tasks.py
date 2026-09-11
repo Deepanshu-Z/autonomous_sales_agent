@@ -387,16 +387,22 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
         except Exception:
             pass
 
-    # Match Ad ID from referral metadata against TARGET_AD_ID in ENV
-    if referral_data and isinstance(referral_data, dict) and target_ad:
+    # Match Ad ID from referral metadata against registered campaigns or TARGET_AD_ID in ENV
+    if referral_data and isinstance(referral_data, dict):
         source_id = str(referral_data.get("source_id") or "").strip()
         source_url = str(referral_data.get("source_url") or "").strip()
         ad_id = str(referral_data.get("ad_id") or "").strip()
+        received_id = source_id or ad_id
 
-        if source_id == target_ad or ad_id == target_ad or target_ad in source_url:
-            return True, f"Target Ad ID matched: '{source_id or ad_id}'"
-        else:
-            return False, f"Ad ID MISMATCH — received '{source_id or ad_id}' vs TARGET '{target_ad}'"
+        from src.core import campaign_loader
+        if received_id and campaign_loader.is_registered_ad_id(received_id):
+            return True, f"Campaign Ad ID matched: '{received_id}'"
+
+        if target_ad and (received_id == target_ad or (source_url and target_ad in source_url)):
+            return True, f"Target Ad ID matched: '{received_id}'"
+
+        if target_ad or received_id:
+            return False, f"Ad ID MISMATCH — received '{received_id}' vs TARGET '{target_ad}'"
 
     if not referral_data:
         return False, "No referral data (organic / non-ad message)"
@@ -687,7 +693,7 @@ def _sanitize_locked_coupons(reply: str, state: dict) -> str:
             cleaned += "\n\n🎁 *(Special welcome discount coupon code app ya website par profile complete karne ke baad yahan receive hoga!)*"
     return cleaned
 
-async def handle_ai_reply_async(phone: str, text: str, history: list, start_time: float = None):
+async def handle_ai_reply_async(phone: str, text: str, history: list, start_time: float = None, referral: dict = None):
     t0 = time.perf_counter()
 
     # Developer/tester reset command
@@ -697,61 +703,47 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         await send_text_message_async(phone, reply)
         return
 
-    if is_welcome_trigger(text):
-        detected_c = kb_loader.detect_course_from_text(text, default_course=None)
-        active_course = detected_c
-        state = await get_user_state_async(phone)
-        state["course"] = active_course
+    state = await get_user_state_async(phone)
 
-        if not active_course:
-            catalog = kb_loader.get_course_catalog()
-            c_names = ", ".join(c.get("name", c.get("id", "").title()) for c in catalog)
-            msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
-            msg2 = f"We offer Online Live Interactive classes with certified expert instructors across: {c_names}."
-            msg3 = "Which course are you interested in exploring today? 😊"
+    # First-message welcome sequence check:
+    # Triggers ONLY on the customer's 1st turn (welcome not yet sent & no prior assistant messages)
+    has_prior_ai_reply = any(t.get("role") in ("assistant", "ai") for t in (history or []))
+    is_first_turn = not state.get("welcome_sent") and not has_prior_ai_reply
 
-            await send_text_message_async(phone, msg1)
-            await asyncio.sleep(1)
-            await send_text_message_async(phone, msg2)
-            await asyncio.sleep(1)
-            await send_text_message_async(phone, msg3)
+    if is_first_turn:
+        from src.core import campaign_loader
+        from src.services.quick_reply_service import send_followup_with_buttons_async
 
-            arm_followup_timer(state, topic="welcome message")
-            await save_user_state_async(phone, state)
-
-            latency_sec = round(time.time() - start_time, 2) if start_time else None
-            full_welcome = f"{msg1}\n{msg2}\n{msg3}"
-            asyncio.create_task(save_message_async(phone, "assistant", full_welcome, response_time_sec=latency_sec))
-            asyncio.create_task(log_message_async(phone, "ai", full_welcome))
+        campaign = campaign_loader.match_campaign(referral=referral, text=text)
+        if not campaign:
+            print(f"[tasks] {phone}: No registered campaign matches referral ad_id — ignoring 1st message.")
             return
 
-        course_data = kb_loader.get_course_data(active_course)
-        course_name = course_data.get("course", active_course.title())
-        pkgs = course_data.get("pricing", {}).get("packages", [])
-        starter_pkg = pkgs[0] if pkgs else {}
-        base_p = starter_pkg.get("base_price", 700)
-        offer_p = starter_pkg.get("offer_price", 300)
-        dur = starter_pkg.get("duration", "1 Month")
+        matched_course = campaign.get("course")
+        if matched_course:
+            state["course"] = matched_course
+        state["welcome_sent"] = True
+        state["is_target_ad"] = True
 
-        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
-        msg2 = f"We offer Online Live Interactive {course_name} classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. {base_p:,}/{dur.lower()} (offer price: Rs. {offer_p:,})."
-        msg3 = "We have batches running throughout the day. Which time slot works best for your schedule?"
+        welcome_msgs = campaign.get("welcome_messages", {})
+        msg1 = welcome_msgs.get("message_1")
+        msg2 = welcome_msgs.get("message_2")
+        buttons = campaign.get("buttons") or ["Timing", "Fees", "Other questions"]
 
-        await send_text_message_async(phone, msg1)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg2)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg3)
+        if msg1:
+            await send_text_message_async(phone, msg1)
+            latency_sec = round(time.time() - start_time, 2) if start_time else None
+            asyncio.create_task(save_message_async(phone, "assistant", msg1, response_time_sec=latency_sec))
+            asyncio.create_task(log_message_async(phone, "ai", msg1))
+            await asyncio.sleep(1.5)
 
-        # Arm follow-up timer for this welcome message too
+        if msg2:
+            await send_followup_with_buttons_async(phone, msg2, buttons=buttons)
+            asyncio.create_task(save_message_async(phone, "assistant", msg2))
+            asyncio.create_task(log_message_async(phone, "ai", msg2))
+
         arm_followup_timer(state, topic="welcome message")
         await save_user_state_async(phone, state)
-
-        latency_sec = round(time.time() - start_time, 2) if start_time else None
-        full_welcome = f"{msg1}\n{msg2}\n{msg3}"
-        # Fire-and-forget background logging to Supabase and CSV so WhatsApp reply is never delayed
-        asyncio.create_task(save_message_async(phone, "assistant", full_welcome, response_time_sec=latency_sec))
-        asyncio.create_task(log_message_async(phone, "ai", full_welcome))
         return
 
     # Steps 3–7: All subsequent turns handled dynamically by Two-Step Semantic Architecture (zero hardcoded values)
@@ -879,7 +871,7 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         return
 
     # AI reply
-    await handle_ai_reply_async(phone, text, history, start_time)
+    await handle_ai_reply_async(phone, text, history, start_time, referral=referral)
     log_lead_action(
         lead_no=phone,
         lead_details=lead_details,

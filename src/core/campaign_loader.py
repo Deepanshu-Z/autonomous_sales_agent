@@ -1,0 +1,91 @@
+"""
+campaign_loader.py — Centralized Ad Campaign & Welcome Flow Mapping Loader.
+
+Loads data/ad_campaigns.json to map:
+- Meta Ad IDs & ad tags -> Course Name
+- Initial welcome messages (Message 1 intro + Message 2 follow-up)
+- 3 interactive quick reply buttons ("Timing", "Fees", "Other questions")
+"""
+
+import os
+import json
+from typing import Dict, Any, List, Optional
+
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_CAMPAIGNS_FILE = os.path.join(_BASE_DIR, "data", "ad_campaigns.json")
+
+_CAMPAIGNS_CACHE: Optional[List[Dict[str, Any]]] = None
+
+
+def clear_cache() -> None:
+    """Clears campaigns cache (useful during testing or hot reloading)."""
+    global _CAMPAIGNS_CACHE
+    _CAMPAIGNS_CACHE = None
+
+
+def get_all_campaigns() -> List[Dict[str, Any]]:
+    """Loads and caches all campaigns from data/ad_campaigns.json."""
+    global _CAMPAIGNS_CACHE
+    if _CAMPAIGNS_CACHE is not None:
+        return _CAMPAIGNS_CACHE
+
+    if os.path.exists(_CAMPAIGNS_FILE):
+        try:
+            with open(_CAMPAIGNS_FILE, "r", encoding="utf-8") as f:
+                _CAMPAIGNS_CACHE = json.load(f)
+                return _CAMPAIGNS_CACHE
+        except Exception as e:
+            print(f"[campaign_loader] Error loading {_CAMPAIGNS_FILE}: {e}")
+
+    _CAMPAIGNS_CACHE = []
+    return _CAMPAIGNS_CACHE
+
+
+def is_registered_ad_id(ad_id: str) -> bool:
+    """Checks if an Ad ID matches any registered campaign."""
+    if not ad_id:
+        return False
+    clean_id = str(ad_id).strip()
+    if not clean_id:
+        return False
+
+    for camp in get_all_campaigns():
+        for registered_id in camp.get("ad_ids", []):
+            if clean_id == str(registered_id).strip():
+                return True
+    return False
+
+
+def match_campaign(referral: Optional[dict] = None, text: str = "") -> Optional[Dict[str, Any]]:
+    """
+    Strictly finds the campaign matching the exact Meta Ad ID from referral metadata.
+    If referral contains an ad_id/source_id, it MUST be registered, otherwise returns None.
+    If no ad_id is present (e.g. whitelisted direct WhatsApp testing), falls back to course detection or default campaign.
+    """
+    campaigns = get_all_campaigns()
+    if not campaigns:
+        return None
+
+    # 1. Production Ad Flow: Strictly match exact Meta Ad ID
+    if referral and isinstance(referral, dict):
+        ad_id = str(referral.get("ad_id") or referral.get("source_id") or "").strip()
+        source_url = str(referral.get("source_url") or "").strip()
+
+        if ad_id or source_url:
+            for camp in campaigns:
+                for registered_id in camp.get("ad_ids", []):
+                    reg_str = str(registered_id).strip()
+                    if reg_str and (ad_id == reg_str or (source_url and reg_str in source_url)):
+                        return camp
+            return None  # Ad ID provided but not registered -> strictly ignore
+
+    # 2. Direct Testing / Whitelisted Fallback (no ad referral attached)
+    from src.core import kb_loader
+    detected_course = kb_loader.detect_course_from_text(text) if text else None
+    if detected_course:
+        for camp in campaigns:
+            if camp.get("course") == detected_course:
+                return camp
+
+    # Default to first campaign (e.g. yoga) for testing
+    return campaigns[0]

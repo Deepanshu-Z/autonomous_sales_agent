@@ -128,6 +128,7 @@ def get_default_state(phone: str) -> dict:
         "wants_trial": False,         # Boolean flag indicating if user preferred a demo/trial class first
         "is_escalated": False,        # Escalation flag to hand off to human agent
         "course": None,               # Active course context (e.g. "yoga", "kathak", None until selected)
+        "welcome_sent": False,        # Flag to ensure initial campaign welcome flow fires only once on 1st message
 
         "is_target_ad": False,        # Whether user verified via secret string (AI enabled)
         "low_confidence_count": 0,     # Consecutive unanswered / low-confidence query count

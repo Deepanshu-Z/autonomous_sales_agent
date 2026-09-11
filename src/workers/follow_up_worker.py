@@ -98,14 +98,23 @@ async def sweep_once():
                 await save_message_async(phone, "assistant", reply)
                 await log_message_async(phone, "ai", reply)
 
-                next_due_iso = datetime.fromtimestamp(now_ts + 300, tz=timezone.utc).isoformat()
+                # Arm the second window: 30 minutes (1800s) before escalating to agent
+                next_due_iso = datetime.fromtimestamp(now_ts + 1800, tz=timezone.utc).isoformat()
                 await asyncio.to_thread(
                     lambda: supabase.table("user_session_state").update({
                         "follow_up_count": 1,
-                        "next_followup_due_at": next_due_iso,  # arm the 5-min window again
+                        "next_followup_due_at": next_due_iso,
                     }).eq("phone", phone).execute()
                 )
-                print(f"[followup_worker] {phone}: sent 1st reminder")
+                try:
+                    from src.state.chat_state import get_user_state, save_user_state
+                    st = get_user_state(phone)
+                    st["follow_up_count"] = 1
+                    st["next_followup_due_at"] = now_ts + 1800
+                    save_user_state(phone, st)
+                except Exception:
+                    pass
+                print(f"[followup_worker] {phone}: sent 1st reminder — scheduled agent assignment in 30 mins")
 
             elif count == 1:
                 # 2nd consecutive unanswered follow-up -> escalate to human agent

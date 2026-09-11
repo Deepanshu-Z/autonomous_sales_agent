@@ -29,9 +29,8 @@ from src.state.chat_state import (
     advance_stage,
 )
 from src.workers.batching import add_message_to_batch_async
-from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email, is_welcome_trigger
+from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email
 from src.core.lead_logger import log_lead_action, extract_lead_details
-from src.core.conversation_handler import handle_conversation_turn_async
 
 router = APIRouter()
 
@@ -248,70 +247,18 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         )
         return {"status": "handed off"}
 
-    if is_welcome_trigger(text):
-        from src.core import kb_loader
-        detected_c = kb_loader.detect_course_from_text(text, default_course=None)
-        active_course = detected_c
-
-        if not active_course:
-            catalog = kb_loader.get_course_catalog()
-            c_names = ", ".join(c.get("name", c.get("id", "").title()) for c in catalog)
-            msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
-            msg2 = f"We offer Online Live Interactive classes with certified expert instructors across: {c_names}."
-            msg3 = "Which course are you interested in exploring today? 😊"
-
-            await send_text_message_async(phone, msg1)
-            await asyncio.sleep(1)
-            await send_text_message_async(phone, msg2)
-            await asyncio.sleep(1)
-            await send_text_message_async(phone, msg3)
-            full_welcome = f"{msg1}\n{msg2}\n{msg3}"
-            await save_message_async(phone, "assistant", full_welcome)
-            log_lead_action(
-                lead_no=phone,
-                lead_details=lead_details,
-                action_taken="REPLIED",
-                reason="Welcome message sent (course selection prompted)",
-            )
-            return {"status": "welcome sent"}
-
-        course_data = kb_loader.get_course_data(active_course)
-        course_name = course_data.get("course", active_course.title())
-        pkgs = course_data.get("pricing", {}).get("packages", [])
-        starter_pkg = pkgs[0] if pkgs else {}
-        base_p = starter_pkg.get("base_price", 700)
-        offer_p = starter_pkg.get("offer_price", 300)
-        dur = starter_pkg.get("duration", "1 Month")
-
-        msg1 = "Welcome to Sensationz! 🙏 We're excited to help you start your journey."
-        msg2 = f"We offer Online Live Interactive {course_name} classes (Monday to Friday) with certified expert instructors, beginner-friendly packages starting at just Rs. {base_p:,}/{dur.lower()} (offer price: Rs. {offer_p:,})."
-        msg3 = "We have batches running throughout the day. Which time slot works best for your schedule?"
-
-        await send_text_message_async(phone, msg1)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg2)
-        await asyncio.sleep(1)
-        await send_text_message_async(phone, msg3)
-        full_welcome = f"{msg1}\n{msg2}\n{msg3}"
-        await save_message_async(phone, "assistant", full_welcome)
-        log_lead_action(
-            lead_no=phone,
-            lead_details=lead_details,
-            action_taken="REPLIED",
-            reason=f"{reason} — Welcome offer sent",
-        )
-        return {"status": "offer sent"}
-
     try:
         history = await get_recent_history_async(phone)
     except Exception:
         history = []
 
-    turn_res = await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
+    from src.workers.tasks import handle_ai_reply_async
+    await handle_ai_reply_async(phone, text, history, start_time, referral=referral)
     log_lead_action(
         lead_no=phone,
         lead_details=lead_details,
         action_taken="REPLIED",
-        reason=f"{reason} — AI turn completed ({turn_res.get('status')})",
+        reason=f"{reason} — AI response sent",
     )
     return {"status": "ok"}
+

@@ -58,43 +58,47 @@
                 "duration_code": "1M",
                 "base_price": 500,
                 "offer_price": 300,
+                "gst_slab": "5%",
                 "coupon_code": "FACE300",
-                "gst_on_offer": null,
-                "total_with_gst_offer": null,
-                "per_day_offer": "Not provided"
+                "gst_on_offer": 15,
+                "total_with_gst_offer": 315,
+                "per_day_offer": "Rs.10 (offer price)"
             },
             {
                 "duration": "3 Months",
                 "duration_code": "3M",
                 "base_price": 1500,
                 "offer_price": 1000,
+                "gst_slab": "5%",
                 "coupon_code": "FACE1000",
-                "gst_on_offer": null,
-                "total_with_gst_offer": null,
-                "per_day_offer": "Not provided"
+                "gst_on_offer": 50,
+                "total_with_gst_offer": 1050,
+                "per_day_offer": "Rs.11/day"
             },
             {
                 "duration": "6 Months",
                 "duration_code": "6M",
                 "base_price": 2100,
                 "offer_price": 1200,
+                "gst_slab": "5%",
                 "coupon_code": "FACE1200",
-                "gst_on_offer": null,
-                "total_with_gst_offer": null,
-                "per_day_offer": "Not provided"
+                "gst_on_offer": 60,
+                "total_with_gst_offer": 1260,
+                "per_day_offer": "Rs.6.6/day"
             },
             {
                 "duration": "1 Year",
                 "duration_code": "1Y",
                 "base_price": 3600,
                 "offer_price": 2000,
+                "gst_slab": "5%",
                 "coupon_code": "FACE2000",
-                "gst_on_offer": null,
-                "total_with_gst_offer": null,
-                "per_day_offer": "Not provided"
+                "gst_on_offer": 100,
+                "total_with_gst_offer": 2100,
+                "per_day_offer": "Rs.5.5/day"
             }
         ],
-        "note": "Offer price and GST amount on offer price were not provided in the source data; base_price is exclusive of the 5% GST."
+        "note": "5% GST is applicable at checkout on app or website; listed base prices and offer prices are exclusive of 5% GST."
     },
     "batch_timings": {
         "total_batches": 4,

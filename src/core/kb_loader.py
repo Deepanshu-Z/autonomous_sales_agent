@@ -331,10 +331,30 @@ def format_batch_timings_display(course_id: Optional[str] = None) -> str:
     return "\n".join(f"• {slot}: " + ", ".join(t for t in times if t) for slot, times in slots.items())
 
 
+def get_course_gst_percentage(course_id: Optional[str] = None) -> int:
+    """Dynamically retrieves the official GST percentage for the course (e.g. 18 for Kathak, 5 for Yoga/Face Yoga)."""
+    if not course_id:
+        return 5
+    data = get_course_data(course_id)
+    pricing = data.get("pricing", {})
+    if pricing.get("gst_percentage") is not None:
+        return int(pricing["gst_percentage"])
+    entry = get_catalog_entry(course_id)
+    if entry and entry.get("gst_percentage") is not None:
+        return int(entry["gst_percentage"])
+    return 5
+
+
 def format_package_fees_display(course_id: Optional[str] = None) -> str:
     if not course_id:
         return ""
-    return "\n".join(f"• {pkg}: {fee}" for pkg, fee in get_valid_packages(course_id).items())
+    pkgs = get_valid_packages(course_id)
+    if not pkgs:
+        return ""
+    gst_pct = get_course_gst_percentage(course_id)
+    lines = [f"• {pkg}: {fee}" for pkg, fee in pkgs.items()]
+    lines.append(f"\n*Note:* {gst_pct}% GST will be applicable at checkout on the app/website.")
+    return "\n".join(lines)
 
 
 def format_demo_videos_display(course_id: Optional[str] = None) -> str:

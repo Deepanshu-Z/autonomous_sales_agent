@@ -11,6 +11,7 @@
         ],
         "has_full_kb": true,
         "kb_file": "data/courses/yoga.json",
+        "gst_percentage": 5,
         "description": "Live interactive online yoga sessions with certified female instructors (Mon-Fri) across 10 flexible batch timings."
     },
     {
@@ -23,6 +24,7 @@
         ],
         "has_full_kb": true,
         "kb_file": "data/courses/kathak.json",
+        "gst_percentage": 18,
         "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
     },
     {
@@ -137,6 +139,7 @@
         ],
         "has_full_kb": true,
         "kb_file": "data/courses/face_yoga.json",
+        "gst_percentage": 5,
         "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness."
     }
 ]

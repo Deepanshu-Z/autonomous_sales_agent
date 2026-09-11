@@ -94,10 +94,12 @@ If customer says "app to ho gaya but profile abhi nahi" -> app_installed_stated:
 If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", profile_created_stated: "denied".
 
 3. "selected_timing":
-   - Batch timing selected or mentioned by user (e.g. "7:00–8:00 AM", "morning 7 am", "evening 6 pm"), else null.
+   - Batch timing explicitly and definitively selected by the user (e.g. "7:00–8:00 AM", "morning 7 am", "evening 6 pm", "shaam 6 baje"), else null.
+   - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a question, expressing doubt, or asking about schedule flexibility or switching batches (e.g. "1 week morning and 1 week evening", "can I switch timing?", "subah aur shaam dono chalega?", "timing change ho sakti hai kya?", "is this ok?"). In these cases, customer_intent is "QUESTION" and selected_timing MUST BE null!
 
 4. "selected_package":
-   - Package duration selected or mentioned by user ("1 Month", "3 Months", "6 Months", "1 Year"), else null.
+   - Package duration definitively chosen by the user ("1 Month", "3 Months", "6 Months", "1 Year"), else null.
+   - CRITICAL NEGATIVE GUARD: NEVER extract "1 week", "2 days", or arbitrary intervals as a package! Sensationz only offers 1 Month, 3 Months, 6 Months, and 1 Year. Set to null if the customer is asking a question.
 
 5. "selected_course":
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
@@ -275,10 +277,10 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     elif flags.get("profile_created_stated") == "denied":
         new_state["profile_created"] = False
 
-    if flags.get("selected_timing"):
+    if flags.get("selected_timing") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
         new_state["timing"] = flags["selected_timing"]
 
-    if flags.get("selected_package"):
+    if flags.get("selected_package") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
         new_state["package"] = flags["selected_package"]
 
     if flags.get("selected_course"):

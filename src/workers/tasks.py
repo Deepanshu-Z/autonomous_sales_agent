@@ -155,7 +155,6 @@ def is_complaint_or_refund(text: str) -> bool:
     return False
 
 
-TARGET_AD_ID = os.getenv("TARGET_AD_ID")
 TARGET_MESSAGE_TEXT = os.getenv("TARGET_MESSAGE_TEXT", "Hello!! Can I get more info on Yoga classes?")
 
 # ── Robust Disinterest / Refusal Engine ──────────────────────────────────────
@@ -379,15 +378,13 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
         if clean_phone in allowed_test:
             return True, "Whitelisted in ALLOWED_TEST_NUMBERS"
 
-    target_ad = (os.getenv("TARGET_AD_ID") or TARGET_AD_ID or "").strip()
-
     if isinstance(referral_data, str):
         try:
             referral_data = json.loads(referral_data)
         except Exception:
             pass
 
-    # Match Ad ID from referral metadata against registered campaigns or TARGET_AD_ID in ENV
+    # Match Ad ID from referral metadata strictly against registered campaigns in ad_campaigns.json
     if referral_data and isinstance(referral_data, dict):
         source_id = str(referral_data.get("source_id") or "").strip()
         source_url = str(referral_data.get("source_url") or "").strip()
@@ -398,16 +395,9 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
         if received_id and campaign_loader.is_registered_ad_id(received_id):
             return True, f"Campaign Ad ID matched: '{received_id}'"
 
-        if target_ad and (received_id == target_ad or (source_url and target_ad in source_url)):
-            return True, f"Target Ad ID matched: '{received_id}'"
+        return False, f"Ad ID '{received_id}' is not registered in ad_campaigns.json"
 
-        if target_ad or received_id:
-            return False, f"Ad ID MISMATCH — received '{received_id}' vs TARGET '{target_ad}'"
-
-    if not referral_data:
-        return False, "No referral data (organic / non-ad message)"
-    else:
-        return False, "TARGET_AD_ID not set in environment"
+    return False, "No referral data (organic / non-ad message)"
 
 
 def is_target_ad_or_message(text: str, referral_data: dict = None, phone: str = None) -> bool:

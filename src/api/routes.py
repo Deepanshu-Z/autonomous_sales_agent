@@ -42,38 +42,68 @@ def _extract_message_text(message: dict) -> str:
     if not isinstance(message, dict):
         return str(message or "")
 
+    extracted_text = ""
+
     # 1. Check direct button_reply or interactive dict
     if "button_reply" in message and isinstance(message["button_reply"], dict):
-        return message["button_reply"].get("title") or message["button_reply"].get("id") or ""
+        extracted_text = message["button_reply"].get("title") or message["button_reply"].get("id") or ""
 
-    interactive = message.get("interactive")
-    if isinstance(interactive, dict):
-        btn = interactive.get("button_reply") or interactive.get("list_reply")
-        if isinstance(btn, dict):
-            return btn.get("title") or btn.get("id") or ""
+    if not extracted_text:
+        interactive = message.get("interactive")
+        if isinstance(interactive, dict):
+            btn = interactive.get("button_reply") or interactive.get("list_reply")
+            if isinstance(btn, dict):
+                extracted_text = btn.get("title") or btn.get("id") or ""
 
-    raw = message.get("message", "")
-    if isinstance(raw, dict):
-        btn = raw.get("button_reply") or raw.get("interactive", {}).get("button_reply")
-        if isinstance(btn, dict):
-            return btn.get("title") or btn.get("id") or ""
-        return raw.get("title") or raw.get("text") or ""
+    if not extracted_text:
+        raw = message.get("message", "")
+        if isinstance(raw, dict):
+            btn = raw.get("button_reply") or raw.get("interactive", {}).get("button_reply")
+            if isinstance(btn, dict):
+                extracted_text = btn.get("title") or btn.get("id") or ""
+            else:
+                extracted_text = raw.get("title") or raw.get("text") or ""
+        elif isinstance(raw, str):
+            trimmed = raw.strip()
+            if trimmed.startswith("{") and trimmed.endswith("}"):
+                try:
+                    parsed = json.loads(trimmed)
+                    if isinstance(parsed, dict):
+                        btn = parsed.get("button_reply") or parsed.get("interactive", {}).get("button_reply")
+                        if isinstance(btn, dict):
+                            extracted_text = btn.get("title") or btn.get("id") or trimmed
+                except Exception:
+                    pass
+            if not extracted_text:
+                extracted_text = raw
 
-    # If raw is a string, check if it's JSON encoded button payload
-    if isinstance(raw, str):
-        trimmed = raw.strip()
-        if trimmed.startswith("{") and trimmed.endswith("}"):
-            try:
-                parsed = json.loads(trimmed)
-                if isinstance(parsed, dict):
-                    btn = parsed.get("button_reply") or parsed.get("interactive", {}).get("button_reply")
-                    if isinstance(btn, dict):
-                        return btn.get("title") or btn.get("id") or trimmed
-            except Exception:
-                pass
-        return raw
+    if not extracted_text:
+        extracted_text = str(message.get("text") or message.get("body") or "")
 
-    return str(raw or "")
+    extracted_text = (extracted_text or "").strip()
+
+    # Capture Quoted / Replied message context (when user swipes right / drags to reply)
+    quoted_text = ""
+    ctx = message.get("context") if isinstance(message, dict) else None
+    if isinstance(ctx, dict):
+        q_msg = ctx.get("quoted_message")
+        if isinstance(q_msg, dict):
+            quoted_text = q_msg.get("body") or q_msg.get("text") or ""
+        elif isinstance(q_msg, str):
+            quoted_text = q_msg
+        if not quoted_text:
+            quoted_text = ctx.get("quoted_message_body") or ctx.get("body") or ctx.get("text") or ""
+    elif isinstance(message, dict) and "quoted_message" in message:
+        q_msg = message.get("quoted_message")
+        if isinstance(q_msg, dict):
+            quoted_text = q_msg.get("body") or q_msg.get("text") or ""
+        elif isinstance(q_msg, str):
+            quoted_text = q_msg
+
+    if quoted_text and quoted_text.strip():
+        return f"[Replying to: \"{quoted_text.strip()}\"]\n{extracted_text}"
+
+    return extracted_text
 
 
 @router.get("/health")

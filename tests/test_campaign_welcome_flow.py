@@ -11,7 +11,11 @@ from src.workers.tasks import handle_ai_reply_async, check_target_ad
 
 
 async def test_campaign_matching():
-    camp_yoga = campaign_loader.match_campaign(referral={"ad_id": "120247632705360010"})
+    camps = campaign_loader.get_all_campaigns()
+    assert len(camps) > 0
+    registered_ad_id = camps[0]["ad_ids"][0]
+
+    camp_yoga = campaign_loader.match_campaign(referral={"ad_id": registered_ad_id})
     assert camp_yoga is not None
     assert camp_yoga["course"] == "yoga"
     assert len(camp_yoga["buttons"]) == 3
@@ -33,13 +37,16 @@ async def test_campaign_matching():
 
 
 async def test_registered_ad_id_check():
+    camps = campaign_loader.get_all_campaigns()
+    registered_ad_id = camps[0]["ad_ids"][0]
+
     # Registered in ad_campaigns.json
-    assert campaign_loader.is_registered_ad_id("120247632705360010") is True
+    assert campaign_loader.is_registered_ad_id(registered_ad_id) is True
     # Non-registered
     assert campaign_loader.is_registered_ad_id("999999999999999999") is False
 
     # Check check_target_ad integration
-    is_target, reason = check_target_ad("Hi", {"ad_id": "120247632705360010"}, "919999999999")
+    is_target, reason = check_target_ad("Hi", {"ad_id": registered_ad_id}, "919999999999")
     assert is_target is True
 
 
@@ -62,8 +69,9 @@ async def test_first_message_welcome_and_second_message_funnel():
          patch("src.core.conversation_handler.send_text_message_async", side_effect=mock_send_text), \
          patch("src.services.quick_reply_service.send_followup_with_buttons_async", side_effect=mock_send_buttons):
 
-        # --- Turn 1: Brand new customer from Yoga ad ---
-        referral = {"ad_id": "120247632705360010"}
+        camps = campaign_loader.get_all_campaigns()
+        registered_ad_id = camps[0]["ad_ids"][0]
+        referral = {"ad_id": registered_ad_id}
         await handle_ai_reply_async(test_phone, "Hi, I am interested in classes", [], referral=referral)
 
         # Verify Welcome message 1 sent as text

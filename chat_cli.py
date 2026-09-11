@@ -106,7 +106,7 @@ async def chat_session():
         if cmd.startswith("course "):
             course_name = cmd.split(" ", 1)[1].strip()
             state["course"] = course_name
-            print(f"🎯 Switched active course to: '{course_name}'")
+            print(f"🎯Switched active course to: '{course_name}'")
             continue
 
         # Detect if user explicitly mentions a course from catalog and persist in session state

@@ -370,33 +370,50 @@ def detect_course_from_text_fallback(text: str, default_course: Optional[str] = 
     """Deterministic keyword/fuzzy course-name matcher. FALLBACK ONLY."""
     if not text:
         return default_course
-    q = text.lower().strip()
+
+    # Normalize whitespace, newlines, hyphens, and underscores to single spaces
+    q = re.sub(r"[\s\-_]+", " ", text).lower().strip()
     words = re.findall(r"\w+", q)
+
     try:
         from rapidfuzz import fuzz
     except ImportError:
-        return default_course
+        fuzz = None
 
     catalog = get_course_catalog()
-    # 1. Multi-word alias matches across the catalog (e.g. "face yoga", "spoken english")
+
+    # Separate candidates into multi-word and single-word, prioritizing longest multi-word first
+    multi_word_candidates = []
+    single_word_candidates = []
     for item in catalog:
         cid = item.get("id")
         for alias in item.get("aliases", []) + [cid]:
-            if " " in alias and alias in q:
-                return cid
+            alias_clean = re.sub(r"[\s\-_]+", " ", alias).lower().strip()
+            if " " in alias_clean:
+                multi_word_candidates.append((alias_clean, cid))
+            else:
+                single_word_candidates.append((alias_clean, cid))
+
+    # Sort multi-word candidates by length descending (e.g. "face yoga" before "yoga")
+    multi_word_candidates.sort(key=lambda x: len(x[0]), reverse=True)
+
+    # 1. Multi-word alias matches across the catalog (longest first)
+    for alias_clean, cid in multi_word_candidates:
+        pattern = r"\b" + re.escape(alias_clean) + r"\b"
+        if re.search(pattern, q) or alias_clean in q:
+            return cid
 
     # 2. Single-word exact and fuzzy matches
-    for item in catalog:
-        cid = item.get("id")
-        for alias in item.get("aliases", []) + [cid]:
-            alias_cons = _normalize_consonants(alias)
-            for w in words:
-                if w == alias:
-                    return cid
-                if len(_normalize_consonants(w)) >= 3 and _normalize_consonants(w) == alias_cons:
-                    return cid
-                if len(w) >= 3 and len(alias) >= 3 and fuzz.ratio(w, alias) >= 75:
-                    return cid
+    for alias_clean, cid in single_word_candidates:
+        alias_cons = _normalize_consonants(alias_clean)
+        for w in words:
+            if w == alias_clean:
+                return cid
+            if len(_normalize_consonants(w)) >= 3 and _normalize_consonants(w) == alias_cons:
+                return cid
+            if fuzz and len(w) >= 3 and len(alias_clean) >= 3 and fuzz.ratio(w, alias_clean) >= 80:
+                return cid
+
     return default_course
 
 

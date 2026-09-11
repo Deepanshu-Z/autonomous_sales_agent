@@ -107,13 +107,19 @@ async def handle_incoming_message(
 
     # Dynamic course switch: if customer mentions any course from the catalog, switch to it for this turn
     course_in_msg = kb_loader.detect_course_from_text(user_message, default_course=None) if user_message else None
-    effective_course_id = course_in_msg or new_state.get("course") or session_state.get("course") or course_id or ""
 
-    if not effective_course_id and conversation_history:
-        hist_text = " ".join((t.get("content") or "") for t in conversation_history[-10:])
-        detected_c = kb_loader.detect_course_from_text(hist_text, default_course=None)
-        if detected_c:
-            effective_course_id = detected_c
+    # If user message alone doesn't mention a course (e.g. fragmented "kathak" followed by "ki fees kya hj"),
+    # inspect recent user turns in conversation history to find the active course being discussed
+    if not course_in_msg and conversation_history:
+        for turn in reversed(conversation_history[-4:]):
+            if turn.get("role") in ("user", "customer"):
+                c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
+                if c:
+                    course_in_msg = c
+                    break
+
+    old_course = session_state.get("course") or course_id or ""
+    effective_course_id = course_in_msg or new_state.get("course") or old_course or ""
 
     if effective_course_id:
         entry = kb_loader.get_catalog_entry(effective_course_id)
@@ -121,6 +127,14 @@ async def handle_incoming_message(
             effective_course_id = entry["id"]
         new_state["course"] = effective_course_id
         session_state["course"] = effective_course_id
+        # When switching to a different course, clear old course-specific timings and packages
+        if old_course and old_course != effective_course_id:
+            new_state["timing"] = None
+            new_state["package"] = None
+            new_state["fee"] = None
+            session_state["timing"] = None
+            session_state["package"] = None
+            session_state["fee"] = None
 
     # 3. Build the system prompt with the freshly-understood state.
     system_prompt = prompt_module.format_system_prompt(new_state, course_id=effective_course_id)

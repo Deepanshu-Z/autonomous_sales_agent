@@ -173,6 +173,16 @@ async def extract_intent_and_state_changes(
                 last_ai = (turn.get("content") or "").strip()
                 break
 
+    recent_user_turns = [
+        (t.get("content") or "").strip()
+        for t in (history or [])
+        if t.get("role") in ("user", "customer") and (t.get("content") or "").strip()
+    ][-2:]
+    recent_user_context = (
+        "RECENT CUSTOMER MESSAGES:\n" + "\n".join(f"- \"{m}\"" for m in recent_user_turns) + "\n\n"
+        if recent_user_turns else ""
+    )
+
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
@@ -183,6 +193,7 @@ async def extract_intent_and_state_changes(
         f"- Profile Created in State: {bool(s.get('profile_created'))}\n"
         f"- Welcome Coupon Already Sent: {bool(s.get('coupon_sent'))}\n\n"
         f"PREVIOUS AI MESSAGE:\n\"{last_ai[:300]}\"\n\n"
+        f"{recent_user_context}"
         f"LATEST CUSTOMER MESSAGE:\n\"{text.strip()}\""
     )
 
@@ -203,9 +214,25 @@ async def extract_intent_and_state_changes(
 
         # Deterministic course detection from user text overrides ambiguous LLM extraction
         from src.core import kb_loader
+        llm_course = clean.get("selected_course")
+        valid_llm_course = None
+        if llm_course:
+            entry = kb_loader.get_catalog_entry(str(llm_course))
+            if entry:
+                valid_llm_course = entry["id"]
+
         text_course = kb_loader.detect_course_from_text(text, default_course=None)
-        if text_course:
-            clean["selected_course"] = text_course
+        if not text_course and history:
+            for turn in reversed(history[-4:]):
+                if turn.get("role") in ("user", "customer"):
+                    c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
+                    if c:
+                        text_course = c
+                        break
+
+        chosen_course = text_course or valid_llm_course
+        if chosen_course:
+            clean["selected_course"] = chosen_course
 
         return clean
     except Exception as e:

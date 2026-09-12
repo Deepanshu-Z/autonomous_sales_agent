@@ -20,7 +20,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"[supabase_client] Supabase connection error: {e}")
 else:
-    print("[supabase_client] SUPABASE_URL/SUPABASE_KEY not set — caching disabled.")
+    print("[supabase_client]  SUPABASE_URL/SUPABASE_KEY not set — caching disabled.")
 
 
 def normalize(text: str) -> str:

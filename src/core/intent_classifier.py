@@ -139,7 +139,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - Brief 3-8 word English description of what they are asking about if customer_intent is "QUESTION", else null.
 
 13. "detected_language":
-    - The exact language and script of the customer's incoming message (e.g. "Malayalam", "Tamil", "Telugu", "Kannada", "Hindi (Devanagari script)", "Hinglish (Latin script)", "Spanish", "French", "Arabic", "German", "English", etc.).
+    - Detect the customer's exact language and writing script from any language in the world (e.g. "English", "Hinglish (Latin script)", "Hindi (Devanagari script)", "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "French", "German", "Arabic", etc.).
+    - STRICT SCRIPT RULES:
+      • If written in the Latin/English alphabet using Hindi, Urdu, or Indic words (e.g. "nhi kathak ki fees bta and time", "seekhna h", "kya timing h", "acha", "fees bta do"): ALWAYS classify as "Hinglish (Latin script)".
+      • If written in standard English: classify as "English".
+      • Classify as "Hindi (Devanagari script)" ONLY IF the customer literally typed using Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते"). NEVER classify Latin/English alphabet as Devanagari!
+      • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
@@ -302,6 +307,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
 
+    if flags.get("detected_language"):
+        new_state["language"] = flags["detected_language"]
+
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
         "wants_trial": flags.get("wants_trial", False),
@@ -310,6 +318,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "is_disinterested": flags.get("is_disinterested", False),
         "is_complaint_or_refund": flags.get("is_complaint_or_refund", False),
         "question_summary": flags.get("question_summary"),
+        "detected_language": flags.get("detected_language"),
     }
 
     return new_state

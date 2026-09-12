@@ -189,7 +189,7 @@ def format_coupon_banner(
             f"{code_details_hi}\n\n"
             "Isko Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
         )
-    elif language in ["hindi", "hinglish"]:
+    elif any(k in str(language).lower() for k in ["hindi", "hinglish"]):
         return (
             "🎉 Sensationz family mein aapka swagat hai! 🌸\n"
             "Aapka welcome discount coupon code ye raha 🎁\n\n"
@@ -290,7 +290,7 @@ def format_coupon_unlock_delivery(
     if details:
         code = details["code"]
         offer = details["offer_price"]
-        if language in ["hindi", "hinglish"]:
+        if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
                 f"\n\nYe raha aapka welcome discount coupon code 🎁\n"
                 f"✨ Coupon Code: *{code}* ({canonical} package ke liye — Offer Price: ₹{offer})\n\n"
@@ -305,7 +305,7 @@ def format_coupon_unlock_delivery(
     else:
         lines = [f"• {pkg}: *{data['code']}* (Offer: ₹{data['offer_price']})" for pkg, data in registry.items()]
         codes_block = "\n".join(lines)
-        if language in ["hindi", "hinglish"]:
+        if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
                 f"\n\nYe rahe aapke welcome discount coupon codes 🎁\n"
                 f"{codes_block}\n\n"

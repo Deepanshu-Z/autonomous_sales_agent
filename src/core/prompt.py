@@ -296,15 +296,43 @@ def format_system_prompt(
         gst_pct=gst_pct,
     )
 
-    if detected_language and "english" not in detected_language.lower():
-        rendered += (
-            f"\n\n════════════════════════════════════════\n"
-            f"🚨 CRITICAL MANDATORY LANGUAGE ENFORCEMENT (HIGHEST PRIORITY):\n"
-            f"The customer's latest message is written in {detected_language}.\n"
-            f"You MUST output 'reply', 'followup', and all 'buttons' strictly in {detected_language}!\n"
-            f"Do NOT reply in English or default to the language of previous conversation turns.\n"
-            f"════════════════════════════════════════"
-        )
+    effective_lang = detected_language or s.get("language")
+    if effective_lang:
+        lang_lower = effective_lang.lower()
+        if "english" in lang_lower and "hinglish" not in lang_lower:
+            rendered += (
+                f"\n\n════════════════════════════════════════\n"
+                f"🚨 MANDATORY LANGUAGE ENFORCEMENT:\n"
+                f"The customer's language is English.\n"
+                f"You MUST output 'reply', 'followup', and all 'buttons' strictly in pure English!\n"
+                f"════════════════════════════════════════"
+            )
+        else:
+            if "devanagari" in lang_lower:
+                script_rule = (
+                    "The customer explicitly wrote using Devanagari script.\n"
+                    "You MUST output 'reply', 'followup', and all 'buttons' strictly in Devanagari script."
+                )
+            elif "latin" in lang_lower or "hinglish" in lang_lower:
+                script_rule = (
+                    f"The customer wrote in {effective_lang} using the Latin/English alphabet.\n"
+                    "You MUST output 'reply', 'followup', and all 'buttons' strictly in the Latin/English alphabet (transliterated).\n"
+                    "CRITICAL: Do NOT output in Devanagari script or any native script! Only use the Latin/English alphabet."
+                )
+            else:
+                script_rule = (
+                    f"You MUST output 'reply', 'followup', and all 'buttons' strictly in {effective_lang}.\n"
+                    "Match the customer's writing script: use native script ONLY if the customer used native script, otherwise use the Latin/English alphabet."
+                )
+
+            rendered += (
+                f"\n\n════════════════════════════════════════\n"
+                f"🚨 CRITICAL MANDATORY LANGUAGE & SCRIPT ENFORCEMENT (HIGHEST PRIORITY):\n"
+                f"Detected Customer Language & Script: {effective_lang}\n"
+                f"{script_rule}\n"
+                f"Do NOT default to English or another language/script.\n"
+                f"════════════════════════════════════════"
+            )
 
     return rendered
 

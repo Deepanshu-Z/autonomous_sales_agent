@@ -6,6 +6,7 @@ are dynamically injected from structured knowledge bases (kb_loader).
 Only core persona, tone, language matching, safety, and formatting rules remain here.
 """
 
+import re
 from typing import Optional, Dict, Any
 from src.core import kb_loader
 
@@ -50,7 +51,8 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     }}
   • BUTTON RULES:
     - Include 2 or 3 short, punchy button labels (max 20 chars / 1-3 words each, e.g. ["Morning Batch", "Evening Batch"], ["1 Month Pack", "3 Months Pack"], ["Profile Done", "Installing App"], ["Free Trial", "View Packages"]) that make it effortless for the customer to reply to the followup question.
-    - IMPORTANT: Ensure button labels represent clear, direct actions answering the followup question. Avoid vague labels like "Yes, help me", "Need Help", or "Madad chahiye". Use precise choices like ["Book Trial", "Check Timings"], ["Completed Profile", "Need App Link"].
+    - LANGUAGE & SCRIPT MATCH: Button labels MUST be in the same language and script as the customer's message (e.g. English -> ["Morning Batch", "Free Trial"], Hinglish -> ["Morning Batch", "Shaam ka Batch"], Hindi -> ["सुबह का बैच", "शाम का बैच"]).
+    - IMPORTANT: Ensure button labels represent clear, direct actions answering the followup question (max 20 chars per button). Avoid vague labels like "Yes, help me", "Need Help", or "Madad chahiye". Use precise choices like ["Book Trial", "Check Timings"], ["Completed Profile", "Need App Link"].
     - If followup is null (declining/suppressed/agent handoff), set "buttons": [].
   • SUPPRESSION: If the customer is declining/not interested, asking for a human agent, or simply saying thank you/goodbye, set "followup": null and "buttons": []. Send only the polite reply.
 - DIRECT QUESTION-FIRST RULE (NEVER ROBOTICALLY SKIP THE USER'S QUESTION):
@@ -102,12 +104,11 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 ════════════════════════════════════════
 - Be warm, natural, concise, and helpful. Use light emojis when appropriate (😊 🧘‍♀️ ✨).
 - STRICT LANGUAGE & SCRIPT MATCHING RULE (NON-NEGOTIABLE):
-  • Match the exact language AND script of the customer's LATEST message.
-  • English input -> Reply ONLY in 100% pure English. Do NOT mix any Hindi/Hinglish words.
-  • Hinglish input (Hindi words written in Latin/English alphabet, e.g. "fees ky rhgi", "kya", "hai", "timing btao", "bhejo") ->
-    Reply ONLY in natural conversational Hinglish using the LATIN/ENGLISH ALPHABET (e.g. "Hamare yoga classes ki fees...", "Morning batches ka timing...").
-    CRITICAL SCRIPT RESTRICTION: NEVER use Devanagari script (कभी भी देवनागरी लिपि का प्रयोग न करें) when the customer writes in Latin/English alphabet!
-  • Devanagari Hindi input (e.g. "नमस्ते", "फीस कितनी है") -> Reply in Devanagari Hindi. Use Devanagari script ONLY if the customer explicitly typed in Devanagari!
+  • Detect and match the exact language and script of the customer's LATEST message (e.g. English, Hindi, Hinglish, Marathi, Tamil, Telugu, Bengali, Gujarati, Spanish, etc.).
+  • If customer writes in English -> Reply ONLY in 100% pure English. Do NOT mix other languages.
+  • If customer writes in Romanized transliteration (e.g. Hinglish, Tanglish, Latin alphabet) -> Reply in that same language using ONLY the LATIN/ENGLISH ALPHABET. NEVER use native scripts (e.g. Devanagari) when the customer writes in Latin/English alphabet!
+  • If customer writes in a native script (Devanagari Hindi, Tamil, Telugu, etc.) -> Reply in that exact language and native script. Use native script ONLY if the customer explicitly typed in native script.
+  • Keep brand name ("Sensationz"), course names ("Yoga", "Kathak"), and URLs untouched.
 - SILENT TYPO HANDLING: Understand customer intent silently despite misspellings or phonetic variations. Never point out or correct typos.
 - Never repeat or restate the customer's message (never write "Aapne poocha...", "Aapka message...", "You asked..."). Answer directly.
 
@@ -198,7 +199,11 @@ def build_not_offered_context(course_dict: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: Optional[str] = None) -> str:
+def format_system_prompt(
+    state: Optional[Dict[str, Any]] = None,
+    course_id: Optional[str] = None,
+    detected_language: Optional[str] = None,
+) -> str:
     """
     Dynamically constructs the system prompt:
     1. Loads clean structured course data from kb_loader for the user's active course only.
@@ -282,7 +287,7 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: Opti
     course_dict = kb_loader.get_course_data(cid)
     not_offered_rules = build_not_offered_context(course_dict)
 
-    return BASE_SYSTEM_TEMPLATE.format(
+    rendered = BASE_SYSTEM_TEMPLATE.format(
         state_context=state_context,
         course_data=course_json_str,
         course_id_title=active_title,
@@ -290,6 +295,18 @@ def format_system_prompt(state: Optional[Dict[str, Any]] = None, course_id: Opti
         not_offered_rules=not_offered_rules,
         gst_pct=gst_pct,
     )
+
+    if detected_language and "english" not in detected_language.lower():
+        rendered += (
+            f"\n\n════════════════════════════════════════\n"
+            f"🚨 CRITICAL MANDATORY LANGUAGE ENFORCEMENT (HIGHEST PRIORITY):\n"
+            f"The customer's latest message is written in {detected_language}.\n"
+            f"You MUST output 'reply', 'followup', and all 'buttons' strictly in {detected_language}!\n"
+            f"Do NOT reply in English or default to the language of previous conversation turns.\n"
+            f"════════════════════════════════════════"
+        )
+
+    return rendered
 
 
 # Backward-compatibility fallback string for new sessions

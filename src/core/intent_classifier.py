@@ -66,6 +66,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_complaint_or_refund": False,
         "customer_intent": "QUESTION",
         "question_summary": None,
+        "detected_language": "English",
     }
 
 
@@ -137,6 +138,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 12. "question_summary":
     - Brief 3-8 word English description of what they are asking about if customer_intent is "QUESTION", else null.
 
+13. "detected_language":
+    - The exact language and script of the customer's incoming message (e.g. "Malayalam", "Tamil", "Telugu", "Kannada", "Hindi (Devanagari script)", "Hinglish (Latin script)", "Spanish", "French", "Arabic", "German", "English", etc.).
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -150,7 +154,8 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "is_disinterested": boolean,
   "is_complaint_or_refund": boolean,
   "customer_intent": string,
-  "question_summary": string | null
+  "question_summary": string | null,
+  "detected_language": string
 }"""
 
 

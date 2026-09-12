@@ -137,7 +137,10 @@ async def handle_incoming_message(
             session_state["fee"] = None
 
     # 3. Build the system prompt with the freshly-understood state.
-    system_prompt = prompt_module.format_system_prompt(new_state, course_id=effective_course_id)
+    detected_lang = flags.get("detected_language")
+    system_prompt = prompt_module.format_system_prompt(
+        new_state, course_id=effective_course_id, detected_language=detected_lang
+    )
 
     # 4. Generate the actual reply, with conversation history for coherence.
     messages = [SystemMessage(content=system_prompt)]

@@ -66,6 +66,8 @@ def _get_reply_llm():
                 api_key=openrouter_key,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0.2,
+                max_tokens=500,
+                timeout=10,
                 model_kwargs={"response_format": {"type": "json_object"}},
             )
         else:
@@ -75,6 +77,8 @@ def _get_reply_llm():
                 model=model_name,
                 api_key=openai_key,
                 temperature=0.2,
+                max_tokens=500,
+                timeout=10,
                 model_kwargs={"response_format": {"type": "json_object"}},
             )
     return _reply_llm
@@ -364,11 +368,15 @@ async def handle_conversation_turn_async(
             new_state["refusal_stage"] = 0
             current_refusal_stage = 0
 
+    # Refusal condition:
+    # 1. Customer signals disinterest, refusal, complaint, or cancellation
+    # 2. Or we just asked for refusal reason (current_refusal_stage == 1) and they are explaining why
+    # (Do NOT hijack normal questions, greetings, or meta queries like "are u an AI?" when stage >= 2 unless they actually refuse)
     is_refusal_or_complaint = (
         last_turn.get("is_disinterested")
         or last_turn.get("is_complaint_or_refund")
         or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
-        or current_refusal_stage > 0
+        or (current_refusal_stage == 1 and last_turn.get("intent") not in ("GREETING", "AGENT_REQUEST"))
     )
 
     if is_refusal_or_complaint:
@@ -421,19 +429,19 @@ async def handle_conversation_turn_async(
     if clean_reply and clean_reply.strip():
         await send_text_message_async(phone, clean_reply)
         latency_sec = round(time.time() - start_time, 2)
-        await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
+        asyncio.create_task(save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec))
         asyncio.create_task(log_message_async(phone, "ai", clean_reply))
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
     if clean_followup and clean_followup.strip():
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(0.8)
         raw_buttons = result.get("buttons") or []
         try:
             from src.services.quick_reply_service import send_followup_with_buttons_async
             await send_followup_with_buttons_async(phone, clean_followup, buttons=raw_buttons)
         except ImportError:
             await send_text_message_async(phone, clean_followup)
-        await save_message_async(phone, "assistant", clean_followup)
+        asyncio.create_task(save_message_async(phone, "assistant", clean_followup))
         asyncio.create_task(log_message_async(phone, "ai", clean_followup))
 
     # Persist updated session state

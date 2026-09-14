@@ -48,7 +48,8 @@ COURSE OFFERINGS & POLICIES SUMMARY:
 - Physical branch addresses are ADMINISTRATIVE OFFICES ONLY. Offline classes or physical studio visits are NOT offered.
 - Cash or offline payments are STRICTLY NOT ACCEPTED.
 - Course fees once paid are non-refundable.
-- Offerings: Flexible daily batch timings (5:00 AM to 8:00 PM), recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch can be changed after 1 month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+
 
 ANALYSIS CRITERIA:
 1. REFUSAL DETECTION:
@@ -71,7 +72,7 @@ ANALYSIS CRITERIA:
 
 4. SOLUTION VIABILITY:
    - Can our system/knowledge base legitimately solve the customer's reason?
-     • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 flexible batches, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
+     • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch switch allowed after 1 month, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
      • NOT Solvable: Customer insists on physical offline in-person studio classes, demands 1-on-1 private home tutors, demands cash payment at physical office, or has unserviceable demands.
    - If the request cannot be fulfilled by our offerings -> `solution_viable` = false.
 

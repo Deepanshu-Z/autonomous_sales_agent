@@ -170,7 +170,8 @@ def get_course_data(course_id: str = "") -> Dict[str, Any]:
         ],
     }
 
-    if cid:
+    has_full_kb = bool(catalog_entry and catalog_entry.get("has_full_kb", False))
+    if cid and has_full_kb:
         course_file = _load_course_file(cid)
         if course_file is not None:
             return {**shared, **course_file}

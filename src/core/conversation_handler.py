@@ -34,6 +34,15 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# The single message sent to the customer on every ESCALATE_TO_AGENT resolution.
+# Hardcoded so it cannot be wrong regardless of what the LLM generated.
+_ESCALATION_NOTICE = (
+    "Aapki query/feedback humari team tak pahunch gayi hai. "
+    "Hamara ek team member aapke saath jald hi connect karega. 😊\n\n"
+    "Your feedback has been escalated to our support team. "
+    "Someone from our team will be with you shortly! 🙏"
+)
+
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
@@ -421,26 +430,24 @@ async def handle_conversation_turn_async(
                 if current_refusal_stage >= 2:
                     resolution = "ESCALATE_TO_AGENT"
                     new_state["refusal_stage"] = 3
-                    # BUG C FIX: reply_text is still the solution pitch — replace with a
-                    # graceful goodbye so the customer doesn't get a sales message as farewell.
-                    reply_text = (
-                        "Bilkul samajh aata hai! 😊 Koi baat nahi. "
-                        "Kabhi bhi kuch explore karna ho toh hum yahan hain. "
-                        "Hum aapke liye ek coordinator connect kar rahe hain jo aapki madad kar sakenge. 🙏"
-                    )
+                    # BUG C FIX: reply_text is still the solution pitch — replace with
+                    # the standard escalation notice so customer gets the correct message.
+                    reply_text = _ESCALATION_NOTICE
                 else:
                     new_state["refusal_stage"] = 2
             elif resolution == "ESCALATE_TO_AGENT":
                 new_state["refusal_stage"] = 3
 
             clean_reply = _format_for_whatsapp(reply_text)
-            # BUG7 FIX: Always deliver the goodbye/acknowledgement message to the customer
-            # BEFORE executing agent handoff — otherwise they get silence.
+            # Always deliver the escalation notice to the customer BEFORE handoff.
+            # We always use _ESCALATION_NOTICE (not clean_reply) so the message is
+            # consistent regardless of what the LLM generated as the reply.
             if resolution == "ESCALATE_TO_AGENT":
-                await send_text_message_async(phone, clean_reply)
+                escalation_notice = _format_for_whatsapp(_ESCALATION_NOTICE)
+                await send_text_message_async(phone, escalation_notice)
                 latency_sec = round(time.time() - start_time, 2)
-                await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
-                asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+                await save_message_async(phone, "assistant", escalation_notice, response_time_sec=latency_sec)
+                asyncio.create_task(log_message_async(phone, "ai", escalation_notice))
                 # BUG A FIX: Do NOT pass clean_reply as user_reply_text —
                 # execute_agent_handoff_async sends it to the customer again, causing a duplicate.
                 # We already sent it above. Pass None so handoff is internal-only.

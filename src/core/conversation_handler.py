@@ -354,11 +354,24 @@ async def handle_conversation_turn_async(
         return {"status": "handed_off", "reply": reply_text}
 
     # ── Refusal / Objection Handling ───────────────────────────────────────
-    # When the customer declines or expresses disinterest, route through the
-    # refusal engine so the reply is empathetic and either asks for the reason,
-    # offers a knowledge-backed solution, or escalates to a human — instead of a
-    # generic "nice bot" answer.
-    if last_turn.get("is_disinterested"):
+    # When the customer declines or is in an active refusal lifecycle,
+    # route through the refusal engine (3-step lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated).
+    current_refusal_stage = new_state.get("refusal_stage", 0)
+
+    # If customer asks a genuine question or normal request without refusal, reset refusal stage back to normal
+    customer_intent = last_turn.get("intent") or last_turn.get("customer_intent")
+    if customer_intent in ["QUESTION", "TIMING_SELECTION", "PACKAGE_SELECTION", "APP_LINK_REQUEST", "COUPON_REQUEST", "GREETING"] and not last_turn.get("is_disinterested"):
+        new_state["refusal_stage"] = 0
+        current_refusal_stage = 0
+
+    is_refusal_or_complaint = (
+        last_turn.get("is_disinterested")
+        or last_turn.get("is_complaint_or_refund")
+        or last_turn.get("intent") == "COMPLAINT"
+        or current_refusal_stage > 0
+    )
+
+    if is_refusal_or_complaint:
         eval_res = await evaluate_refusal_async(
             text_clean, history=history or [], state=new_state
         )
@@ -366,14 +379,24 @@ async def handle_conversation_turn_async(
         refusal_msg = (eval_res or {}).get("reply_message")
         if refusal_msg:
             reply_text = refusal_msg
+            followup_msg = None          # Suppress pushy sales follow-up on refusal turns
+            result["buttons"] = []       # Clear sales buttons
+
+            if resolution == "ASK_REASON":
+                new_state["refusal_stage"] = 1
+            elif resolution == "PROVIDE_SOLUTION":
+                new_state["refusal_stage"] = 2
+            elif resolution == "ESCALATE_TO_AGENT":
+                new_state["refusal_stage"] = 3
+
             clean_reply = _format_for_whatsapp(reply_text)
-            # Escalate when the concern is unresolvable or carries legal/medical risk.
+            # Escalate when customer declines after solution, or concern is unresolvable / legal / risk
             if resolution == "ESCALATE_TO_AGENT":
                 await execute_agent_handoff_async(
                     phone,
                     user_reply_text=clean_reply,
                     escalation_reason=(eval_res or {}).get("escalation_reason")
-                    or f"Refusal with unresolvable/risk concern: {text_clean[:50]}",
+                    or f"Refusal escalation: {text_clean[:50]}",
                     start_time=start_time,
                 )
                 await send_text_message_async(phone, clean_reply)

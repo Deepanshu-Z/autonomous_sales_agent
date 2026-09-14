@@ -77,22 +77,42 @@ ANALYSIS CRITERIA:
 
 DECISION OUTCOMES:
 - If NOT a refusal (and not awaiting reason) -> `resolution_type` = "NOT_A_REFUSAL".
-- If REFUSAL and `has_reason` = false:
-  -> `resolution_type` = "ASK_REASON"
-  -> `reply_message`: Warmly and empathetically ask what is holding them back (timing, fees, or something else). Never pressure.
-- If `has_reason` = true AND (`has_risk_or_legal` = true OR `solution_viable` = false):
-  -> `resolution_type` = "ESCALATE_TO_AGENT"
-  -> `reply_message`: Tell the customer clearly and politely that we have listened to their query/concern and we are assigning a human support specialist from our team to assist them directly.
-  -> `escalation_reason`: Concise English summary of the risk or unresolvable concern for the human agent.
-- If `has_reason` = true AND `has_risk_or_legal` = false AND `solution_viable` = true:
-  -> `resolution_type` = "PROVIDE_SOLUTION"
-  -> `reply_message`: Warm, empathetic message offering our knowledge-based solution (e.g. flexible batch, free trial, starter package) without being pushy. Keep it inviting.
+
+1. HIGH RISK / LEGAL / HARASSMENT / ANGER (IMMEDIATE AGENT ESCALATION):
+   - If the customer expresses legal threats, financial/chargeback disputes, harassment, scam allegations, or direct anger/accusations (e.g. "u r lier", "jhuth bola", "scam company", "police complaint", "fraud", "consumer court"):
+     -> `resolution_type` = "ESCALATE_TO_AGENT"
+     -> `reply_message`: Sincerely apologize for the frustration/miscommunication, reassure them that we take their concern seriously, and let them know our senior human support specialist is stepping in right away to assist them directly.
+     -> `escalation_reason`: English summary of the risk/complaint for the human agent.
+
+2. PERSISTENT REFUSAL (AFTER SOLUTION ALREADY GIVEN OR REFUSAL STAGE >= 2):
+   - If a solution/trial/demo was ALREADY offered (or `Refusal Stage` is >= 2), AND the customer still refuses or declines (e.g. "nahi chahiye", "no", "not interested", "nahi lena", "leave it", "cancel"):
+     -> `resolution_type` = "ESCALATE_TO_AGENT"
+     -> `reply_message`: Warmly and gracefully accept their decision without being pushy or arguing. Tell them we completely understand, thank them, and let them know our support coordinator will be happy to connect if they need any assistance in the future.
+     -> `escalation_reason`: "Customer declined after solution/demo was offered (persistent refusal)".
+
+3. REFUSAL WITH REASON (OR ANSWERING REFUSAL REASON, OR REFUSAL STAGE == 1):
+   - If the customer specifies why they are hesitating/refusing (or is answering our earlier inquiry about why):
+     • If reason is UNRESOLVABLE by our offerings (e.g. insists on offline studio, private home tutor, cash payment):
+       -> `resolution_type` = "ESCALATE_TO_AGENT"
+       -> `reply_message`: Politely explain our offering boundary (e.g. 100% online classes), and let them know our human coordinator will assist them.
+       -> `escalation_reason`: English summary of the unresolvable request.
+     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, beginner hesitation, fear of pace, doubt about teachers):
+       -> `resolution_type` = "PROVIDE_SOLUTION"
+       -> `reply_message`: Warm, empathetic message offering our low-pressure solution:
+          - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
+          - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
+          - Keep it inviting, empathetic, and friendly.
+
+4. REFUSAL WITHOUT REASON (FIRST-TIME REFUSAL, REFUSAL STAGE == 0):
+   - If the customer refuses/declines without providing any explanation (e.g. "not interested", "leave it", "nahi chahiye", "no thanks"):
+     -> `resolution_type` = "ASK_REASON"
+     -> `reply_message`: Warmly and empathetically ask what is holding them back (timing, fees, hesitation, or something else) so we can see if we can help. Never pressure.
 
 STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
 - When generating `reply_message` for PROVIDE_SOLUTION:
-  • You MUST strictly quote the Active Course Name and its exact fees/packages provided in the ACTIVE COURSE CONTEXT.
+  • You MUST strictly quote the Active Course Name and its details provided in the ACTIVE COURSE CONTEXT.
   • NEVER assume, invent, or mention 'Yoga' or '₹300' unless the active course is explicitly Yoga.
-  • If the user objects to price/fees, mention the active course's starter package duration and offer price, and invite them to attend a free trial class.
+  • Share YouTube demo videos if present in ACTIVE COURSE CONTEXT.
   • If no active course is known: DO NOT quote fees or specific course names. Warmly ask which course they are exploring.
 
 STRICT LANGUAGE & SCRIPT MATCHING FOR `reply_message`:
@@ -147,6 +167,8 @@ async def evaluate_refusal_async(
             )
             all_pkgs = ", ".join(f"{p.get('duration')}: ₹{p.get('offer_price', p.get('base_price', 0)):,}" for p in pkgs)
             trial_info = course_data.get("trial_classes", {})
+            demo_videos = trial_info.get("demo_videos") or course_data.get("demo_videos", {})
+            demo_str = ", ".join(f"{teacher}: {url}" for teacher, url in demo_videos.items() if url) if demo_videos else "None"
             not_offered = course_data.get("not_offered", {})
             course_context_str = (
                 f"ACTIVE COURSE CONTEXT (SOURCE OF TRUTH):\n"
@@ -154,6 +176,7 @@ async def evaluate_refusal_async(
                 f"- Starter Package: {starter_str}\n"
                 f"- All Package Offer Prices: {all_pkgs}\n"
                 f"- Free Trial Available: Up to {trial_info.get('max_trial_classes', 1)} free trial class(es)\n"
+                f"- YouTube Demo Videos: {demo_str}\n"
                 f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
             )
 
@@ -180,9 +203,11 @@ async def evaluate_refusal_async(
             recent_context.append(f"{role}: {content}")
     history_snippet = "\n".join(recent_context) if recent_context else "No prior history."
 
+    refusal_stage = state.get("refusal_stage", 0)
     user_payload = (
         f"{course_context_str}\n"
-        f"Awaiting Refusal Reason from previous turn: {awaiting_reason}\n"
+        f"Current Refusal Stage: {refusal_stage} (0=new refusal, 1=asked reason, 2=solution offered)\n"
+        f"Awaiting Refusal Reason from previous turn: {awaiting_reason or refusal_stage == 1}\n"
         f"Customer Message: \"{text}\"\n\n"
         f"Recent History:\n{history_snippet}\n\n"
         "Evaluate and output JSON:"

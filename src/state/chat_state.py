@@ -134,7 +134,8 @@ def get_default_state(phone: str) -> dict:
         "low_confidence_count": 0,     # Consecutive unanswered / low-confidence query count
         "follow_up_count": 0,
         "next_follow_up_due_at": 0,
-        "last_topic": 0    
+        "last_topic": 0,
+        "refusal_stage": 0,           # 3-step refusal lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated
     }
 
 

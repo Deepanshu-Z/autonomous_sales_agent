@@ -225,40 +225,40 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
 
     if not profile_created:
         lines = [
-            "• WELCOME DISCOUNT POLICY (PROFILE REGISTRATION REQUIRED):",
-            "  - Welcome coupon codes are LOCKED and hidden. Codes unlock ONLY AFTER profile registration.",
+            "• GANESH CHATURTHI OFFER — DISCOUNT POLICY (PROFILE REGISTRATION REQUIRED):",
+            "  - Ganesh Chaturthi Offer coupon codes are LOCKED and hidden. Codes unlock ONLY AFTER profile registration.",
             "  - ZERO FABRICATION RULE: You do NOT have any coupon codes. NEVER invent, fabricate, guess, or output ANY coupon code string (e.g. NEVER make up codes like 'WELCOME100', 'DISCOUNT50', or ANY code string).",
             "  - If customer asks for a coupon or code for ANY package (e.g. '6 month ka coupon do', 'coupon code kya hai', 'give coupon'):",
-            "    1. Warmly explain that coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
-            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is ₹1,000, 1 Month is ₹300).",
+            "    1. Warmly explain that Ganesh Chaturthi Offer coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
+            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is \u20b91,000, 1 Month is \u20b9300).",
             "    3. Guide them to complete their profile on the Sensationz App or website using the official links:",
-            "       • Android App: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
-            "       • iOS App: https://apps.apple.com/us/app/sensationz/id6761418351",
-            "       • Website: https://shop.sensationzperformingarts.com/",
+            "       \u2022 Android App: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
+            "       \u2022 iOS App: https://apps.apple.com/us/app/sensationz/id6761418351",
+            "       \u2022 Website: https://shop.sensationzperformingarts.com/",
             "  - PROFILE COMPLETION TRIGGER (STRICT PAST TENSE AFFIRMATION ONLY):",
-            "    • Emit [UNLOCK_COUPON] ONLY IF the customer states they ALREADY finished/created/completed their profile or registered.",
-            "    • STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",
-            "    • CELEBRATE warmly and include [UNLOCK_COUPON] ONLY when they confirm completion (e.g. 'Congratulations! [UNLOCK_COUPON]').",
-            "• OFFICIAL OFFER PRICES (Coupon codes are securely hidden until profile created):"
+            "    \u2022 Emit [UNLOCK_COUPON] ONLY IF the customer states they ALREADY finished/created/completed their profile or registered.",
+            "    \u2022 STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",
+            "    \u2022 CELEBRATE warmly and include [UNLOCK_COUPON] ONLY when they confirm completion (e.g. 'Congratulations! [UNLOCK_COUPON]').",
+            "\u2022 OFFICIAL OFFER PRICES — GANESH CHATURTHI OFFER (Coupon codes are securely hidden until profile created):"
         ]
         for pkg in packages:
-            lines.append(f"  • {pkg.get('duration')}: Offer Price ₹{pkg.get('offer_price')} (Regular: ₹{pkg.get('base_price')}) — [Code locked until profile created]")
+            lines.append(f"  \u2022 {pkg.get('duration')}: Offer Price \u20b9{pkg.get('offer_price')} (Regular: \u20b9{pkg.get('base_price')}) \u2014 [Code locked until profile created]")
         if not packages:
-            lines.append("  (No course selected yet — once customer selects a course, offer prices and locked codes will be shown.)")
+            lines.append("  (No course selected yet \u2014 once customer selects a course, offer prices and locked codes will be shown.)")
         return "\n".join(lines)
 
     else:
         selected = s.get("package")
         if not packages:
             return (
-                "• WELCOME DISCOUNT — PROFILE CONFIRMED (UNLOCKED):\n"
+                "• GANESH CHATURTHI OFFER — PROFILE CONFIRMED (UNLOCKED):\n"
                 "  - Profile is confirmed but no course is selected yet. Coupon codes are course-specific.\n"
                 "  - DO NOT output any coupon code. Once the customer selects their course and package, share the exact code from COURSE_DATA.\n"
                 "  - ZERO FABRICATION RULE: NEVER invent, guess, or make up any coupon code string!"
             )
         lines = [
-            "• WELCOME DISCOUNT — PROFILE CONFIRMED (UNLOCKED):",
-            "  - Customer's profile registration is CONFIRMED. Welcome coupons are UNLOCKED.",
+            "• GANESH CHATURTHI OFFER — PROFILE CONFIRMED (UNLOCKED):",
+            "  - Customer's profile registration is CONFIRMED. Ganesh Chaturthi Offer coupon codes are UNLOCKED.",
             "  - Below are the exact unlocked coupon codes for each package duration:",
         ]
         for p in packages:
@@ -292,13 +292,13 @@ def format_coupon_unlock_delivery(
         offer = details["offer_price"]
         if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
-                f"\n\nYe raha aapka welcome discount coupon code 🎁\n"
+                f"\n\nYe raha aapka Ganesh Chaturthi Offer coupon code 🎁🪔\n"
                 f"✨ Coupon Code: *{code}* ({canonical} package ke liye — Offer Price: ₹{offer})\n\n"
                 "Isko Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
             )
         else:
             return (
-                f"\n\nHere is your welcome discount coupon code 🎁\n"
+                f"\n\nHere is your Ganesh Chaturthi Offer coupon code 🎁🪔\n"
                 f"✨ Coupon Code: *{code}* (for {canonical} package — Offer Price: ₹{offer})\n\n"
                 "Please enter this code during checkout in the Sensationz App or website to activate your discount. See you in class! ✨"
             )
@@ -307,13 +307,13 @@ def format_coupon_unlock_delivery(
         codes_block = "\n".join(lines)
         if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
-                f"\n\nYe rahe aapke welcome discount coupon codes 🎁\n"
+                f"\n\nYe rahe aapke Ganesh Chaturthi Offer coupon codes 🎁🪔\n"
                 f"{codes_block}\n\n"
                 "Apne selected package ke liye coupon code Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
             )
         else:
             return (
-                f"\n\nHere are your welcome discount coupon codes 🎁\n"
+                f"\n\nHere are your Ganesh Chaturthi Offer coupon codes 🎁🪔\n"
                 f"{codes_block}\n\n"
                 "Please enter the coupon code for your selected package during checkout in the Sensationz App or website. See you in class! ✨"
             )

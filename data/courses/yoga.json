@@ -53,7 +53,7 @@
         "gst_included_in_listed_price": false,
         "gst_percentage": 5,
         "gst_added_at": "Checkout in app or website",
-        "offer_mechanism": "Welcome coupon sent after profile creation in app/website",
+        "offer_mechanism": "Ganesh Chaturthi Offer coupon sent after profile creation in app/website",
         "beginner_recommendation": "1 Month package",
         "packages": [
             {
@@ -62,7 +62,7 @@
                 "base_price": 700,
                 "offer_price": 300,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA300",
+                "coupon_code": "YOGA70",
                 "gst_on_offer": 15,
                 "total_with_gst_offer": 315,
                 "per_day_offer": "Rs.10 (offer price)"
@@ -73,7 +73,7 @@
                 "base_price": 1750,
                 "offer_price": 600,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA600",
+                "coupon_code": "YOGA70",
                 "gst_on_offer": 30,
                 "total_with_gst_offer": 630,
                 "per_day_offer": "Rs.6/day — less than a cup of tea"
@@ -84,7 +84,7 @@
                 "base_price": 3200,
                 "offer_price": 1000,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA1000",
+                "coupon_code": "YOGA70",
                 "gst_on_offer": 50,
                 "total_with_gst_offer": 1050,
                 "per_day_offer": "Rs.5.5/day"
@@ -95,7 +95,7 @@
                 "base_price": 5000,
                 "gst_slab": "5%",
                 "offer_price": 1800,
-                "coupon_code": "YOGA1800",
+                "coupon_code": "YOGA70",
                 "gst_on_offer": 90,
                 "total_with_gst_offer": 1890,
                 "per_day_offer": "Rs.5/day"

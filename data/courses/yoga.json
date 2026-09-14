@@ -60,45 +60,45 @@
                 "duration": "1 Month",
                 "duration_code": "1M",
                 "base_price": 700,
-                "offer_price": 300,
+                "offer_price": 210,
                 "gst_slab": "5%",
                 "coupon_code": "YOGA70",
-                "gst_on_offer": 15,
-                "total_with_gst_offer": 315,
-                "per_day_offer": "Rs.10 (offer price)"
+                "gst_on_offer": 11,
+                "total_with_gst_offer": 221,
+                "per_day_offer": "Rs.7/day (offer price)"
             },
             {
                 "duration": "3 Months",
                 "duration_code": "3M",
                 "base_price": 1750,
-                "offer_price": 600,
+                "offer_price": 525,
                 "gst_slab": "5%",
                 "coupon_code": "YOGA70",
-                "gst_on_offer": 30,
-                "total_with_gst_offer": 630,
-                "per_day_offer": "Rs.6/day — less than a cup of tea"
+                "gst_on_offer": 26,
+                "total_with_gst_offer": 551,
+                "per_day_offer": "Rs.5.8/day — less than a cup of tea"
             },
             {
                 "duration": "6 Months",
                 "duration_code": "6M",
                 "base_price": 3200,
-                "offer_price": 1000,
+                "offer_price": 960,
                 "gst_slab": "5%",
                 "coupon_code": "YOGA70",
-                "gst_on_offer": 50,
-                "total_with_gst_offer": 1050,
-                "per_day_offer": "Rs.5.5/day"
+                "gst_on_offer": 48,
+                "total_with_gst_offer": 1008,
+                "per_day_offer": "Rs.5.3/day"
             },
             {
                 "duration": "1 Year",
                 "duration_code": "1Y",
                 "base_price": 5000,
                 "gst_slab": "5%",
-                "offer_price": 1800,
+                "offer_price": 1500,
                 "coupon_code": "YOGA70",
-                "gst_on_offer": 90,
-                "total_with_gst_offer": 1890,
-                "per_day_offer": "Rs.5/day"
+                "gst_on_offer": 75,
+                "total_with_gst_offer": 1575,
+                "per_day_offer": "Rs.4.1/day"
             }
         ]
     },

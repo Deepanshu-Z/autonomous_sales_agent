@@ -84,7 +84,7 @@ async def sweep_once():
 
                 if course_id:
                     course_data = kb_loader.get_course_data(course_id)
-                    course_name = course_data.get("course", course_id.title())
+                    course_name = (course_data.get("course") or course_id.replace("_", " ")).title()
                     reply = (
                         f"Hi again! 😊 Just checking in — were you still interested in "
                         f"knowing more about our {course_name} classes? Happy to help whenever you're ready!"

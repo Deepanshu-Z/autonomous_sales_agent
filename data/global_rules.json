@@ -67,10 +67,13 @@
         "leave_and_absence": {
             "leave_permitted": false,
             "pause_permitted": false,
-            "missed_class_carryover": false
+            "missed_class_carryover": false,
+            "student_missed_class_rescheduled": false,
+            "rule": "If a student misses a class from their end, that class is NOT rescheduled and CANNOT be carried over. Students must attend their assigned schedule (e.g. Monday to Friday, 5 classes per week for Yoga)."
         },
         "class_cancellation_by_company": {
-            "compensation": "Missed class will be rescheduled",
+            "reschedule_permitted": true,
+            "reschedule_condition": "Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company's end.",
             "teacher_absence": "Another teacher will conduct the class, or the class will be rescheduled"
         },
         "batch_change": {
@@ -112,6 +115,7 @@
         "refund_promise": "NEVER promise refunds or exceptions under any circumstances.",
         "common_sense_gap_fill": "If a question is not directly covered but adjacent to KB data, use reasoning grounded in KB context. Do not contradict any KB fact.",
         "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
-        "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/"
+        "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/",
+        "rescheduling_policy": "NEVER tell a customer that their missed class will be rescheduled if they miss it on their own. Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company side. Student missed classes cannot be carryover or rescheduled."
     }
 }

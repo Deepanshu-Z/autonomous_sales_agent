@@ -383,23 +383,12 @@ def format_app_links_display() -> str:
 # failure. If the classifier succeeds, these never run and never override
 # its result.
 
-def _normalize_consonants(word: str) -> str:
-    return re.sub(r"[^bcdfghjklmnpqrstvwxyz]", "", word.lower())
-
-# DEFAULT TO NONE FOR TESTING
 def detect_course_from_text_fallback(text: str, default_course: Optional[str] = None) -> Optional[str]:
-    """Deterministic keyword/fuzzy course-name matcher. FALLBACK ONLY."""
+    """Deterministic keyword course-name matcher against catalog aliases. FALLBACK ONLY."""
     if not text:
         return default_course
 
-    # Normalize whitespace, newlines, hyphens, and underscores to single spaces
     q = re.sub(r"[\s\-_]+", " ", text).lower().strip()
-    words = re.findall(r"\w+", q)
-
-    try:
-        from rapidfuzz import fuzz
-    except ImportError:
-        fuzz = None
 
     catalog = get_course_catalog()
 
@@ -409,7 +398,9 @@ def detect_course_from_text_fallback(text: str, default_course: Optional[str] = 
     for item in catalog:
         cid = item.get("id")
         for alias in item.get("aliases", []) + [cid]:
-            alias_clean = re.sub(r"[\s\-_]+", " ", alias).lower().strip()
+            if not alias:
+                continue
+            alias_clean = re.sub(r"[\s\-_]+", " ", str(alias)).lower().strip()
             if " " in alias_clean:
                 multi_word_candidates.append((alias_clean, cid))
             else:
@@ -418,22 +409,17 @@ def detect_course_from_text_fallback(text: str, default_course: Optional[str] = 
     # Sort multi-word candidates by length descending (e.g. "face yoga" before "yoga")
     multi_word_candidates.sort(key=lambda x: len(x[0]), reverse=True)
 
-    # 1. Multi-word alias matches across the catalog (longest first)
+    # 1. Multi-word alias matches across the catalog (longest first, with word boundaries)
     for alias_clean, cid in multi_word_candidates:
         pattern = r"\b" + re.escape(alias_clean) + r"\b"
-        if re.search(pattern, q) or alias_clean in q:
+        if re.search(pattern, q):
             return cid
 
-    # 2. Single-word exact and fuzzy matches
+    # 2. Single-word exact matches with word boundaries (zero hardcoded stop words)
+    words = set(re.findall(r"\b[a-zA-Z0-9_]+\b", q))
     for alias_clean, cid in single_word_candidates:
-        alias_cons = _normalize_consonants(alias_clean)
-        for w in words:
-            if w == alias_clean:
-                return cid
-            if len(_normalize_consonants(w)) >= 3 and _normalize_consonants(w) == alias_cons:
-                return cid
-            if fuzz and len(w) >= 3 and len(alias_clean) >= 3 and fuzz.ratio(w, alias_clean) >= 80:
-                return cid
+        if alias_clean in words:
+            return cid
 
     return default_course
 

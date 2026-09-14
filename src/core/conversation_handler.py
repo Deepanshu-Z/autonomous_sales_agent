@@ -108,9 +108,10 @@ async def handle_incoming_message(
     # Dynamic course switch: if customer mentions any course from the catalog, switch to it for this turn
     course_in_msg = kb_loader.detect_course_from_text(user_message, default_course=None) if user_message else None
 
-    # If user message alone doesn't mention a course (e.g. fragmented "kathak" followed by "ki fees kya hj"),
-    # inspect recent user turns in conversation history to find the active course being discussed
-    if not course_in_msg and conversation_history:
+    old_course = session_state.get("course") or course_id or ""
+
+    # If no course is active in state or message, inspect recent user turns in conversation history
+    if not course_in_msg and not old_course and not new_state.get("course") and conversation_history:
         for turn in reversed(conversation_history[-4:]):
             if turn.get("role") in ("user", "customer"):
                 c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
@@ -118,7 +119,6 @@ async def handle_incoming_message(
                     course_in_msg = c
                     break
 
-    old_course = session_state.get("course") or course_id or ""
     effective_course_id = course_in_msg or new_state.get("course") or old_course or ""
 
     if effective_course_id:

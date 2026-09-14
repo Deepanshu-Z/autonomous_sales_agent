@@ -190,19 +190,12 @@ def get_user_state(phone: str) -> dict:
             if res.data and len(res.data) > 0:
                 row = dict(res.data[0])
                 raw_topic = row.get("last_topic") or ""
-                if isinstance(raw_topic, str):
-                    if "COURSE:" in raw_topic:
-                        parts = raw_topic.split("COURSE:", 1)[1].split("||", 1)
-                        row["course"] = parts[0].strip()
-                        raw_topic = parts[1] if len(parts) > 1 else ""
-                    if "RSTAGE:" in raw_topic:
-                        parts = raw_topic.split("RSTAGE:", 1)[1].split("||", 1)
-                        try:
-                            row["refusal_stage"] = int(parts[0].strip())
-                        except Exception:
-                            pass
-                        raw_topic = parts[1] if len(parts) > 1 else ""
-                    row["last_topic"] = raw_topic
+                if isinstance(raw_topic, str) and raw_topic.startswith("COURSE:"):
+                    parts = raw_topic.split("||", 1)
+                    c_id = parts[0].replace("COURSE:", "").strip()
+                    if c_id:
+                        row["course"] = c_id
+                    row["last_topic"] = parts[1] if len(parts) > 1 else ""
                 state.update(row)
         except Exception as e:
             print(f"[chat_state] Supabase get_user_state read failed: {e}")
@@ -244,14 +237,9 @@ def save_user_state(phone: str, state: dict):
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
             db_state["phone"] = phone
             course_val = state.get("course") or ""
-            rstage_val = state.get("refusal_stage", 0)
             topic_val = str(state.get("last_topic") or "")
-            prefix = ""
             if course_val:
-                prefix += f"COURSE:{course_val}||"
-            if rstage_val:
-                prefix += f"RSTAGE:{rstage_val}||"
-            db_state["last_topic"] = f"{prefix}{topic_val}"[:200]
+                db_state["last_topic"] = f"COURSE:{course_val}||{topic_val}"[:200]
             if "next_followup_due_at" in db_state and db_state["next_followup_due_at"] is not None:
                 val = db_state["next_followup_due_at"]
                 if isinstance(val, (int, float)):

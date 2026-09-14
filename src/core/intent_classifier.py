@@ -116,7 +116,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").
 
 9. "is_disinterested":
-   - boolean: true if customer refuses, declines, or asks to stop messaging ("not interested", "nahi chahiye", "cancel", "don't message").
+    - boolean: true if the customer refuses, declines, rejects, or signals they will NOT enroll.
+    - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
+      • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "no", "nahi lena", "rehne do".
+      • Contextual: Customer states a need/requirement that our offering CANNOT meet, and this is clearly a dealbreaker for them (e.g. "I need flexible timings", "I want offline classes", "mujhe flexible chahiye" after being told we don't offer it, "I can't do fixed schedule").
+      • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
+    - NEGATIVE GUARD: Do NOT set to true for pure informational questions ("timing kya hai?", "fees kitni hai?") without any rejection signal.
 
 10. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
@@ -130,7 +135,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
-    - "DISINTEREST": Customer declines enrollment ("not interested", "nahi chahiye", "cancel").
+     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer states a requirement we cannot meet (e.g. "I need flexible timings", "mujhe flexible chahiye", "I want offline classes") after the bot has already explained we don't offer it.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.

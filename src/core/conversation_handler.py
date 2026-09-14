@@ -367,7 +367,7 @@ async def handle_conversation_turn_async(
     is_refusal_or_complaint = (
         last_turn.get("is_disinterested")
         or last_turn.get("is_complaint_or_refund")
-        or last_turn.get("intent") == "COMPLAINT"
+        or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
         or current_refusal_stage > 0
     )
 

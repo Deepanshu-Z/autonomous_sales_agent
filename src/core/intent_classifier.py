@@ -239,6 +239,14 @@ async def extract_intent_and_state_changes(
                 valid_llm_course = entry["id"]
 
         text_course = kb_loader.detect_course_from_text(text, default_course=None)
+        if not text_course and history:
+            for turn in reversed(history[-4:]):
+                if turn.get("role") in ("user", "customer"):
+                    c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
+                    if c:
+                        text_course = c
+                        break
+
         chosen_course = text_course or valid_llm_course
         if chosen_course:
             clean["selected_course"] = chosen_course

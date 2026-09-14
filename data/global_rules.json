@@ -86,7 +86,14 @@
             "substitute_option": "they can shift their batch timing after 1 month of enrollment"
         },
         "multiple_classes_per_day": false,
-        "gender_specific_batches": false
+        "gender_specific_batches": false,
+        "trial_classes": {
+            "free_trials_available": true,
+            "max_trials": 3,
+            "trial_teachers": "ALL certified instructors take trial classes across all batch timings.",
+            "teacher_allotment": "The instructor allotted for a trial class is determined by the batch timing selected by the user. Each batch timing has its assigned instructor.",
+            "demo_videos_rule": "Demo videos are sample recorded previews available for 3 instructors (Suman Lata, Mradula, Priya Mathur) to showcase teaching style. Any teacher takes live trial classes in their assigned batch timing."
+        }
     },
     "universal_enrollment_flow": {
         "steps": [
@@ -116,6 +123,7 @@
         "common_sense_gap_fill": "If a question is not directly covered but adjacent to KB data, use reasoning grounded in KB context. Do not contradict any KB fact.",
         "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
         "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/",
-        "rescheduling_policy": "NEVER tell a customer that their missed class will be rescheduled if they miss it on their own. Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company side. Student missed classes cannot be carryover or rescheduled."
+        "rescheduling_policy": "NEVER tell a customer that their missed class will be rescheduled if they miss it on their own. Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company side. Student missed classes cannot be carryover or rescheduled.",
+        "trial_class_instructors": "Trial classes are conducted by ALL certified teachers across all batch timings. The teacher allotted is determined by the batch timing chosen by the user (each batch timing has its assigned instructor). Demo videos are sample previews available for 3 instructors only, but do NOT restrict trial classes to only those 3 teachers! NEVER tell a customer that only teachers with demo videos take trial classes or that other teachers do not take trial classes."
     }
 }

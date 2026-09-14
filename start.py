@@ -77,5 +77,6 @@ if __name__ == "__main__":
         port=port,
         workers=1,  # Single worker — in-memory state requires it
         log_level="info",
+        reload=True,
     )
 

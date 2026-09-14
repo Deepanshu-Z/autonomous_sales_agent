@@ -92,32 +92,37 @@ DECISION OUTCOMES:
      -> `reply_message`: Warmly and gracefully accept their decision and respect their choice without being pushy or arguing (e.g. "Hum samajhte hain aur aapki choice ka poora sammaan karte hain! 😊 Agar aapko future mein kabhi bhi koi guidance ya classes ki zaroorat ho, toh hamara support team aapse connect karne ke liye hamesha available hai. Have a wonderful day!").
      -> `escalation_reason`: "Customer declined after solution was offered (persistent refusal)".
 
-3. COMPETITOR COMPARISON OR UNREALISTIC OFFER (e.g. "ABC gives 30 days free / Rs 100 fees / they are cheaper"):
-   - If the customer compares with competitors offering terms we CANNOT match (e.g. 30 days trial, Rs 100/mo fees, mass pricing):
-     • If a solution/starter package was ALREADY offered in the previous turn: Treat as PERSISTENT REFUSAL (Rule 2) -> `ESCALATE_TO_AGENT`.
-     • If this is the FIRST time they raise the competitor comparison:
-       -> Do NOT match price or give repeated discount codes.
-       -> Reframe on the VALUE WEDGE: Sensationz classes are 100% Live Interactive with certified instructors observing on camera with real-time posture correction (unlike cheap pre-recorded videos or automated mass apps). Invite them to experience 1 free live trial class to feel the personal coaching difference firsthand.
+3. FIRST-TIME OBJECTION: BUDGET / FEES / COMPETITOR PRICING (REFUSAL STAGE == 1):
+   - If the customer mentions fees are too high, or compares with competitors ("Fees jyda h", "ABC classes sasti h", "XYZ gives 30 days trial / Rs 100"):
+     • If a solution/starter package was ALREADY offered in recent history: Treat as PERSISTENT REFUSAL (Rule 2) -> `ESCALATE_TO_AGENT`.
+     • If this is the FIRST time they raise fees/budget/competitor:
        -> `resolution_type` = "PROVIDE_SOLUTION"
-       -> `reply_message`: Warmly acknowledge their point, explain the live interactive difference, and offer 1 free live trial class without pushing paid packages.
+       -> `solution_viable` = true
+       -> `reply_message`: Warmly acknowledge their concern. Reframe on the value difference (100% Live Interactive with certified instructors observing on camera with real-time posture correction, unlike pre-recorded videos or automated mass apps). Offer the 1-Month Starter Package and up to 3 free live trial classes from ACTIVE COURSE CONTEXT so they can experience it with zero risk.
 
-4. FIRST-TIME REFUSAL WITH SOLVABLE REASON (REFUSAL STAGE == 1):
-   - If the customer specifies why they are hesitating/refusing (or is answering our earlier inquiry about why):
-     • If reason is UNRESOLVABLE by our offerings (e.g. insists on offline studio, private home tutor, cash payment):
-       -> `resolution_type` = "ESCALATE_TO_AGENT"
-       -> `reply_message`: Politely explain our offering boundary (e.g. 100% online classes), and let them know our human coordinator will assist them.
-       -> `escalation_reason`: English summary of the unresolvable request.
-     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, beginner hesitation, fear of pace, doubt about teachers):
-       -> `resolution_type` = "PROVIDE_SOLUTION"
-       -> `reply_message`: Warm, empathetic message offering our low-pressure solution:
-          - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
-          - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
-          - Keep it inviting, empathetic, and friendly.
+4. FIRST-TIME REFUSAL WITH OTHER REASONS (REFUSAL STAGE == 1):
+   - If the customer specifies why they are hesitating/refusing:
+     • SOLVABLE REASONS -> `resolution_type` = "PROVIDE_SOLUTION", `solution_viable` = true:
+       1. Doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links or offer free live trial classes so they can see the beginner pace firsthand.
+       2. General hesitation or wanting to try first: Offer free live trial classes.
+     • UNRESOLVABLE REASONS -> `resolution_type` = "ESCALATE_TO_AGENT", `solution_viable` = false:
+       1. Demands flexible / shifting batch timings or on-demand hours: Unresolvable! We only offer 10 fixed 1-hour slots (5:00 AM to 8:00 PM). Politely explain our fixed-batch schedule, and let them know our human coordinator will assist them.
+       2. Demands offline classes / physical studio visits / 1-on-1 private home tutors / cash payments: Unresolvable! Politely explain our 100% online live format, and let them know our coordinator will assist them.
+       3. Severe medical hazard / legal threats / dispute: Unresolvable! Escalate immediately.
 
 5. FIRST-TIME REFUSAL WITHOUT REASON (REFUSAL STAGE == 0):
    - If the customer refuses/declines without providing any explanation (e.g. "not interested", "leave it", "nahi chahiye", "no thanks"):
      -> `resolution_type` = "ASK_REASON"
      -> `reply_message`: Warmly and empathetically ask what is holding them back (timing, fees, hesitation, or something else) so we can see if we can help. Never pressure.
+
+CRITICAL ANTI-LOOP RULE (NON-NEGOTIABLE):
+- If `Awaiting Refusal Reason from previous turn` is True OR `Current Refusal Stage` >= 1:
+  • You are STRICTLY FORBIDDEN from choosing `ASK_REASON`!
+  • You MUST NEVER ask "kya aap humein bata sakte hain...", "what is holding you back...", or ask why they are refusing a second time!
+  • Customer messages on this turn (including shorthand, typos, or slang like "flexible tm", "tm", "fees", "paise", "cost", "timing", "time nahi h", "bkr h") ARE THEIR STATED REASON -> set `has_reason: true`!
+  • Slang decoding: "tm" / "tym" = timing, "bkr" = bekaar/bad, "jyda" = high, "krna" = karna.
+  • If their stated reason is flexible timings: Sensationz does NOT offer flexible timings (only fixed 1-hour batch slots 5AM-8PM). Therefore, this is UNRESOLVABLE (`solution_viable: false`) -> `resolution_type: "ESCALATE_TO_AGENT"`!
+  • If the customer simply repeats refusal without reason (e.g. "nahi chahiye", "rehne do", "no", "nahi lena") -> Do NOT ask again! Respectfully accept and escalate to agent (`ESCALATE_TO_AGENT`).
 
 6. GENERAL / META / IDENTITY QUESTIONS (NOT A REFUSAL):
    - If the customer asks questions like "are you an AI?", "kya tum bot ho?", "who are you?", "kaun ho?", or questions about class schedules/curriculum:
@@ -145,7 +150,7 @@ Respond ONLY with strict JSON:
   "risk_category": "LEGAL" | "PAYMENT_DISPUTE" | "HARASSMENT" | "UNSAFE_MEDICAL" | "NONE",
   "solution_viable": bool,
   "resolution_type": "ASK_REASON" | "PROVIDE_SOLUTION" | "ESCALATE_TO_AGENT" | "NOT_A_REFUSAL",
-  "reply_message": string or null,
+  "reply_message": string or null (MUST NOT be null when resolution_type is ASK_REASON, PROVIDE_SOLUTION, or ESCALATE_TO_AGENT),
   "escalation_reason": string or null
 }"""
 
@@ -192,6 +197,8 @@ async def evaluate_refusal_async(
             demo_videos = trial_info.get("demo_videos") or course_data.get("demo_videos", {})
             demo_str = ", ".join(f"{teacher}: {url}" for teacher, url in demo_videos.items() if url) if demo_videos else "None"
             not_offered = course_data.get("not_offered", {})
+            unoffered_items = list(not_offered.get("course_types", [])) + list(not_offered.get("other", []))
+            unoffered_items.append("Flexible/on-demand timings (only 10 fixed batches 5AM-8PM available)")
             course_context_str = (
                 f"ACTIVE COURSE CONTEXT (SOURCE OF TRUTH):\n"
                 f"- Course Name: {course_name}\n"
@@ -199,7 +206,7 @@ async def evaluate_refusal_async(
                 f"- All Package Offer Prices: {all_pkgs}\n"
                 f"- Free Trial Available: Up to {max_trials} free trial class(es)\n"
                 f"- YouTube Demo Videos: {demo_str}\n"
-                f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
+                f"- Unoffered / Excluded: {', '.join(unoffered_items)}"
             )
 
     # Quick pre-filter: if text is empty, ignore
@@ -239,7 +246,20 @@ async def evaluate_refusal_async(
         or "trial class" in prior_assistant_replies
     )
 
-    refusal_stage = state.get("refusal_stage", 0)
+    # Infer refusal stage directly from history (Bulletproof against lost state)
+    inferred_stage = state.get("refusal_stage", 0)
+    if history:
+        for turn in reversed(history[-4:]):
+            if turn.get("role") in ("assistant", "ai"):
+                c = (turn.get("content") or "").lower()
+                if any(q in c for q in ["kya rok raha hai", "kya timing hai, fees", "kyun interested nahi", "what is holding you back"]):
+                    inferred_stage = max(inferred_stage, 1)
+                elif any(q in c for q in ["starter package", "starter pack", "210", "free trial", "trial classes"]):
+                    inferred_stage = max(inferred_stage, 2)
+                break
+    refusal_stage = inferred_stage
+    awaiting_reason = awaiting_reason or (refusal_stage == 1)
+
     user_payload = (
         f"{course_context_str}\n"
         f"Current Refusal Stage: {refusal_stage} (0=new refusal, 1=asked reason, 2=solution offered)\n"
@@ -261,6 +281,17 @@ async def evaluate_refusal_async(
         ])
         raw = resp.content.strip().strip("`").replace("json\n", "").strip()
         data = json.loads(raw)
+
+        # Code-level anti-loop guard:
+        # If refusal_stage >= 1 and LLM still returned ASK_REASON, prevent infinite repetition!
+        if (refusal_stage >= 1 or awaiting_reason) and data.get("resolution_type") == "ASK_REASON":
+            data["resolution_type"] = "ESCALATE_TO_AGENT"
+            data["solution_viable"] = False
+            data["escalation_reason"] = f"Customer replied to refusal inquiry: {text[:60]}"
+            data["reply_message"] = (
+                "Hum samajhte hain aur aapki choice ka poora sammaan karte hain! 😊 "
+                "Agar aapko future mein kabhi bhi koi guidance ya classes ki zaroorat ho, toh hamara support team aapse connect karne ke liye hamesha available hai. Have a wonderful day!"
+            )
 
         # Code-level anti-repetition guard:
         # If refusal_stage >= 2 and LLM tried to PROVIDE_SOLUTION again,

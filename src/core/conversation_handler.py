@@ -361,6 +361,17 @@ async def handle_conversation_turn_async(
     # When the customer declines or is in an active refusal lifecycle,
     # route through the refusal engine (3-step lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated).
     current_refusal_stage = new_state.get("refusal_stage", 0)
+    if current_refusal_stage == 0 and history:
+        for turn in reversed(history[-4:]):
+            if turn.get("role") in ("assistant", "ai"):
+                c = (turn.get("content") or "").lower()
+                if any(q in c for q in ["kya rok raha hai", "kya timing hai, fees", "kyun interested nahi", "what is holding you back"]):
+                    current_refusal_stage = 1
+                    new_state["refusal_stage"] = 1
+                elif any(q in c for q in ["starter package", "starter pack", "210", "free trial", "trial classes"]):
+                    current_refusal_stage = 2
+                    new_state["refusal_stage"] = 2
+                break
 
     # Only reset refusal_stage back to 0 if customer actively accepts an enrollment step (timing, package, trial)
     if current_refusal_stage >= 2 and not last_turn.get("is_disinterested"):

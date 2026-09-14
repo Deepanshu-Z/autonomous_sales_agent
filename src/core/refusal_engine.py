@@ -167,6 +167,12 @@ async def evaluate_refusal_async(
             )
             all_pkgs = ", ".join(f"{p.get('duration')}: ₹{p.get('offer_price', p.get('base_price', 0)):,}" for p in pkgs)
             trial_info = course_data.get("trial_classes", {})
+            course_overview = course_data.get("course_overview", {})
+            max_trials = (
+                course_overview.get("max_trial_classes")
+                or trial_info.get("max_trial_classes")
+                or 3
+            )
             demo_videos = trial_info.get("demo_videos") or course_data.get("demo_videos", {})
             demo_str = ", ".join(f"{teacher}: {url}" for teacher, url in demo_videos.items() if url) if demo_videos else "None"
             not_offered = course_data.get("not_offered", {})
@@ -175,7 +181,7 @@ async def evaluate_refusal_async(
                 f"- Course Name: {course_name}\n"
                 f"- Starter Package: {starter_str}\n"
                 f"- All Package Offer Prices: {all_pkgs}\n"
-                f"- Free Trial Available: Up to {trial_info.get('max_trial_classes', 1)} free trial class(es)\n"
+                f"- Free Trial Available: Up to {max_trials} free trial class(es)\n"
                 f"- YouTube Demo Videos: {demo_str}\n"
                 f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
             )

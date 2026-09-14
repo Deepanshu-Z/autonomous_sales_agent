@@ -421,6 +421,13 @@ async def handle_conversation_turn_async(
                 if current_refusal_stage >= 2:
                     resolution = "ESCALATE_TO_AGENT"
                     new_state["refusal_stage"] = 3
+                    # BUG C FIX: reply_text is still the solution pitch — replace with a
+                    # graceful goodbye so the customer doesn't get a sales message as farewell.
+                    reply_text = (
+                        "Bilkul samajh aata hai! 😊 Koi baat nahi. "
+                        "Kabhi bhi kuch explore karna ho toh hum yahan hain. "
+                        "Hum aapke liye ek coordinator connect kar rahe hain jo aapki madad kar sakenge. 🙏"
+                    )
                 else:
                     new_state["refusal_stage"] = 2
             elif resolution == "ESCALATE_TO_AGENT":

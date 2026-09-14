@@ -358,11 +358,11 @@ async def handle_conversation_turn_async(
     # route through the refusal engine (3-step lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated).
     current_refusal_stage = new_state.get("refusal_stage", 0)
 
-    # If customer asks a genuine question or normal request without refusal, reset refusal stage back to normal
-    customer_intent = last_turn.get("intent") or last_turn.get("customer_intent")
-    if customer_intent in ["QUESTION", "TIMING_SELECTION", "PACKAGE_SELECTION", "APP_LINK_REQUEST", "COUPON_REQUEST", "GREETING"] and not last_turn.get("is_disinterested"):
-        new_state["refusal_stage"] = 0
-        current_refusal_stage = 0
+    # Only reset refusal_stage back to 0 if customer actively accepts an enrollment step (timing, package, trial)
+    if current_refusal_stage >= 2 and not last_turn.get("is_disinterested"):
+        if last_turn.get("wants_trial") or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED"]:
+            new_state["refusal_stage"] = 0
+            current_refusal_stage = 0
 
     is_refusal_or_complaint = (
         last_turn.get("is_disinterested")
@@ -398,12 +398,9 @@ async def handle_conversation_turn_async(
                     escalation_reason=(eval_res or {}).get("escalation_reason")
                     or f"Refusal escalation: {text_clean[:50]}",
                     start_time=start_time,
+                    send_connecting_notice=False,
                 )
-                await send_text_message_async(phone, clean_reply)
-                latency_sec = round(time.time() - start_time, 2)
                 await save_user_state_async(phone, new_state)
-                asyncio.create_task(save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec))
-                asyncio.create_task(log_message_async(phone, "ai", clean_reply))
                 return {"status": "handed_off_refusal", "reply": clean_reply}
 
     # ── Separate Message #1 and Message #2 (Strict JSON with fallback) ───────

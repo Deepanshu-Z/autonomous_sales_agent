@@ -51,6 +51,7 @@ async def execute_agent_handoff_async(
     user_reply_text: str,
     escalation_reason: str,
     start_time: float = None,
+    send_connecting_notice: bool = True,
 ) -> bool:
     """
     Executes the complete agent handoff pipeline:
@@ -87,20 +88,22 @@ async def execute_agent_handoff_async(
         asyncio.create_task(save_message_async(phone, "assistant", user_reply_text.strip(), response_time_sec=latency_sec))
         asyncio.create_task(log_message_async(phone, "agent_handoff", user_reply_text.strip()))
 
-        # If the reply didn't already inform them of the handoff to team members, send the connecting notice
-        reply_lower = user_reply_text.lower()
-        already_has_handoff_notice = any(
-            phrase in reply_lower
-            for phrase in [
-                "team member", "support team", "connecting you",
-                "connect karenge", "someone will be with you", "reach out to you"
-            ]
-        )
-        if not already_has_handoff_notice:
-            await asyncio.sleep(0.5)
-            await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
-            asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE))
-            asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
+        # If requested and the reply didn't already inform them of team contact, send the connecting notice
+        if send_connecting_notice:
+            reply_lower = user_reply_text.lower()
+            already_has_handoff_notice = any(
+                phrase in reply_lower
+                for phrase in [
+                    "team member", "support team", "connecting you",
+                    "connect karenge", "someone will be with you", "reach out to you",
+                    "support coordinator", "coordinator"
+                ]
+            )
+            if not already_has_handoff_notice:
+                await asyncio.sleep(0.5)
+                await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
+                asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE))
+                asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
     else:
         await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
         latency_sec = round(time.time() - start_time, 2) if start_time else None

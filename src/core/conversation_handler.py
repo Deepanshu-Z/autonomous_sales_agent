@@ -416,7 +416,13 @@ async def handle_conversation_turn_async(
             if resolution == "ASK_REASON":
                 new_state["refusal_stage"] = 1
             elif resolution == "PROVIDE_SOLUTION":
-                new_state["refusal_stage"] = 2
+                # BUG B FIX: If we already gave a solution (stage==2) and the LLM still
+                # returns PROVIDE_SOLUTION, it's a persistent refusal — force escalate.
+                if current_refusal_stage >= 2:
+                    resolution = "ESCALATE_TO_AGENT"
+                    new_state["refusal_stage"] = 3
+                else:
+                    new_state["refusal_stage"] = 2
             elif resolution == "ESCALATE_TO_AGENT":
                 new_state["refusal_stage"] = 3
 
@@ -428,9 +434,12 @@ async def handle_conversation_turn_async(
                 latency_sec = round(time.time() - start_time, 2)
                 await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
                 asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+                # BUG A FIX: Do NOT pass clean_reply as user_reply_text —
+                # execute_agent_handoff_async sends it to the customer again, causing a duplicate.
+                # We already sent it above. Pass None so handoff is internal-only.
                 await execute_agent_handoff_async(
                     phone,
-                    user_reply_text=clean_reply,
+                    user_reply_text=None,
                     escalation_reason=(eval_res or {}).get("escalation_reason")
                     or f"Refusal escalation: {text_clean[:50]}",
                     start_time=start_time,

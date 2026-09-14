@@ -366,6 +366,13 @@ async def handle_conversation_turn_async(
             new_state["refusal_stage"] = 0
             current_refusal_stage = 0
 
+    # BUG2 FIX: If stage==1 (we asked "why are you refusing?") and the customer is no longer
+    # disinterested (they changed topic or asked a normal question), exit the refusal lifecycle.
+    if current_refusal_stage == 1 and not last_turn.get("is_disinterested"):
+        if last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT", "OTHER", None):
+            new_state["refusal_stage"] = 0
+            current_refusal_stage = 0
+
     is_refusal_or_complaint = (
         last_turn.get("is_disinterested")
         or last_turn.get("is_complaint_or_refund")
@@ -379,6 +386,28 @@ async def handle_conversation_turn_async(
         )
         resolution = (eval_res or {}).get("resolution_type", "NOT_A_REFUSAL")
         refusal_msg = (eval_res or {}).get("reply_message")
+        # Guard: reject instruction-text leaks — if the LLM echoed the meta-instruction
+        # description instead of generating a real reply, drop it silently.
+        _INSTRUCTION_FINGERPRINTS = (
+            "warmly and gracefully accept",
+            "without being pushy or arguing",
+            "sincerely apologize for the frustration",
+            "politely explain our offering boundary",
+            "warmly and empathetically ask what is holding",
+            "generate a",
+            "reply_message",
+        )
+        if refusal_msg and any(fp in refusal_msg.lower() for fp in _INSTRUCTION_FINGERPRINTS):
+            logger.warning(
+                f"[refusal_engine] Prompt leak detected in reply_message — dropping. "
+                f"Snippet: {refusal_msg[:120]!r}"
+            )
+            refusal_msg = None
+
+        # BUG3 FIX: Engine says this turn isn't a refusal at all — exit the lifecycle.
+        if resolution == "NOT_A_REFUSAL":
+            new_state["refusal_stage"] = 0
+
         if refusal_msg:
             reply_text = refusal_msg
             followup_msg = None          # Suppress pushy sales follow-up on refusal turns
@@ -392,8 +421,13 @@ async def handle_conversation_turn_async(
                 new_state["refusal_stage"] = 3
 
             clean_reply = _format_for_whatsapp(reply_text)
-            # Escalate when customer declines after solution, or concern is unresolvable / legal / risk
+            # BUG7 FIX: Always deliver the goodbye/acknowledgement message to the customer
+            # BEFORE executing agent handoff — otherwise they get silence.
             if resolution == "ESCALATE_TO_AGENT":
+                await send_text_message_async(phone, clean_reply)
+                latency_sec = round(time.time() - start_time, 2)
+                await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
+                asyncio.create_task(log_message_async(phone, "ai", clean_reply))
                 await execute_agent_handoff_async(
                     phone,
                     user_reply_text=clean_reply,

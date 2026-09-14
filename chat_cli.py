@@ -94,7 +94,7 @@ async def chat_session():
             state["profile_created"] = True
             state["app_installed"] = True
             state["stage"] = "PROFILE_COMPLETED"
-            print("🔓 [SIMULATION] User profile marked as CREATED. Welcome coupon is now UNLOCKED!")
+            print("🔓 [SIMULATION] User profile marked as CREATED. Welcome coupon is now UNLOCKED!.")
             continue
 
         if cmd == "state":

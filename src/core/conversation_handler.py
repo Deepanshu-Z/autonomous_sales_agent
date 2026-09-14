@@ -137,7 +137,9 @@ async def handle_incoming_message(
             session_state["fee"] = None
 
     # 3. Build the system prompt with the freshly-understood state.
-    detected_lang = new_state.get("language") or flags.get("detected_language") or session_state.get("language")
+    # Always trust the current-turn classifier result first — it reflects what the customer
+    # JUST wrote. Stale persisted state is only a fallback when the classifier is silent.
+    detected_lang = flags.get("detected_language") or new_state.get("language") or session_state.get("language")
     system_prompt = prompt_module.format_system_prompt(
         new_state, course_id=effective_course_id, detected_language=detected_lang
     )

@@ -93,11 +93,6 @@
             "trial_teachers": "ALL certified instructors take trial classes across all batch timings.",
             "teacher_allotment": "The instructor allotted for a trial class is determined by the batch timing selected by the user. Each batch timing has its assigned instructor.",
             "demo_videos_rule": "Demo videos are sample recorded previews available for 3 instructors (Suman Lata, Mradula, Priya Mathur) to showcase teaching style. Any teacher takes live trial classes in their assigned batch timing."
-        },
-        "objection_handling": {
-            "competitor_comparison_policy": "When customers compare with competitors offering cheap fees or long free trials (e.g. Rs 100 or 30 days trial), do NOT match prices or give repeated discounts. Reframe on the core value: Sensationz classes are 100% Live Interactive with certified instructors who observe students on camera and provide real-time posture correction (unlike cheap pre-recorded videos or automated mass apps). Offer 1 free live trial session to experience the personal coaching difference.",
-            "anti_repetition_rule": "Present a value solution or trial offer at most ONCE. If the customer declines or pushes back again, NEVER repeat the starter package or discount pitch. Respectfully acknowledge their decision and gracefully hand off to a human support coordinator.",
-            "unserviceable_requests": "Offline studio classes, physical attendance, home tutors, and cash payments are strictly unserviceable. State the online/digital boundary politely and escalate to support coordinator."
         }
     },
     "universal_enrollment_flow": {

@@ -31,11 +31,10 @@ def _get_refusal_llm():
     global _refusal_llm
     if _refusal_llm is None:
         _refusal_llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
             api_key=os.getenv("OPENAI_API_KEY"),
             temperature=0.2,
-            max_tokens=400,
-            timeout=10,
+            timeout=15,
             max_retries=1,
         )
     return _refusal_llm
@@ -50,6 +49,7 @@ COURSE OFFERINGS & POLICIES SUMMARY:
 - Cash or offline payments are STRICTLY NOT ACCEPTED.
 - Course fees once paid are non-refundable.
 - Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch can be changed after 1 month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+
 
 ANALYSIS CRITERIA:
 1. REFUSAL DETECTION:
@@ -77,7 +77,7 @@ ANALYSIS CRITERIA:
    - If the request cannot be fulfilled by our offerings -> `solution_viable` = false.
 
 DECISION OUTCOMES:
-- If NOT a refusal (and not awaiting reason) -> `resolution_type` = "NOT_A_REFUSAL", `reply_message` = null.
+- If NOT a refusal (and not awaiting reason) -> `resolution_type` = "NOT_A_REFUSAL".
 
 1. HIGH RISK / LEGAL / HARASSMENT / ANGER (IMMEDIATE AGENT ESCALATION):
    - If the customer expresses legal threats, financial/chargeback disputes, harassment, scam allegations, or direct anger/accusations (e.g. "u r lier", "jhuth bola", "scam company", "police complaint", "fraud", "consumer court"):
@@ -85,23 +85,13 @@ DECISION OUTCOMES:
      -> `reply_message`: Sincerely apologize for the frustration/miscommunication, reassure them that we take their concern seriously, and let them know our senior human support specialist is stepping in right away to assist them directly.
      -> `escalation_reason`: English summary of the risk/complaint for the human agent.
 
-2. PERSISTENT REFUSAL OR REPEATED OBJECTION (AFTER SOLUTION ALREADY GIVEN OR REFUSAL STAGE >= 2):
-   - If a solution/starter package/trial was ALREADY offered in conversation (or `Refusal Stage` is >= 2), AND the customer still refuses, continues objecting, expresses dissatisfaction, or declines:
-     -> CRITICAL ANTI-REPETITION RULE: You MUST NEVER repeat, re-pitch, or re-explain the starter package, fees, or trial classes again! Doing so sounds like an unaware, annoying robot!
+2. PERSISTENT REFUSAL (AFTER SOLUTION ALREADY GIVEN OR REFUSAL STAGE >= 2):
+   - If a solution/trial/demo was ALREADY offered (or `Refusal Stage` is >= 2), AND the customer still refuses or declines (e.g. "nahi chahiye", "no", "not interested", "nahi lena", "leave it", "cancel"):
      -> `resolution_type` = "ESCALATE_TO_AGENT"
-     -> `reply_message`: Warmly and gracefully accept their decision and respect their choice without being pushy or arguing (e.g. "Hum samajhte hain aur aapki choice ka poora sammaan karte hain! 😊 Agar aapko future mein kabhi bhi koi guidance ya classes ki zaroorat ho, toh hamara support team aapse connect karne ke liye hamesha available hai. Have a wonderful day!").
-     -> `escalation_reason`: "Customer declined after solution was offered (persistent refusal)".
+     -> `reply_message`: Warmly and gracefully accept their decision without being pushy or arguing. Tell them we completely understand, thank them, and let them know our support coordinator will be happy to connect if they need any assistance in the future.
+     -> `escalation_reason`: "Customer declined after solution/demo was offered (persistent refusal)".
 
-3. COMPETITOR COMPARISON OR UNREALISTIC OFFER (e.g. "ABC gives 30 days free / Rs 100 fees / they are cheaper"):
-   - If the customer compares with competitors offering terms we CANNOT match (e.g. 30 days trial, Rs 100/mo fees, mass pricing):
-     • If a solution/starter package was ALREADY offered in the previous turn: Treat as PERSISTENT REFUSAL (Rule 2) -> `ESCALATE_TO_AGENT`.
-     • If this is the FIRST time they raise the competitor comparison:
-       -> Do NOT match price or give repeated discount codes.
-       -> Reframe on the VALUE WEDGE: Sensationz classes are 100% Live Interactive with certified instructors observing on camera with real-time posture correction (unlike cheap pre-recorded videos or automated mass apps). Invite them to experience 1 free live trial class to feel the personal coaching difference firsthand.
-       -> `resolution_type` = "PROVIDE_SOLUTION"
-       -> `reply_message`: Warmly acknowledge their point, explain the live interactive difference, and offer 1 free live trial class without pushing paid packages.
-
-4. FIRST-TIME REFUSAL WITH SOLVABLE REASON (REFUSAL STAGE == 1):
+3. REFUSAL WITH REASON (OR ANSWERING REFUSAL REASON, OR REFUSAL STAGE == 1):
    - If the customer specifies why they are hesitating/refusing (or is answering our earlier inquiry about why):
      • If reason is UNRESOLVABLE by our offerings (e.g. insists on offline studio, private home tutor, cash payment):
        -> `resolution_type` = "ESCALATE_TO_AGENT"
@@ -114,15 +104,10 @@ DECISION OUTCOMES:
           - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
           - Keep it inviting, empathetic, and friendly.
 
-5. FIRST-TIME REFUSAL WITHOUT REASON (REFUSAL STAGE == 0):
+4. REFUSAL WITHOUT REASON (FIRST-TIME REFUSAL, REFUSAL STAGE == 0):
    - If the customer refuses/declines without providing any explanation (e.g. "not interested", "leave it", "nahi chahiye", "no thanks"):
      -> `resolution_type` = "ASK_REASON"
      -> `reply_message`: Warmly and empathetically ask what is holding them back (timing, fees, hesitation, or something else) so we can see if we can help. Never pressure.
-
-6. GENERAL / META / IDENTITY QUESTIONS (NOT A REFUSAL):
-   - If the customer asks questions like "are you an AI?", "kya tum bot ho?", "who are you?", "kaun ho?", or questions about class schedules/curriculum:
-     -> `resolution_type` = "NOT_A_REFUSAL"
-     -> `reply_message` = null
 
 STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
 - When generating `reply_message` for PROVIDE_SOLUTION:
@@ -225,29 +210,11 @@ async def evaluate_refusal_async(
             recent_context.append(f"{role}: {content}")
     history_snippet = "\n".join(recent_context) if recent_context else "No prior history."
 
-    # History-aware offer tracking: identify what assistant already pitched in recent turns
-    prior_assistant_replies = " ".join((t.get("content") or "") for t in (history or []) if t.get("role") in ("assistant", "ai")).lower()
-    starter_pack_already_offered = bool(
-        "starter package" in prior_assistant_replies
-        or "starter pack" in prior_assistant_replies
-        or "210" in prior_assistant_replies
-        or "₹210" in prior_assistant_replies
-    )
-    trial_already_offered = bool(
-        "free trial" in prior_assistant_replies
-        or "trial classes" in prior_assistant_replies
-        or "trial class" in prior_assistant_replies
-    )
-
     refusal_stage = state.get("refusal_stage", 0)
     user_payload = (
         f"{course_context_str}\n"
         f"Current Refusal Stage: {refusal_stage} (0=new refusal, 1=asked reason, 2=solution offered)\n"
         f"Awaiting Refusal Reason from previous turn: {awaiting_reason or refusal_stage == 1}\n"
-        f"Already Offered in Recent History:\n"
-        f"- Starter Package already pitched: {starter_pack_already_offered}\n"
-        f"- Trial classes already pitched: {trial_already_offered}\n"
-        f"- Non-Negotiable Rule: If an offer was already pitched, NEVER pitch it again!\n\n"
         f"Customer Message: \"{text}\"\n\n"
         f"Recent History:\n{history_snippet}\n\n"
         "Evaluate and output JSON:"
@@ -261,19 +228,6 @@ async def evaluate_refusal_async(
         ])
         raw = resp.content.strip().strip("`").replace("json\n", "").strip()
         data = json.loads(raw)
-
-        # Code-level anti-repetition guard:
-        # If refusal_stage >= 2 and LLM tried to PROVIDE_SOLUTION again,
-        # OR if customer is still pushing back after a solution was offered:
-        if refusal_stage >= 2 and data.get("resolution_type") == "PROVIDE_SOLUTION":
-            data["resolution_type"] = "ESCALATE_TO_AGENT"
-            data["solution_viable"] = False
-            data["escalation_reason"] = "Customer declined/countered after solution was already offered (persistent refusal)"
-            data["reply_message"] = (
-                "Hum samajhte hain aur aapki choice ka poora sammaan karte hain! 😊 "
-                "Agar aapko future mein kabhi bhi koi guidance ya live classes ki zaroorat ho, toh hamara support team aapse connect karne ke liye hamesha available hai. Have a wonderful day!"
-            )
-
         return data
     except Exception as e:
         print(f"[refusal_engine] Evaluation error: {e}")

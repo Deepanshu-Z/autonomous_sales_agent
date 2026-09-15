@@ -104,7 +104,7 @@ async def execute_agent_handoff_async(
                 await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
                 asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE))
                 asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
-    else:
+    elif send_connecting_notice:
         await send_text_message_async(phone, HANDOFF_CONNECTING_MESSAGE)
         latency_sec = round(time.time() - start_time, 2) if start_time else None
         asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE, response_time_sec=latency_sec))

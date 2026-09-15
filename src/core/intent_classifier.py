@@ -119,23 +119,23 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - boolean: true if the customer refuses, declines, rejects, or signals they will NOT enroll.
     - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
       • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "no", "nahi lena", "rehne do".
-      • Contextual: Customer states a need/requirement that our offering CANNOT meet, and this is clearly a dealbreaker for them (e.g. "I need flexible timings", "I want offline classes", "mujhe flexible chahiye" after being told we don't offer it, "I can't do fixed schedule").
+      • Contextual: Customer explicitly states that an unmet requirement is a dealbreaker preventing enrollment, ONLY AFTER having been informed of our policy (e.g. "then I won't join", "offline nahi hai to rehne do", "fixed schedule nahi ho payega mujhse, cancel karo").
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
-    - NEGATIVE GUARD: Do NOT set to true for pure informational questions ("timing kya hai?", "fees kitni hai?") without any rejection signal.
+    - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
 
 10. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
 
 11. "customer_intent":
     Must be EXACTLY ONE of:
-    - "QUESTION": Customer is asking an informational question (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "how to apply?", "what is syllabus?").
+    - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
     - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
-     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer states a requirement we cannot meet (e.g. "I need flexible timings", "mujhe flexible chahiye", "I want offline classes") after the bot has already explained we don't offer it.
+    - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.

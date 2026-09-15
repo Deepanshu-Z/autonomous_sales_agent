@@ -119,9 +119,10 @@ DECISION OUTCOMES:
        -> `resolution_type` = "ESCALATE_TO_AGENT"
        -> GENERATE a `reply_message` that: politely explains the offering boundary (e.g. 100% online classes), and lets them know our human coordinator can assist them further.
        -> `escalation_reason`: English summary of the unresolvable request.
-     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, beginner hesitation, fear of pace, doubt about teachers):
+     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, flexible timings, beginner hesitation, fear of pace, doubt about teachers):
        -> `resolution_type` = "PROVIDE_SOLUTION"
        -> GENERATE a `reply_message` that: warmly and empathetically offers our low-pressure solution:
+          - If doubt about schedule, timing flexibility, or missing classes: Warmly explain that live interactive classes run Mon-Fri (1 session/day) across 10 batch slots (5 AM to 8 PM). While day-to-day switching isn't available, they can switch their batch after 1 month, and full recordings are available in the app if they ever miss a session.
           - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
           - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
           - Keep it inviting, empathetic, and friendly.

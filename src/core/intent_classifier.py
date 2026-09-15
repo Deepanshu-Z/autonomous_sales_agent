@@ -315,13 +315,17 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("detected_language"):
         detected_lang = flags["detected_language"]
-        # Deterministic override: if the raw text contains only ASCII/Latin characters
-        # but the classifier returned a Devanagari/native-script classification,
-        # correct it to Hinglish (Latin script) — the classifier cannot be right.
-        # This prevents the reply LLM from outputting Devanagari for Hinglish messages.
-        if detected_lang and "devanagari" in detected_lang.lower():
-            raw_text = (flags.get("_raw_text") or "").strip()
-            if raw_text and all(ord(c) < 256 for c in raw_text):
+        # Deterministic override: if the raw text is pure ASCII/Latin but the classifier
+        # returned any native-script classification (Devanagari, Telugu, Tamil, Bengali,
+        # Arabic, etc.) — it is physically impossible. Correct to Hinglish (Latin script).
+        _NATIVE_SCRIPT_MARKERS = (
+            "devanagari", "telugu", "tamil", "bengali", "gujarati",
+            "malayalam", "kannada", "odia", "punjabi", "arabic",
+            "urdu", "thai", "myanmar", "sinhala",
+        )
+        raw_text = (flags.get("_raw_text") or "").strip()
+        if raw_text and all(ord(c) < 256 for c in raw_text):
+            if detected_lang and any(m in detected_lang.lower() for m in _NATIVE_SCRIPT_MARKERS):
                 detected_lang = "Hinglish (Latin script)"
         new_state["language"] = detected_lang
 

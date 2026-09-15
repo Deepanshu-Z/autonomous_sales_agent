@@ -107,6 +107,7 @@ async def handle_incoming_message(
     )
 
     # 2. Pure state merge.
+    flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
 
     # A customer can switch topics mid-conversation ("what about Kathak
@@ -149,6 +150,10 @@ async def handle_incoming_message(
     # Always trust the current-turn classifier result first — it reflects what the customer
     # JUST wrote. Stale persisted state is only a fallback when the classifier is silent.
     detected_lang = flags.get("detected_language") or new_state.get("language") or session_state.get("language")
+    # Deterministic correction: if classifier said Devanagari but message is pure ASCII, override.
+    if detected_lang and "devanagari" in detected_lang.lower():
+        if user_message and all(ord(c) < 256 for c in user_message.strip()):
+            detected_lang = "Hinglish (Latin script)"
     system_prompt = prompt_module.format_system_prompt(
         new_state, course_id=effective_course_id, detected_language=detected_lang
     )

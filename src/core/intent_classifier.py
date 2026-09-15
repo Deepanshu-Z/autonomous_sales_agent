@@ -145,10 +145,11 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 13. "detected_language":
     - Detect the customer's exact language and writing script from any language in the world (e.g. "English", "Hinglish (Latin script)", "Hindi (Devanagari script)", "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "French", "German", "Arabic", etc.).
-    - STRICT SCRIPT RULES:
-      • If written in the Latin/English alphabet using Hindi, Urdu, or Indic words (e.g. "nhi kathak ki fees bta and time", "seekhna h", "kya timing h", "acha", "fees bta do"): ALWAYS classify as "Hinglish (Latin script)".
-      • If written in standard English: classify as "English".
-      • Classify as "Hindi (Devanagari script)" ONLY IF the customer literally typed using Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते"). NEVER classify Latin/English alphabet as Devanagari!
+    - STRICT SCRIPT RULES — READ CAREFULLY:
+      • LATIN/ROMAN ALPHABET = NEVER DEVANAGARI: If the customer's message contains ONLY standard ASCII/Latin characters (a-z, A-Z, 0-9, punctuation, spaces), it is physically impossible for it to be Devanagari script. You MUST classify it as "Hinglish (Latin script)" (if Indic/Hindi meaning) or "English" (if pure English).
+      • Hinglish (Latin script): Any message typed in the Latin alphabet that uses Hindi/Urdu words, shortened forms, or phonetic transliterations. Examples: "fees kya h", "teachers kon h", "trial kon leta h", "mjhe tumpe trust nhi hora", "kya timing h", "nhi kathak ki fees bta", "seekhna h", "acha", "fees bta do", "kya h", "kon h", "kab h", "batao", "nahi lena", "thik h", "hnji", "kaise hoga", "mujhe chahiye", "mam", "sir", "plz", "pls". ALL of these MUST be classified as "Hinglish (Latin script)".
+      • English: Message is in standard English words with no Hindi/Urdu terms.
+      • Classify as "Hindi (Devanagari script)" ONLY IF the customer's message literally contains Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते", "क्या टाइमिंग है"). If you do NOT see actual Devanagari characters (अ आ इ ई etc.) in the message, NEVER output "Hindi (Devanagari script)"!
       • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
 RESPOND ONLY WITH STRICT JSON matching this schema:
@@ -313,7 +314,16 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["wants_trial"] = True
 
     if flags.get("detected_language"):
-        new_state["language"] = flags["detected_language"]
+        detected_lang = flags["detected_language"]
+        # Deterministic override: if the raw text contains only ASCII/Latin characters
+        # but the classifier returned a Devanagari/native-script classification,
+        # correct it to Hinglish (Latin script) — the classifier cannot be right.
+        # This prevents the reply LLM from outputting Devanagari for Hinglish messages.
+        if detected_lang and "devanagari" in detected_lang.lower():
+            raw_text = (flags.get("_raw_text") or "").strip()
+            if raw_text and all(ord(c) < 256 for c in raw_text):
+                detected_lang = "Hinglish (Latin script)"
+        new_state["language"] = detected_lang
 
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),

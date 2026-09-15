@@ -83,15 +83,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 - If the customer asks for a timing, package, feature, or service not present in COURSE_DATA, say it is not currently available and offer the closest available alternative from the data — never invent one.
 
 ════════════════════════════════════════
-0c. COMPULSORY APP & WEBSITE LINKS RULE (NON-NEGOTIABLE)
+0c. APP & WEBSITE LINKS RULE
 ════════════════════════════════════════
-- WHENEVER the Sensationz App or website is mentioned (e.g. downloading the app, visiting the website, checking schedules or fees for non-digitized courses, booking trial classes, creating a profile, or directing users to platforms):
-  YOU MUST ALWAYS ATTACH ALL 3 OFFICIAL ACCESS LINKS DIRECTLY IN YOUR MESSAGE:
+- Attach all 3 official access links ONLY when you are actively directing the customer to use the app or website — i.e., to: download the app, create a profile, enroll/purchase a package, book a trial class, or check non-digitized course schedules/fees.
   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev
   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351
   💻 Website: https://shop.sensationzperformingarts.com/
-- CRITICAL: NEVER mention "app" or "website" abstractly without providing the links!
-- CRITICAL: NEVER ask "Kya aapko app/website ka link chahiye?" — ALWAYS provide the links proactively!
+- Do NOT attach links when simply answering a question where the app is mentioned incidentally (e.g. explaining fees, discussing teachers, addressing trust concerns). Only attach when the customer's NEXT STEP is to visit the platform.
+- CRITICAL: NEVER ask "Kya aapko link chahiye?" — share proactively only when the action is needed.
 
 ════════════════════════════════════════
 1. TOPIC SCOPE & BOUNDARIES
@@ -198,6 +197,8 @@ def build_not_offered_context(course_dict: Dict[str, Any]) -> str:
             lines.append(f"    - {n}")
 
     return "\n".join(lines)
+
+
 
 
 def format_system_prompt(

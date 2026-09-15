@@ -304,7 +304,9 @@ OFFICIAL_PLATFORM_LINKS_BLOCK = (
 
 
 def _ensure_app_website_links(text: str) -> str:
-    """Guarantees that whenever app or website is mentioned, official links are present."""
+    """Appends official links ONLY when the message is actively directing the user to the platform.
+    Does NOT fire on incidental mentions of 'app'/'website' in general answers (fees, teachers, etc.).
+    """
     if not text:
         return text
     t_lower = text.lower()
@@ -315,12 +317,21 @@ def _ensure_app_website_links(text: str) -> str:
     )
     if has_links:
         return text
-    mentions_platform = bool(
-        re.search(r"\b(app|apps|application|website|web site|portal|platform|platforms|playstore|play store|appstore|app store)\b", t_lower)
+    # Only inject when the message directs the user to act on the platform.
+    # Covers: download/install, profile creation, enrollment/purchase, trial booking,
+    # visiting for non-digitized course schedules. Excludes incidental 'app' mentions.
+    ACTION_PATTERNS = (
+        r"\b(download|install|daalo|download kar|install kar)\b",
+        r"\b(register|sign.?up|create.{0,10}profile|profile bana|profile create)\b",
+        r"\b(enroll|enroll kar|join kar|purchase|buy|payment|checkout)\b",
+        r"\b(book.{0,10}trial|trial book|free trial.{0,15}(app|website|platform))\b",
+        r"\b(check.{0,20}(schedule|timing|fees).{0,20}(app|website|platform))\b",
+        r"\b(visit.{0,10}(our|the).{0,10}(app|website|platform)|open.{0,10}(app|website))\b",
     )
-    if mentions_platform:
+    if any(re.search(p, t_lower) for p in ACTION_PATTERNS):
         return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
     return text
+
 
 
 async def handle_conversation_turn_async(

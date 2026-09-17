@@ -523,9 +523,43 @@ async def handle_conversation_turn_async(
     user_asked_links = bool(re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE))
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply)) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links)
+
+    # Dynamic guarantee: Ensure trial tutorial video from active course KB is present whenever trial booking steps are shared
+    active_cid = active_course or state.get("course") or ""
+    course_data_active = kb_loader.get_course_data(active_cid)
+    trial_video_url = course_data_active.get("trial_class", {}).get("how_to_book_video_url")
+    if trial_video_url and trial_video_url not in clean_reply:
+        if re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE):
+            if re.search(r"\b(step|download the sensationz app|profile then tap|trial links)\b", clean_reply, re.IGNORECASE):
+                video_line = f"🎬 Watch How to Book Trial Video: {trial_video_url}"
+                if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
+                    clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
+                elif "play.google.com" in clean_reply:
+                    parts = re.split(r"(?=📱\s*Android:)", clean_reply)
+                    if len(parts) == 2:
+                        clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
+                    else:
+                        clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+                else:
+                    clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup and "play.google.com" not in clean_reply:
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links)
+
+    # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
+    if clean_followup and "play.google.com" in clean_reply:
+        REDUNDANT_LINK_QUESTIONS = (
+            r"\b(would you like|do you want|kya aapko|chahiye).{0,30}\b(links?|download links?)\b",
+            r"\b(links?.{0,25}(download|app|website)\b.*\?)",
+        )
+        if any(re.search(p, clean_followup, re.IGNORECASE) for p in REDUNDANT_LINK_QUESTIONS):
+            is_trial = bool(last_turn.get("wants_trial") or re.search(r"\b(trial)\b", clean_reply, re.IGNORECASE))
+            clean_followup = (
+                "Which batch timing works best for your trial class? 😊"
+                if is_trial
+                else "Which batch timing or package would you like to explore? 😊"
+            )
 
     # Deliver main reply to customer on WhatsApp (Message 1)
     if clean_reply and clean_reply.strip():

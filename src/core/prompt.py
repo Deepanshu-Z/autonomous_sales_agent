@@ -43,6 +43,10 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       In Message #2 (followup), ask them to reply 'Done' or 'Yes' once they complete their profile!
       CRITICAL: NEVER ask "Kya aap app download karna chahenge ya website?" — ALWAYS share all 3 links directly!
     - Step 5: If profile confirmed -> share and celebrate their welcome discount coupon code. Ask if they want help applying it to start their classes!
+    - Step Trial (When customer asks for or wants to book a trial class):
+      * In Message #1 (reply): Share the trial booking steps from trial_class in COURSE_DATA, ALWAYS include the 'How to Book Trial' video tutorial link from trial_class.how_to_book_video_url, and attach the official app download links.
+      * In Message #2 (followup): Ask which batch timing works best for their trial class (e.g. "Which batch timing would you like to choose for your free trial? 😊" with buttons ["Morning Batch", "Evening Batch"]).
+      * CRITICAL ANTI-REDUNDANCY: NEVER ask "Would you like the links to download the app?" in followup when the links and booking steps are already provided in Message #1!
     - CRITICAL: NEVER repeat "Kya aap trial class book karna chahenge?" if the customer has already asked for a trial or if their coupon has been sent!
   • FORMAT EXAMPLE:
     {{
@@ -251,7 +255,16 @@ def format_system_prompt(
 
     active_title = catalog_entry.get("name") if catalog_entry else (cid.title() if cid else "Not Selected")
 
-    trial_str = "REQUESTED (Customer wants to book a trial class)" if s.get("wants_trial") else "NOT REQUESTED"
+    course_dict = kb_loader.get_course_data(cid)
+    trial_video = course_dict.get("trial_class", {}).get("how_to_book_video_url")
+    if trial_video:
+        trial_str = (
+            f"REQUESTED (Customer wants to book a trial class — share booking steps, tutorial video: {trial_video}, and app links)"
+            if s.get("wants_trial")
+            else f"NOT REQUESTED (Available tutorial video: {trial_video})"
+        )
+    else:
+        trial_str = "REQUESTED (Customer wants to book a trial class)" if s.get("wants_trial") else "NOT REQUESTED"
 
     app_platforms_str = (
         "• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"

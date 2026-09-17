@@ -171,15 +171,24 @@ def get_course_data(course_id: str = "") -> Dict[str, Any]:
     }
 
     has_full_kb = bool(catalog_entry and catalog_entry.get("has_full_kb", False))
+    global_trials = g.get("universal_course_policies", {}).get("trial_classes", {})
     if cid and has_full_kb:
         course_file = _load_course_file(cid)
         if course_file is not None:
-            return {**shared, **course_file}
+            merged_course = dict(course_file)
+            if global_trials:
+                course_trial = dict(merged_course.get("trial_class") or {})
+                for k, v in global_trials.items():
+                    if k not in course_trial or not course_trial[k]:
+                        course_trial[k] = v
+                merged_course["trial_class"] = course_trial
+            return {**shared, **merged_course}
 
     if catalog_entry is not None:
         name = catalog_entry.get("name", cid.title())
         return {
             **shared,
+            "trial_class": global_trials,
             "course_overview": {
                 "name": name,
                 "description": catalog_entry.get("description", ""),

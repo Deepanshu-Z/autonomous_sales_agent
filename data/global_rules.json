@@ -104,6 +104,7 @@
         }
     },
     "universal_enrollment_flow": {
+        "how_to_create_profile_video_url": "https://youtube.com/shorts/EekAQFAM_HQ?feature=share",
         "steps": [
             "Select preferred batch timing",
             "Select package duration (1M / 3M / 6M / 1Y)",
@@ -133,6 +134,7 @@
         "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/",
         "rescheduling_policy": "NEVER tell a customer that their missed class will be rescheduled if they miss it on their own. Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company side. Student missed classes cannot be carryover or rescheduled.",
         "trial_class_instructors": "Trial classes are conducted by ALL certified teachers across all batch timings. The teacher allotted is determined by the batch timing chosen by the user (each batch timing has its assigned instructor). Demo videos are sample previews available for 3 instructors only, but do NOT restrict trial classes to only those 3 teachers! NEVER tell a customer that only teachers with demo videos take trial classes or that other teachers do not take trial classes.",
-        "trial_booking_video_rule": "Whenever a user wants to book a trial or asks how to join/book a trial class, always share the step-by-step booking guide and include the 'How to Book Trial' video link: https://youtube.com/shorts/wyJBvEqIsvU?feature=share"
+        "trial_booking_video_rule": "Whenever a user wants to book a trial or asks how to join/book a trial class, always share the step-by-step booking guide and include the 'How to Book Trial' video link: https://youtube.com/shorts/wyJBvEqIsvU?feature=share",
+        "create_profile_video_rule": "Whenever directing a customer to create a profile, download the app to register, or explaining how to create a profile, always include the 'How to Create Profile' video link: https://youtube.com/shorts/EekAQFAM_HQ?feature=share"
     }
 }

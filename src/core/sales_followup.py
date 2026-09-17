@@ -12,6 +12,7 @@ HOW TO EDIT (no other file needs to change):
 """
 
 from typing import Optional
+from src.core import kb_loader
 
 
 # -- Suppression Rules --------------------------------------------------------

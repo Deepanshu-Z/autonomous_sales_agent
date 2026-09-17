@@ -222,6 +222,7 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
 
     course_kb = kb_loader.get_course_data(course_id)
     packages = course_kb.get("pricing", {}).get("packages", [])
+    profile_video = course_kb.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
 
     if not profile_created:
         lines = [
@@ -232,6 +233,10 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             "    1. Warmly explain that Ganesh Chaturthi Offer coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
             "    2. Quote the official offer price for their package (e.g. 6 Months offer price is \u20b91,000, 1 Month is \u20b9300).",
             "    3. Guide them to complete their profile on the Sensationz App or website using the official links:",
+        ]
+        if profile_video:
+            lines.append(f"       \u2022 Tutorial Video: {profile_video}")
+        lines.extend([
             "       \u2022 Android App: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
             "       \u2022 iOS App: https://apps.apple.com/us/app/sensationz/id6761418351",
             "       \u2022 Website: https://shop.sensationzperformingarts.com/",
@@ -240,7 +245,7 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             "    \u2022 STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",
             "    \u2022 CELEBRATE warmly and include [UNLOCK_COUPON] ONLY when they confirm completion (e.g. 'Congratulations! [UNLOCK_COUPON]').",
             "\u2022 OFFICIAL OFFER PRICES — GANESH CHATURTHI OFFER (Coupon codes are securely hidden until profile created):"
-        ]
+        ])
         for pkg in packages:
             lines.append(f"  \u2022 {pkg.get('duration')}: Offer Price \u20b9{pkg.get('offer_price')} (Regular: \u20b9{pkg.get('base_price')}) \u2014 [Code locked until profile created]")
         if not packages:

@@ -544,6 +544,23 @@ async def handle_conversation_turn_async(
                 else:
                     clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
 
+    # Dynamic guarantee: Ensure profile creation tutorial video from active course KB is present whenever directing to create profile
+    create_profile_video_url = course_data_active.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
+    if create_profile_video_url and create_profile_video_url not in clean_reply:
+        if re.search(r"\b(create.{0,15}profile|profile bana|complete.{0,15}profile|profile create)\b", clean_reply, re.IGNORECASE):
+            if "how to book trial" not in clean_reply.lower() and "watch how to book trial" not in clean_reply.lower():
+                video_line = f"🎬 Watch How to Create Profile Video: {create_profile_video_url}"
+                if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
+                    clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
+                elif "play.google.com" in clean_reply:
+                    parts = re.split(r"(?=📱\s*Android:)", clean_reply)
+                    if len(parts) == 2:
+                        clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
+                    else:
+                        clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+                else:
+                    clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup and "play.google.com" not in clean_reply:
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links)

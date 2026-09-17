@@ -35,7 +35,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       💻 Website: https://shop.sensationzperformingarts.com/
       (Or they can type *agent* for support team assistance). NEVER invent, guess, or fabricate batch timings or fees! In Message #2 (followup), ask if they need any help or have any questions.
     - Step 3: If timing selected & package duration not selected -> ask which package duration they prefer (1 Month or 3 Months).
-    - Step 4: If package selected & profile pending -> In Message #1, acknowledge their package selection and IMMEDIATELY SHARE ALL 3 official links so they can download the app or visit the website to create their profile:
+    - Step 4: If package selected & profile pending -> In Message #1, acknowledge their package selection, share all 3 official access links, and include the 'How to Create Profile' video tutorial link from universal_enrollment_flow.how_to_create_profile_video_url in COURSE_DATA:
       📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev
       🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351
       💻 Website: https://shop.sensationzperformingarts.com/
@@ -270,6 +270,8 @@ def format_system_prompt(
     else:
         trial_str = "REQUESTED (Customer wants to book a trial class)" if s.get("wants_trial") else "NOT REQUESTED"
 
+    profile_video = course_dict.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
+
     app_platforms_str = (
         "• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
         "• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
@@ -298,7 +300,7 @@ def format_system_prompt(
         f"- Package Fee: {fee_str}\n"
         f"- Funnel Stage: {stage_str}\n"
         f"- App Installed: {app_str}\n"
-        f"- Profile Created: {'CONFIRMED (unlocked)' if profile_confirmed else 'PENDING (locked)'}\n"
+        f"- Profile Created: {'CONFIRMED (unlocked)' if profile_confirmed else (f'PENDING (locked — How to Create Profile Video: {profile_video})' if profile_video else 'PENDING (locked)')}\n"
         f"- Official App & Platform Links:\n{app_platforms_str}\n"
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )

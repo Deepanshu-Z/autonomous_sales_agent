@@ -42,11 +42,15 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       Explain that profile registration is required to receive/activate their welcome discount coupon.
       In Message #2 (followup), ask them to reply 'Done' or 'Yes' once they complete their profile!
       CRITICAL: NEVER ask "Kya aap app download karna chahenge ya website?" — ALWAYS share all 3 links directly!
-    - Step 5: If profile confirmed -> share and celebrate their welcome discount coupon code. Ask if they want help applying it to start their classes!
-    - Step Trial (When customer asks for or wants to book a trial class):
-      * In Message #1 (reply): Share the trial booking steps from trial_class in COURSE_DATA, ALWAYS include the 'How to Book Trial' video tutorial link from trial_class.how_to_book_video_url, and attach the official app download links.
-      * In Message #2 (followup): Ask which batch timing works best for their trial class (e.g. "Which batch timing would you like to choose for your free trial? 😊" with buttons ["Morning Batch", "Evening Batch"]).
-      * CRITICAL ANTI-REDUNDANCY: NEVER ask "Would you like the links to download the app?" in followup when the links and booking steps are already provided in Message #1!
+    - Step 5 (Paid Package Enrollment): If profile confirmed AND customer is enrolling in a package (or asked for pricing/coupons) -> share and celebrate their welcome discount coupon code. Ask if they want help applying it at checkout to start their classes!
+    - Step Trial:
+      * When customer asks for or wants to book a trial class:
+        - In Message #1 (reply): Share the trial booking steps from trial_class in COURSE_DATA, ALWAYS include the 'How to Book Trial' video tutorial link from trial_class.how_to_book_video_url, and attach the official app download links.
+        - In Message #2 (followup): Ask which batch timing works best for their trial class (e.g. "Which batch timing would you like to choose for your free trial? 😊" with buttons ["Morning Batch", "Evening Batch"]).
+        - CRITICAL ANTI-REDUNDANCY: NEVER ask "Would you like the links to download the app?" in followup when the links and booking steps are already provided in Message #1!
+      * When a trial customer confirms profile creation (e.g. 'Profile Done', 'Done', 'Yes'):
+        - In Message #1 (reply): Congratulate them warmly on creating their profile and instruct them to complete their trial booking in the app (Profile -> Trial Links -> Select batch timing -> Tap Confirm Trial Enrollment). DO NOT output paid package prices or coupon codes!
+        - In Message #2 (followup): Ask if they are ready for their trial class or need any help with class timings (e.g. "Are you all set for your trial class tomorrow? 😊" with buttons ["All Set!", "Need Help"]).
     - CRITICAL: NEVER repeat "Kya aap trial class book karna chahenge?" if the customer has already asked for a trial or if their coupon has been sent!
   • FORMAT EXAMPLE:
     {{
@@ -299,8 +303,12 @@ def format_system_prompt(
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
 
+    should_include_coupons = bool(
+        profile_confirmed
+        and (not s.get("wants_trial") or s.get("package") or s.get("is_coupon_requested"))
+    )
     course_json_str = kb_loader.get_course_prompt_str(
-        cid, minified=True, include_coupons=profile_confirmed
+        cid, minified=True, include_coupons=should_include_coupons
     )
 
     catalog_names = ", ".join(

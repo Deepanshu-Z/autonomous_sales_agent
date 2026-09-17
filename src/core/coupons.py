@@ -247,6 +247,16 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             lines.append("  (No course selected yet \u2014 once customer selects a course, offer prices and locked codes will be shown.)")
         return "\n".join(lines)
 
+    elif profile_created and s.get("wants_trial") and not s.get("package") and not s.get("is_coupon_requested"):
+        return (
+            "• CUSTOMER STATUS — PROFILE CREATED FOR FREE TRIAL:\n"
+            "  - The customer has completed their profile registration specifically to attend a FREE TRIAL class.\n"
+            "  - DO NOT pitch paid packages or output discount coupon codes right now! The customer is here for their free trial class.\n"
+            "  - Congratulate them warmly on creating their profile and instruct them to finalize their free trial in the Sensationz App: "
+            "Profile -> Trial Links -> Select batch timing -> Tap Confirm Trial Enrollment.\n"
+            "  - Ask if they are all set for their trial session or have any questions."
+        )
+
     else:
         selected = s.get("package")
         if not packages:

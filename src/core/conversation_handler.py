@@ -303,9 +303,10 @@ OFFICIAL_PLATFORM_LINKS_BLOCK = (
 )
 
 
-def _ensure_app_website_links(text: str) -> str:
+def _ensure_app_website_links(text: str, user_asked_for_links: bool = False) -> str:
     """Appends official links ONLY when the message is actively directing the user to the platform.
-    Does NOT fire on incidental mentions of 'app'/'website' in general answers (fees, teachers, etc.).
+    Does NOT fire on incidental mentions of 'app'/'website' in general answers (fees, teachers, etc.),
+    nor during intermediate timing/package selection turns.
     """
     if not text:
         return text
@@ -315,18 +316,35 @@ def _ensure_app_website_links(text: str) -> str:
         or "shop.sensationzperformingarts.com" in t_lower
         or "apps.apple.com" in t_lower
     )
+
+    # Guard: Never keep or append links if the turn is asking the customer to choose
+    # a batch timing or package duration (unless user explicitly asked for links)
+    INTERMEDIATE_SELECTION_PATTERNS = (
+        r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(batch|timing|slot|samay)\b",
+        r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(package|duration|mahine|pack)\b",
+        r"\b(select|choose|chuniye|bataiye)\b.{0,30}\b(package duration|package|batch timing|timing)\b",
+        r"\b(timing|time slot|batch).{0,25}\b(works best|suits you|prefer)\b",
+    )
+    is_intermediate = any(re.search(p, t_lower) for p in INTERMEDIATE_SELECTION_PATTERNS)
+    if is_intermediate and not user_asked_for_links:
+        if has_links:
+            lines = [
+                line for line in text.splitlines()
+                if not any(d in line for d in ["play.google.com", "apps.apple.com", "shop.sensationzperformingarts.com"])
+            ]
+            return "\n".join(lines).strip()
+        return text
+
     if has_links:
         return text
-    # Only inject when the message directs the user to act on the platform.
-    # Covers: download/install, profile creation, enrollment/purchase, trial booking,
-    # visiting for non-digitized course schedules. Excludes incidental 'app' mentions.
+
+    # Only inject when the message explicitly directs the user to act on the platform.
     ACTION_PATTERNS = (
         r"\b(download|install|daalo|download kar|install kar)\b",
         r"\b(register|sign.?up|create.{0,10}profile|profile bana|profile create)\b",
-        r"\b(enroll|enroll kar|join kar|purchase|buy|payment|checkout)\b",
-        r"\b(book.{0,10}trial|trial book|free trial.{0,15}(app|website|platform))\b",
         r"\b(check.{0,20}(schedule|timing|fees).{0,20}(app|website|platform))\b",
         r"\b(visit.{0,10}(our|the).{0,10}(app|website|platform)|open.{0,10}(app|website))\b",
+        r"\b(trial.{0,20}(app|download|profile|steps))\b",
     )
     if any(re.search(p, t_lower) for p in ACTION_PATTERNS):
         return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
@@ -502,11 +520,12 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
+    user_asked_links = bool(re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE))
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply)) if followup_msg else _format_for_whatsapp(main_reply)
-    clean_reply = _ensure_app_website_links(clean_reply)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links)
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup and "play.google.com" not in clean_reply:
-        clean_followup = _ensure_app_website_links(clean_followup)
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links)
 
     # Deliver main reply to customer on WhatsApp (Message 1)
     if clean_reply and clean_reply.strip():

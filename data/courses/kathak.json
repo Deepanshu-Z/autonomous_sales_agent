@@ -1,37 +1,38 @@
 {
     "_meta": {
-        "version": "3.1",
+        "version": "1.0",
         "course": "kathak",
-        "document_status": "active",
+        "document_status": "near-final — 2 fields pending, see pending_fields",
         "language_support": [
             "en",
             "hi"
         ],
         "last_updated": "2026",
-        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here."
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here.",
+        "pending_fields": [
+            "Per-teacher gharana / stylistic specialization",
+            "Year-by-year / level-by-level syllabus breakdown (currently one flat topic list)"
+        ]
     },
     "course_overview": {
         "name": "Online Live Interactive Kathak",
         "mode": "Online Only",
         "platform": "Sensationz App",
         "class_format": "Live and interactive",
-        "class_days": "Monday, Wednesday, Friday (3 days per week)",
+        "batch_structure": "Twice-weekly day-pair batches (Tuesday/Thursday, Wednesday/Friday, or Saturday/Sunday) — not daily like Yoga",
         "weekend_classes": true,
         "session_duration_minutes": 60,
         "minimum_age_years": 5,
         "prior_experience_required": false,
-        "batch_size_range": "20 to 30 students (varies per batch)",
+        "batch_size_range": "35 to 50 students (same as Yoga)",
         "class_language": [
             "Hindi",
             "English"
         ],
-        "all_teachers_female": false,
+        "all_teachers_female": true,
         "suitable_for": [
-            "Beginners",
-            "Intermediate learners",
-            "Kids",
-            "Adults",
-            "Dance enthusiasts"
+            "All ages 5+",
+            "All levels — beginners through experienced"
         ],
         "duration_options": [
             "1 Month",
@@ -41,7 +42,6 @@
         ],
         "available_from_anywhere": true,
         "recordings_available": false,
-        "certificate_provided": true,
         "trial_classes_available": true,
         "max_trial_classes": 3,
         "trial_cost": "Free",
@@ -52,251 +52,295 @@
         "gst_included_in_listed_price": false,
         "gst_percentage": 18,
         "gst_added_at": "Checkout in app or website",
-        "offer_mechanism": "Ganesh Chaturthi Offer coupon sent after profile creation in app/website",
-        "beginner_recommendation": "3 Months package",
+        "offer_mechanism": "Coupon sent after profile creation in app/website (same mechanism as Yoga)",
+        "beginner_recommendation": "1 Month package",
         "packages": [
             {
                 "duration": "1 Month",
                 "duration_code": "1M",
-                "base_price": 1200,
-                "offer_price": 800,
+                "base_price": 1000,
+                "offer_price": 700,
                 "gst_slab": "18%",
-                "coupon_code": "KATHAK800",
-                "gst_on_offer": 144,
-                "total_with_gst_offer": 944,
-                "per_day_offer": "Rs.26 (offer price)"
+                "coupon_code": "KATHAK700",
+                "gst_on_offer": 126,
+                "total_with_gst_offer": 826,
+                "per_day_offer": "~Rs.27.5/day (offer price)"
             },
             {
                 "duration": "3 Months",
                 "duration_code": "3M",
-                "base_price": 3000,
-                "offer_price": 2000,
+                "base_price": 2100,
+                "offer_price": 1500,
                 "gst_slab": "18%",
-                "coupon_code": "KATHAK2000",
-                "gst_on_offer": 360,
-                "total_with_gst_offer": 2360,
-                "per_day_offer": "Rs.22/day"
+                "coupon_code": "KATHAK1500",
+                "gst_on_offer": 270,
+                "total_with_gst_offer": 1770,
+                "per_day_offer": "~Rs.19.7/day"
             },
             {
                 "duration": "6 Months",
                 "duration_code": "6M",
-                "base_price": 5500,
-                "offer_price": 3500,
+                "base_price": 3800,
+                "offer_price": 2500,
                 "gst_slab": "18%",
-                "coupon_code": "KATHAK3500",
-                "gst_on_offer": 630,
-                "total_with_gst_offer": 4130,
-                "per_day_offer": "Rs.19/day"
+                "coupon_code": "KATHAK2500",
+                "gst_on_offer": 450,
+                "total_with_gst_offer": 2950,
+                "per_day_offer": "~Rs.16.4/day"
             },
             {
                 "duration": "1 Year",
                 "duration_code": "1Y",
-                "base_price": 10000,
-                "offer_price": 6000,
+                "base_price": 7000,
+                "offer_price": 4000,
                 "gst_slab": "18%",
-                "coupon_code": "KATHAK6000",
-                "gst_on_offer": 1080,
-                "total_with_gst_offer": 7080,
-                "per_day_offer": "Rs.16/day"
+                "coupon_code": "KATHAK4000",
+                "gst_on_offer": 720,
+                "total_with_gst_offer": 4720,
+                "per_day_offer": "~Rs.12.9/day"
             }
         ]
     },
     "batch_timings": {
-        "total_batches": 4,
-        "flexibility_at_enrollment": "Select one fixed batch slot at enrollment",
-        "classes_per_day": 1,
-        "batches": [
+        "selection_flow": "Student selects a time + day-pair slot. If more than one teacher is assigned to that slot, the student is prompted to select a teacher.",
+        "classes_per_week": 2,
+        "slots": [
             {
-                "slot": "Evening",
-                "time_24h": "16:00-17:00",
                 "time_12h": "4:00 PM to 5:00 PM",
+                "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Anjali Sharma"
+                    "Madhuri"
                 ]
             },
             {
-                "slot": "Evening",
-                "time_24h": "17:00-18:00",
+                "time_12h": "4:00 PM to 5:00 PM",
+                "days": "Wednesday/Friday",
+                "instructors": [
+                    "Madhuri"
+                ]
+            },
+            {
                 "time_12h": "5:00 PM to 6:00 PM",
+                "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Rohan Verma"
+                    "Madhuri",
+                    "Vibha Mittal",
+                    "Sneha Maurya"
                 ]
             },
             {
-                "slot": "Evening",
-                "time_24h": "18:00-19:00",
+                "time_12h": "5:00 PM to 6:00 PM",
+                "days": "Wednesday/Friday",
+                "instructors": [
+                    "Madhuri",
+                    "Kratika Gontiya"
+                ]
+            },
+            {
+                "time_12h": "5:00 PM to 6:00 PM",
+                "days": "Saturday/Sunday",
+                "instructors": [
+                    "Vibha Mittal",
+                    "Kratika Gontiya",
+                    "Sneha Maurya"
+                ]
+            },
+            {
                 "time_12h": "6:00 PM to 7:00 PM",
+                "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Anjali Sharma"
+                    "Madhuri"
                 ]
             },
             {
-                "slot": "Weekend",
-                "time_24h": "10:00-11:00",
-                "time_12h": "10:00 AM to 11:00 AM",
+                "time_12h": "6:00 PM to 7:00 PM",
+                "days": "Wednesday/Friday",
                 "instructors": [
-                    "Meera Rajput"
+                    "Madhuri",
+                    "Vibha Mittal",
+                    "Kratika Gontiya"
+                ]
+            },
+            {
+                "time_12h": "6:00 PM to 7:00 PM",
+                "days": "Saturday/Sunday",
+                "instructors": [
+                    "Vibha Mittal",
+                    "Kratika Gontiya",
+                    "Sneha Maurya"
+                ]
+            },
+            {
+                "time_12h": "7:00 PM to 8:00 PM",
+                "days": "Tuesday/Thursday",
+                "instructors": [
+                    "Vibha Mittal",
+                    "Kratika Gontiya"
+                ]
+            },
+            {
+                "time_12h": "7:00 PM to 8:00 PM",
+                "days": "Wednesday/Friday",
+                "instructors": [
+                    "Vibha Mittal",
+                    "Kratika Gontiya"
+                ]
+            },
+            {
+                "time_12h": "7:00 PM to 8:00 PM",
+                "days": "Saturday/Sunday",
+                "instructors": [
+                    "Vibha Mittal",
+                    "Kratika Gontiya",
+                    "Sneha Maurya"
+                ]
+            },
+            {
+                "time_12h": "8:00 PM to 9:00 PM",
+                "days": "Wednesday/Friday",
+                "instructors": [
+                    "Kratika Gontiya",
+                    "Sneha Maurya"
+                ]
+            },
+            {
+                "time_12h": "8:00 PM to 9:00 PM",
+                "days": "Saturday/Sunday",
+                "instructors": [
+                    "Kratika Gontiya",
+                    "Sneha Maurya"
+                ]
+            },
+            {
+                "time_12h": "8:00 PM to 9:00 PM",
+                "days": "Tuesday/Thursday",
+                "instructors": [
+                    "Sneha Maurya"
                 ]
             }
         ],
-        "unavailable_slots": [
-            "Morning before 10:00 AM",
-            "11:00 AM to 4:00 PM",
-            "After 7:00 PM"
-        ],
-        "earliest_batch": "4:00 PM to 5:00 PM (Weekdays), 10:00 AM to 11:00 AM (Weekends)",
-        "latest_batch": "6:00 PM to 7:00 PM"
+        "earliest_batch": "4:00 PM to 5:00 PM",
+        "latest_batch": "8:00 PM to 9:00 PM"
     },
     "teachers": [
         {
-            "name": "Anjali Sharma",
-            "experience_years": "8+",
+            "name": "Ms. Madhuri",
+            "experience_years": "12+",
             "qualifications": [
-                "Visharad in Kathak (Gandharva Mahavidyalaya)",
-                "Diploma in Performing Arts"
+                "PENDING — certifying institution not yet provided"
             ],
             "certifications": [
-                "Senior National Fellowship in Dance"
+                "Certified Kathak Teacher"
             ],
             "specialization": [
-                "Lucknow Gharana",
-                "Abhinaya (Expression)",
-                "Beginner Foundations"
+                "PENDING — gharana/style not yet provided"
             ],
-            "assigned_batches": [
-                "4:00 PM to 5:00 PM",
-                "6:00 PM to 7:00 PM"
-            ],
-            "demo_video": "https://youtu.be/dummy_kathak_anjali"
+            "demo_video": "https://youtu.be/t-XO2enPGwM"
         },
         {
-            "name": "Rohan Verma",
-            "experience_years": "5+",
+            "name": "Vibha Mittal",
+            "experience_years": "4+",
             "qualifications": [
-                "Prabhakar in Kathak (Prayag Sangeet Samiti)"
+                "PENDING"
             ],
             "certifications": [
-                "Certified Classical Dance Instructor"
+                "Certified Kathak Teacher"
             ],
             "specialization": [
-                "Jaipur Gharana",
-                "Footwork (Tatkar)",
-                "Chakkar Techniques"
+                "PENDING"
             ],
-            "assigned_batches": [
-                "5:00 PM to 6:00 PM"
-            ],
-            "demo_video": null
+            "demo_video": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS"
         },
         {
-            "name": "Meera Rajput",
-            "experience_years": "10+",
+            "name": "Kratika Gontiya",
+            "experience_years": "4+",
             "qualifications": [
-                "MA in Kathak",
-                "Alankar (Gandharva Mahavidyalaya)"
+                "PENDING"
             ],
             "certifications": [
-                "Advanced Choreography Certification"
+                "Certified Kathak Teacher"
             ],
             "specialization": [
-                "Advanced Kathak Repertoire",
-                "Rhythmic Patterns (Taal)",
-                "Stage Performance Prep"
+                "PENDING"
             ],
-            "assigned_batches": [
-                "10:00 AM to 11:00 AM (Weekend)"
+            "demo_video": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1"
+        },
+        {
+            "name": "Sneha Maurya",
+            "experience_years": "4+",
+            "qualifications": [
+                "PENDING"
             ],
-            "demo_video": "https://youtu.be/dummy_kathak_meera"
+            "certifications": [
+                "Certified Kathak Teacher"
+            ],
+            "specialization": [
+                "PENDING"
+            ],
+            "demo_video": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
         }
     ],
     "syllabus": {
-        "kathak_foundations": [
-            "Introduction to Kathak",
-            "Basic Posture and Hand Gestures (Mudras)",
-            "Tatkar (Basic Footwork)",
-            "Chakkar (Spins)"
+        "topics_covered_overall": [
+            "Tatkar, Hastak, Chakkars & Layakari",
+            "Thaat, Aamad, Toda, Tihai & Paran",
+            "Gat, Gat Nikas & Gatbhav",
+            "Teentaal, Jhaptaal, Ektaal & Dhamar",
+            "Folk Dance & Expressive Performance",
+            "Kathak Theory, History & Gharanas",
+            "Indian Music, Taal & Notation",
+            "Introduction to Tabla & Pakhawaj"
         ],
-        "rhythm_and_taal": [
-            "Understanding Teentaal (16 beats)",
-            "Reciting Bols (Padhant)",
-            "Toda, Tukda, and Tihai",
-            "Laya (Tempo) Variations"
-        ],
-        "expressions": [
-            "Introduction to Abhinaya",
-            "Navarasa (Nine Emotions)",
-            "Facial Expressions for Storytelling",
-            "Gat Nikas (Graceful Walks)"
-        ],
-        "advanced_elements": [
-            "Complex Footwork Patterns",
-            "Fast-paced Chakkars",
-            "Vandana and Kavitt",
-            "Performance Choreography"
-        ]
+        "year_by_year_breakdown": "PENDING — topics are taught progressively by year/level; exact mapping not yet provided"
     },
     "course_benefits": {
         "focus_areas": [
-            "Grace and Posture",
-            "Rhythmic Understanding",
-            "Stamina and Fitness",
-            "Facial Expressions",
-            "Cultural Connection",
-            "Confidence Building",
-            "Footwork Coordination"
+            "Tatkar & Footwork — rhythm, precision, coordination",
+            "Hand Gestures (Mudras) — traditional expressive movement",
+            "Rhythm & Taal — beats, compositions, musicality",
+            "Abhinaya & Expressions — expressive storytelling",
+            "Chakkars & Movements — spins and coordination",
+            "Traditional Kathak Compositions — structured repertoire and technique",
+            "Stage Presentation — confidence, elegance, performance skills"
         ],
-        "disclaimer": "These are course focus areas, individual progression depends on consistent practice."
+        "disclaimer": "These are course focus areas, not guarantees of performance level or outcome."
     },
     "what_to_keep_ready": [
-        "Ghungroo (Optional for absolute beginners, required later)",
-        "Comfortable Ethnic Wear (Kurta/Leggings)",
+        "Comfortable Clothing / Dance Attire",
         "Water Bottle",
         "Stable Internet Connection",
-        "Adequate open floor space"
+        "Open Space to Move"
     ],
-    "trial_class": {
-        "available": true,
-        "cost": "Free",
-        "max_trials": 1,
-        "booking_platform": "Sensationz App",
-        "booking_steps": [
-            "Download the Sensationz App",
-            "Login using Continue with Google",
-            "Complete your profile (Name, Gender, Country, etc.)",
-            "Go to Profile then tap Trial Links",
-            "Select the desired trial class (Kathak)",
-            "Select preferred Timing, Days, and Teacher",
-            "Tap Confirm Trial Enrollment",
-            "Your trial will be confirmed and booked"
+    "certification_structure": {
+        "tiers": [
+            {
+                "duration": "1 Year",
+                "credential": "Certificate"
+            },
+            {
+                "duration": "2 Years",
+                "credential": "Junior Diploma"
+            },
+            {
+                "duration": "4 Years",
+                "credential": "Senior Diploma"
+            },
+            {
+                "duration": "6 Years",
+                "credential": "Degree"
+            }
         ],
-        "demo_videos": {
-            "Anjali Sharma": "https://youtu.be/dummy_kathak_anjali",
-            "Meera Rajput": "https://youtu.be/dummy_kathak_meera"
-        }
+        "beyond_1_year_rule": "The AI must not process enrollment or quote pricing for continuation beyond the 1 Year package. If a student needs a track beyond 1 Year (toward Junior Diploma, Senior Diploma, or Degree), the AI must direct them to type 'agent' so the team can plan accordingly."
     },
     "enrollment": {
-        "batches_start": "First week of every month"
+        "batches_start": "Ongoing — enroll anytime (same as Yoga)"
     },
     "not_offered": {
-        "course_types": [
-            "1-on-1 private classes",
-            "Offline / in-person classes for this specific package",
-            "Home tuition"
-        ],
         "other": [
+            "1-on-1 private classes",
             "Recordings of live classes",
             "Leave or class pause",
-            "Refunds",
-            "Ghungroo or costume provision"
-        ],
-        "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
-    },
-    "health_and_medical": {
-        "covered_topics": [
-            "Stamina Building",
-            "Flexibility",
-            "Coordination"
-        ],
-        "medical_disclaimer": "Course requires physical exertion. Not a substitute for physical therapy. Advise users to consult a doctor if they have joint or back injuries."
+            "Refunds"
+        ]
     }
 }

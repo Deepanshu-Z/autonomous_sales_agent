@@ -47,6 +47,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from src.core import intent_classifier
+from src.core import kb_loader
 from src.core import prompt as prompt_module
 from src.core.refusal_engine import evaluate_refusal_async
 from src.services.interakt import send_text_message_async

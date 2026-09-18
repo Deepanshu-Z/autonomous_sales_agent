@@ -24,7 +24,7 @@
         "session_duration_minutes": 60,
         "minimum_age_years": 5,
         "prior_experience_required": false,
-        "batch_size_range": "35 to 50 students (same as Yoga)",
+        "batch_size_range": "35 to 50 students",
         "class_language": [
             "Hindi",
             "English"
@@ -291,7 +291,7 @@
             "Indian Music, Taal & Notation",
             "Introduction to Tabla & Pakhawaj"
         ],
-        "year_by_year_breakdown": "PENDING — topics are taught progressively by year/level; exact mapping not yet provided"
+        "year_by_year_breakdown": "PENDING — topics are taught progressively by year/level"
     },
     "course_benefits": {
         "focus_areas": [

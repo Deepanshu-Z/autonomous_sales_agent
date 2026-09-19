@@ -330,7 +330,7 @@
                 "credential": "Degree"
             }
         ],
-        "beyond_1_year_rule": "The AI must not process enrollment or quote pricing for continuation beyond the 1 Year package. If a student needs a track beyond 1 Year (toward Junior Diploma, Senior Diploma, or Degree), the AI must direct them to type 'agent' so the team can plan accordingly."
+        "beyond_1_year_rule": "Yes, we DO offer multi-year courses and tracks (1, 2, 3, 4, 6+ years leading to Junior Diploma, Senior Diploma, Degree). For 1+ year courses or multi-year packages, standard direct app packages are not fixed; the AI must tell the customer that we do offer multi-year courses, and direct them to type 'agent' so a human executive can connect with them to provide the best offer, custom plan, and assistance."
     },
     "enrollment": {
         "batches_start": "Ongoing — enroll anytime (same as Yoga)"

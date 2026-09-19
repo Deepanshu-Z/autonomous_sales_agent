@@ -22,7 +22,8 @@
             "classical dance",
             "indian classical dance"
         ],
-        "has_full_kb": false,
+        "has_full_kb": true,
+        "kb_file": "data/courses/kathak.json",
         "gst_percentage": 18,
         "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
     },

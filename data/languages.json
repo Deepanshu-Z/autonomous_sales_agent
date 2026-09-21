@@ -6,19 +6,22 @@
       "id": "english",
       "name": "English",
       "button_label": "English",
-      "aliases": ["english", "eng", "en", "1"]
+      "aliases": ["english", "eng", "en", "1"],
+      "agent_button": "Talk to Agent"
     },
     {
       "id": "hindi",
       "name": "Hindi",
       "button_label": "हिन्दी (Hindi)",
-      "aliases": ["hindi", "हिन्दी", "हिंदी", "hi", "2"]
+      "aliases": ["hindi", "हिन्दी", "हिंदी", "hi", "2"],
+      "agent_button": "एजेंट से बात"
     },
     {
       "id": "hinglish",
       "name": "Hinglish",
       "button_label": "Hinglish",
-      "aliases": ["hinglish", "roman hindi", "3"]
+      "aliases": ["hinglish", "roman hindi", "3"],
+      "agent_button": "Agent se baat"
     }
   ]
 }

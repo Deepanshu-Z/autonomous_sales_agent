@@ -750,6 +750,12 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
             msg1 = welcome_msgs.get("message_1")
             msg2 = welcome_msgs.get("message_2")
             buttons = campaign_loader.get_campaign_buttons(campaign, language=matched_lang)
+            if buttons:
+                from src.core import language_loader
+                agent_btn = language_loader.get_agent_button(matched_lang)
+                all_agent_labels = language_loader.get_all_agent_buttons()
+                filtered_b = [str(b).strip() for b in buttons if str(b).strip() and str(b).strip().lower() not in all_agent_labels]
+                buttons = filtered_b[:2] + [agent_btn]
 
             if msg1:
                 await send_text_message_async(phone, msg1)

@@ -218,6 +218,14 @@ async def handle_incoming_message(
         new_state["stage"] = "COUPON_SENT"
         new_state["coupon_sent"] = True
 
+    # Guarantee dedicated "Talk to Agent" button in user's language (max 3 buttons total on WhatsApp)
+    if followup_msg and buttons is not None:
+        from src.core import language_loader
+        agent_btn = language_loader.get_agent_button(new_state.get("language") or session_state.get("language"))
+        all_agent_labels = language_loader.get_all_agent_buttons()
+        filtered_b = [str(b).strip() for b in buttons if str(b).strip() and str(b).strip().lower() not in all_agent_labels]
+        buttons = filtered_b[:2] + [agent_btn]
+
     return {"reply": main_reply, "followup": followup_msg, "buttons": buttons, "new_state": new_state}
 
 
@@ -287,7 +295,7 @@ def _strip_trailing_question(text: str, followup: Optional[str] = None) -> str:
     if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
         return "\n".join(lines[:-1]).strip()
 
-    # 3. If last line is a call to action prompting for 'Done' / 'Yes'
+    # 3. If last line is a call to action prompting for 'Done' / 'Yes' (e.g. 'Done' ya 'Yes' likhein / लिखें)
     if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
         return "\n".join(lines[:-1]).strip()
 
@@ -398,6 +406,24 @@ async def handle_conversation_turn_async(
         latency_sec = round(time.time() - start_time, 2)
         asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
         return {"status": "unescalated", "reply": reply}
+
+    # ── Instant Direct Escalation on Agent Button tap ────────────────────────
+    from src.core import language_loader
+    all_agent_labels = language_loader.get_all_agent_buttons()
+    if cmd in all_agent_labels or cmd in ["agent", "human"]:
+        escalation_reply = (
+            "Aapki query/request humari support team tak pahunch gayi hai. "
+            "Hamara ek team member aapke saath jald hi connect karega. 😊\n\n"
+            "Your request has been escalated to our support team. "
+            "Someone from our team will be with you shortly! 🙏"
+        )
+        await execute_agent_handoff_async(
+            phone,
+            user_reply_text=escalation_reply,
+            escalation_reason=f"Customer tapped agent button: {text_clean}",
+            start_time=start_time,
+        )
+        return {"status": "handed_off", "reply": escalation_reply}
 
     # ── Orchestrate Customer Turn via handle_incoming_message ─────────────────
     active_course = state.get("course")
@@ -598,9 +624,14 @@ async def handle_conversation_turn_async(
     if clean_followup and clean_followup.strip():
         await asyncio.sleep(2.5)
         raw_buttons = result.get("buttons") or []
+        from src.core import language_loader
+        agent_btn = language_loader.get_agent_button(new_state.get("language"))
+        all_agent_labels = language_loader.get_all_agent_buttons()
+        filtered_b = [str(b).strip() for b in raw_buttons if str(b).strip() and str(b).strip().lower() not in all_agent_labels]
+        final_buttons = filtered_b[:2] + [agent_btn]
         try:
             from src.services.quick_reply_service import send_followup_with_buttons_async
-            await send_followup_with_buttons_async(phone, clean_followup, buttons=raw_buttons)
+            await send_followup_with_buttons_async(phone, clean_followup, buttons=final_buttons)
         except ImportError:
             await send_text_message_async(phone, clean_followup)
         await save_message_async(phone, "assistant", clean_followup)

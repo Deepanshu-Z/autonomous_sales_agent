@@ -102,3 +102,37 @@ def match_language(text: str) -> Optional[str]:
             return lang.get("name")
 
     return None
+
+
+def get_agent_button(language: Optional[str] = None) -> str:
+    """
+    Returns the 'Talk to Agent' button label for the specified language.
+    Strict rule:
+    - Hindi -> 'एजेंट से बात'
+    - Hinglish -> 'Agent se baat'
+    - For users other than Hindi and Hinglish, always use English: 'Talk to Agent'
+    """
+    if not language:
+        return "Talk to Agent"
+
+    lang_lower = str(language).lower().strip()
+    cfg = get_language_config()
+
+    for lang in cfg.get("languages", []):
+        lid = lang.get("id", "").lower()
+        lname = lang.get("name", "").lower()
+        if (lid in lang_lower or lname in lang_lower) and lid in ("hindi", "hinglish"):
+            return lang.get("agent_button", "Talk to Agent")
+
+    return "Talk to Agent"
+
+
+def get_all_agent_buttons() -> set:
+    """Returns a set of all recognized agent button labels in lowercase."""
+    cfg = get_language_config()
+    labels = {"talk to agent", "agent"}
+    for lang in cfg.get("languages", []):
+        btn = lang.get("agent_button")
+        if btn:
+            labels.add(btn.strip().lower())
+    return labels

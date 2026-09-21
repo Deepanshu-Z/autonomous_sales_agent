@@ -280,7 +280,8 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             lines.append(f"  • {p.get('duration')}: *{p.get('coupon_code')}* (Regular: ₹{p.get('base_price')}, Offer Price: ₹{p.get('offer_price')})")
 
         if selected:
-            pkg = next((p for p in packages if p.get("duration") == selected), None)
+            canonical_sel = normalize_package_name(selected, course_id=course_id) or selected.strip()
+            pkg = next((p for p in packages if normalize_package_name(p.get("duration"), course_id=course_id) == canonical_sel or str(p.get("duration", "")).lower() == canonical_sel.lower()), None)
             if pkg:
                 lines.append(f"\n  - Customer's Selected Package: {pkg.get('duration')}. Share their code *{pkg.get('coupon_code')}* and checkout instructions.")
         else:

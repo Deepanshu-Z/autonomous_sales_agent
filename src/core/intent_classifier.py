@@ -99,8 +99,10 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a question, expressing doubt, or asking about schedule flexibility or switching batches (e.g. "1 week morning and 1 week evening", "can I switch timing?", "subah aur shaam dono chalega?", "timing change ho sakti hai kya?", "is this ok?"). In these cases, customer_intent is "QUESTION" and selected_timing MUST BE null!
 
 4. "selected_package":
-   - Package duration definitively chosen by the user ("1 Month", "3 Months", "6 Months", "1 Year"), else null.
-   - CRITICAL NEGATIVE GUARD: NEVER extract "1 week", "2 days", or arbitrary intervals as a package! Sensationz only offers 1 Month, 3 Months, 6 Months, and 1 Year. Set to null if the customer is asking a question.
+   - Package duration definitively chosen by the user in ANY language, script, or dialect worldwide (e.g. English "1 month", Hindi "1 महीना", Tamil "1 மாதம்", Malayalam "1 മാസം", Telugu "1 నెల", Spanish "1 mes", etc.).
+   - You MUST translate and map it directly to the exact matching canonical package string from the Allowed Canonical Packages in context (e.g. "1 Month", "3 Months", "6 Months", "1 Year").
+   - Output ONLY the exact canonical English string from the allowed list, or null. NEVER output foreign language text or unlisted intervals.
+   - CRITICAL NEGATIVE GUARD: NEVER extract "1 week", "2 days", or arbitrary intervals as a package! Sensationz only offers packages listed in the course catalog. Set to null if the customer is asking a question or expressing doubt.
 
 5. "selected_course":
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
@@ -205,10 +207,16 @@ async def extract_intent_and_state_changes(
         if recent_user_turns else ""
     )
 
+    from src.core import kb_loader
+    active_cid = s.get("course") or ""
+    course_pkgs = list(kb_loader.get_valid_packages(active_cid).keys()) if active_cid else ["1 Month", "3 Months", "6 Months", "1 Year"]
+    pkgs_str = ", ".join(f'"{p}"' for p in course_pkgs) if course_pkgs else '"1 Month", "3 Months", "6 Months", "1 Year"'
+
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
         f"- Active Course: {s.get('course') or 'None (Not Selected)'}\n"
+        f"- Allowed Canonical Packages for Active Course: [{pkgs_str}]\n"
         f"- Selected Package: {s.get('package') or 'None'}\n"
         f"- Selected Timing: {s.get('timing') or 'None'}\n"
         f"- App Installed in State: {bool(s.get('app_installed'))}\n"
@@ -234,8 +242,14 @@ async def extract_intent_and_state_changes(
             if k in data:
                 clean[k] = data[k]
 
+        # Strict canonical package normalization against allowed course packages
+        raw_pkg = clean.get("selected_package")
+        if raw_pkg and isinstance(raw_pkg, str):
+            from src.core.coupons import normalize_package_name
+            norm_pkg = normalize_package_name(raw_pkg, course_id=active_cid or "yoga")
+            clean["selected_package"] = norm_pkg or (raw_pkg if raw_pkg in course_pkgs else None)
+
         # Deterministic course detection from user text overrides ambiguous LLM extraction
-        from src.core import kb_loader
         llm_course = clean.get("selected_course")
         valid_llm_course = None
         if llm_course:
@@ -301,7 +315,10 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["timing"] = flags["selected_timing"]
 
     if flags.get("selected_package") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
-        new_state["package"] = flags["selected_package"]
+        from src.core.coupons import normalize_package_name
+        course_for_pkg = new_state.get("course") or "yoga"
+        canonical_pkg = normalize_package_name(flags["selected_package"], course_id=course_for_pkg)
+        new_state["package"] = canonical_pkg or flags["selected_package"]
 
     if flags.get("selected_course"):
         from src.core import kb_loader

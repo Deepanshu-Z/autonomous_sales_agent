@@ -263,16 +263,35 @@ def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional
     return reply
 
 
-def _strip_trailing_question(text: str) -> str:
-    """If the main reply accidentally ended with a trailing question line,
+def _strip_trailing_question(text: str, followup: Optional[str] = None) -> str:
+    """If the main reply accidentally ended with a trailing question line or duplicate followup call,
     strip it so Message 1 remains purely informative without duplicating
     the dedicated follow-up question sent as Message 2."""
     if not text:
         return text
-    lines = text.strip().split("\n")
-    if len(lines) > 1 and lines[-1].strip().endswith("?"):
+    text_clean = text.strip()
+    lines = text_clean.split("\n")
+    if len(lines) <= 1:
+        return text_clean
+
+    last_line = lines[-1].strip()
+
+    # 1. If followup is provided and last line matches followup text
+    if followup:
+        f_clean = followup.strip().rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+        l_clean = last_line.rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+        if f_clean and l_clean and (f_clean in l_clean or l_clean in f_clean):
+            return "\n".join(lines[:-1]).strip()
+
+    # 2. If last line ends with a question mark (possibly followed by emojis, punctuation, or spaces)
+    if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
         return "\n".join(lines[:-1]).strip()
-    return text.strip()
+
+    # 3. If last line is a call to action prompting for 'Done' / 'Yes'
+    if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
+        return "\n".join(lines[:-1]).strip()
+
+    return text_clean
 
 
 def _format_for_whatsapp(text: str) -> str:
@@ -511,7 +530,7 @@ async def handle_conversation_turn_async(
             followup_msg = parts[1].strip() or None
 
     user_asked_links = bool(re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE))
-    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply)) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links)
 
     # Dynamic guarantee: Ensure trial tutorial video from active course KB is present whenever trial booking steps are shared

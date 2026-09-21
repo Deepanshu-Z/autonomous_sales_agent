@@ -148,29 +148,18 @@ async def handle_incoming_message(
             session_state["fee"] = None
 
     # 3. Build the system prompt with the freshly-understood state.
-    # Language detection is ALWAYS per-turn from the current message.
-    # Stale state language is NEVER used for the prompt — language can change every message.
-    #
-    # Deterministic ASCII rule (code-level, no LLM needed):
-    # If every character in the user's message is ASCII/Latin (ord < 256), it is
-    # mathematically impossible for the script to be any native script (Devanagari,
-    # Telugu, Tamil, Bengali, Arabic, etc.). Override to Hinglish or English.
-    def _detect_lang_for_prompt(msg: str, classifier_lang: str) -> str:
-        msg_stripped = (msg or "").strip()
-        if msg_stripped and all(ord(c) < 256 for c in msg_stripped):
-            # Pure ASCII message — classify by content, not stale state
-            if classifier_lang and "english" in classifier_lang.lower() and "hinglish" not in classifier_lang.lower():
-                return "English"
-            # Has Hindi/Urdu intent or classifier said a native script — force Hinglish
-            return "Hinglish (Latin script)"
-        # Non-ASCII: trust the current-turn classifier result
-        return classifier_lang or ""
+    # The bot strictly uses the customer's selected language unless explicitly switched.
+    from src.core import language_loader
 
-    _classifier_lang = flags.get("detected_language") or ""
-    detected_lang = _detect_lang_for_prompt(user_message, _classifier_lang)
-    # If current turn has no classification at all, fall back to persisted state as last resort
-    if not detected_lang:
-        detected_lang = new_state.get("language") or session_state.get("language") or ""
+    locked_lang = new_state.get("language") or session_state.get("language")
+    if locked_lang:
+        detected_lang = locked_lang
+    else:
+        _classifier_lang = flags.get("detected_language") or ""
+        detected_lang = _classifier_lang or language_loader.get_default_language()
+
+    new_state["language"] = detected_lang
+
     system_prompt = prompt_module.format_system_prompt(
         new_state, course_id=effective_course_id, detected_language=detected_lang
     )

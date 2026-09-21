@@ -89,3 +89,58 @@ def match_campaign(referral: Optional[dict] = None, text: str = "") -> Optional[
 
     # Default to first campaign (e.g. yoga) for testing
     return campaigns[0]
+
+
+def get_welcome_messages(campaign: Optional[Dict[str, Any]], language: Optional[str] = None) -> Dict[str, str]:
+    """
+    Extracts localized welcome messages (message_1, message_2) from campaign data.
+    Supports both language-keyed dictionaries and flat legacy dictionaries.
+    """
+    if not campaign:
+        return {}
+
+    raw_msgs = campaign.get("welcome_messages", {})
+    if not raw_msgs:
+        return {}
+
+    # If already a flat legacy dict with message_1
+    if "message_1" in raw_msgs:
+        return raw_msgs
+
+    # Language-keyed dictionary
+    lang_key = (language or "english").strip().lower()
+    if lang_key in raw_msgs:
+        return raw_msgs[lang_key]
+
+    # Fallback to english, then first available language
+    if "english" in raw_msgs:
+        return raw_msgs["english"]
+
+    first_val = next(iter(raw_msgs.values()), {})
+    return first_val if isinstance(first_val, dict) else {}
+
+
+def get_campaign_buttons(campaign: Optional[Dict[str, Any]], language: Optional[str] = None) -> List[str]:
+    """
+    Extracts localized quick-reply buttons from campaign data.
+    Supports both language-keyed button dictionaries and flat button lists.
+    """
+    if not campaign:
+        return ["Timing", "Fees", "Free Trial"]
+
+    raw_buttons = campaign.get("buttons")
+    if isinstance(raw_buttons, list):
+        return raw_buttons
+
+    if isinstance(raw_buttons, dict):
+        lang_key = (language or "english").strip().lower()
+        if lang_key in raw_buttons:
+            return raw_buttons[lang_key]
+        if "english" in raw_buttons:
+            return raw_buttons["english"]
+        first_val = next(iter(raw_buttons.values()), [])
+        if isinstance(first_val, list):
+            return first_val
+
+    return ["Timing", "Fees", "Free Trial"]
+

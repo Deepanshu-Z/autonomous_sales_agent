@@ -18,8 +18,9 @@ async def test_campaign_matching():
     camp_yoga = campaign_loader.match_campaign(referral={"ad_id": registered_ad_id})
     assert camp_yoga is not None
     assert camp_yoga["course"] == "yoga"
-    assert len(camp_yoga["buttons"]) == 3
-    assert camp_yoga["buttons"] == ["Timing", "Fees", "Other questions"]
+    buttons = campaign_loader.get_campaign_buttons(camp_yoga, language="English")
+    assert len(buttons) == 3
+    assert buttons == ["Timing", "Fees", "Free Trial"]
 
     # 2. Unregistered Ad ID strictly returns None (ignored)
     assert campaign_loader.match_campaign(referral={"ad_id": "999999999999999999"}) is None
@@ -72,32 +73,54 @@ async def test_first_message_welcome_and_second_message_funnel():
         camps = campaign_loader.get_all_campaigns()
         registered_ad_id = camps[0]["ad_ids"][0]
         referral = {"ad_id": registered_ad_id}
+
+        # --- Turn 1: Customer arrives via ad ---
         await handle_ai_reply_async(test_phone, "Hi, I am interested in classes", [], referral=referral)
+
+        # Verify Stage 1 Language prompt sent with language buttons
+        assert len(sent_buttons) == 1
+        assert "English" in sent_buttons[0]["buttons"]
+        assert "हिन्दी (Hindi)" in sent_buttons[0]["buttons"]
+
+        # Verify state populated
+        state = await get_user_state_async(test_phone)
+        assert state.get("language_prompt_sent") is True
+        assert state.get("awaiting_language") is True
+        assert state.get("course") == "yoga"
+
+        # --- Turn 2: Customer selects English ---
+        sent_messages.clear()
+        sent_buttons.clear()
+        history = [
+            {"role": "user", "content": "Hi, I am interested in classes"},
+            {"role": "assistant", "content": "Please select your preferred language"}
+        ]
+        await handle_ai_reply_async(test_phone, "English", history, referral=referral)
 
         # Verify Welcome message 1 sent as text
         assert len(sent_messages) == 1
         assert "Welcome to Sensationz" in sent_messages[0]["text"]
-        assert "Live Interactive Yoga classes" in sent_messages[0]["text"]
+        assert "Yoga classes" in sent_messages[0]["text"]
 
-        # Verify Welcome message 2 sent with 3 interactive buttons
+        # Verify Welcome message 2 sent with 3 interactive course buttons
         assert len(sent_buttons) == 1
         assert "get started today" in sent_buttons[0]["text"]
-        assert sent_buttons[0]["buttons"] == ["Timing", "Fees", "Other questions"]
+        assert sent_buttons[0]["buttons"] == ["Timing", "Fees", "Free Trial"]
 
         # Verify state populated
         state = await get_user_state_async(test_phone)
         assert state.get("welcome_sent") is True
-        assert state.get("course") == "yoga"
+        assert state.get("language") == "English"
+        assert state.get("language_selected") is True
 
-        # --- Turn 2: Customer clicks button "Fees" ---
+        # --- Turn 3: Customer clicks button "Fees" ---
         sent_messages.clear()
         sent_buttons.clear()
 
-        # Simulate customer answering
-        history = [
-            {"role": "user", "content": "Hi, I am interested in classes"},
+        history.extend([
+            {"role": "user", "content": "English"},
             {"role": "assistant", "content": sent_messages[0]["text"] if sent_messages else "welcome"}
-        ]
+        ])
         await handle_ai_reply_async(test_phone, "Fees", history, referral=referral)
 
         # Welcome flow should NOT trigger again!

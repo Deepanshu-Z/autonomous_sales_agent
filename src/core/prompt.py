@@ -348,10 +348,10 @@ def format_system_prompt(
                 f"════════════════════════════════════════"
             )
         else:
-            if "devanagari" in lang_lower:
+            if "devanagari" in lang_lower or lang_lower == "hindi":
                 script_rule = (
-                    "The customer explicitly wrote using Devanagari script.\n"
-                    "You MUST output 'reply', 'followup', and all 'buttons' strictly in Devanagari script."
+                    "The customer's selected language is Hindi.\n"
+                    "You MUST output 'reply', 'followup', and all 'buttons' strictly in Hindi (Devanagari script)."
                 )
             elif "latin" in lang_lower or "hinglish" in lang_lower:
                 script_rule = (

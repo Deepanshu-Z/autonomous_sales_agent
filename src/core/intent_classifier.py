@@ -152,6 +152,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Classify as "Hindi (Devanagari script)" ONLY IF the customer's message literally contains Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते", "क्या टाइमिंग है"). If you do NOT see actual Devanagari characters (अ आ इ ई etc.) in the message, NEVER output "Hindi (Devanagari script)"!
       • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
+14. "explicit_language_request":
+    - string or null: If customer explicitly asks to change language or talk in a specific language (e.g. "talk in Hindi", "speak in English", "Hindi please", "English me bolo", "switch language to Hindi"), specify the target language name (e.g. "Hindi", "English", "Hinglish"). Otherwise null.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -166,7 +169,8 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "is_complaint_or_refund": boolean,
   "customer_intent": string,
   "question_summary": string | null,
-  "detected_language": string
+  "detected_language": string,
+  "explicit_language_request": string | null
 }"""
 
 
@@ -313,17 +317,37 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
 
-    if flags.get("detected_language"):
-        detected_lang = flags["detected_language"]
-        # Deterministic override: if the raw text is pure ASCII/Latin but the classifier
-        # returned any native-script classification (Devanagari, Telugu, Tamil, Bengali,
-        # Arabic, etc.) — it is physically impossible. Correct to Hinglish (Latin script).
+    # Language management: Lock selected language until explicitly changed
+    from src.core import language_loader
+
+    raw_text = (flags.get("_raw_text") or "").strip()
+    explicit_req = flags.get("explicit_language_request")
+    matched_explicit = language_loader.match_language(explicit_req) if explicit_req else None
+
+    # Check if raw text directly matches a language name or button
+    if not matched_explicit and raw_text:
+        # Check direct language button / option clicks
+        matched_from_text = language_loader.match_language(raw_text)
+        if matched_from_text:
+            matched_explicit = matched_from_text
+        else:
+            # Check explicit switch phrases like "talk in Hindi", "English please"
+            import re
+            m = re.search(r"\b(?:speak|talk|reply|switch|change|baat)\s+(?:in|to|me|mein)?\s*([a-zA-Z]+)", raw_text, re.IGNORECASE)
+            if m:
+                matched_explicit = language_loader.match_language(m.group(1))
+
+    if matched_explicit:
+        new_state["language"] = matched_explicit
+        new_state["language_selected"] = True
+    elif not new_state.get("language"):
+        # Initial fallback if language not yet selected
+        detected_lang = flags.get("detected_language") or language_loader.get_default_language()
         _NATIVE_SCRIPT_MARKERS = (
             "devanagari", "telugu", "tamil", "bengali", "gujarati",
             "malayalam", "kannada", "odia", "punjabi", "arabic",
             "urdu", "thai", "myanmar", "sinhala",
         )
-        raw_text = (flags.get("_raw_text") or "").strip()
         if raw_text and all(ord(c) < 256 for c in raw_text):
             if detected_lang and any(m in detected_lang.lower() for m in _NATIVE_SCRIPT_MARKERS):
                 detected_lang = "Hinglish (Latin script)"

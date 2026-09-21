@@ -1,0 +1,24 @@
+{
+  "default_language": "English",
+  "prompt_message": "Welcome to Sensationz! 🙏\n\nPlease select your preferred language:\nकृपया अपनी पसंदीदा भाषा चुनें:",
+  "languages": [
+    {
+      "id": "english",
+      "name": "English",
+      "button_label": "English",
+      "aliases": ["english", "eng", "en", "1"]
+    },
+    {
+      "id": "hindi",
+      "name": "Hindi",
+      "button_label": "हिन्दी (Hindi)",
+      "aliases": ["hindi", "हिन्दी", "हिंदी", "hi", "2"]
+    },
+    {
+      "id": "hinglish",
+      "name": "Hinglish",
+      "button_label": "Hinglish",
+      "aliases": ["hinglish", "roman hindi", "3"]
+    }
+  ]
+}

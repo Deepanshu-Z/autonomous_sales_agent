@@ -695,15 +695,15 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
 
     state = await get_user_state_async(phone)
 
-    # First-message welcome sequence check:
-    # Triggers ONLY on the customer's 1st turn (welcome not yet sent & no prior assistant messages)
+    # Dynamic Language Selection & Welcome Flow (Zero Hardcoding)
+    from src.core import campaign_loader, language_loader
+    from src.services.quick_reply_service import send_followup_with_buttons_async
+
     has_prior_ai_reply = any(t.get("role") in ("assistant", "ai") for t in (history or []))
-    is_first_turn = not state.get("welcome_sent") and not has_prior_ai_reply
 
-    if is_first_turn:
-        from src.core import campaign_loader
-        from src.services.quick_reply_service import send_followup_with_buttons_async
-
+    # Stage 1: First-contact language selection prompt
+    # Triggers on turn 1 when no language has been prompted or selected yet
+    if not state.get("language_prompt_sent") and not state.get("language_selected") and not has_prior_ai_reply:
         campaign = campaign_loader.match_campaign(referral=referral, text=text)
         if not campaign:
             print(f"[tasks] {phone}: No registered campaign matches referral ad_id — ignoring 1st message.")
@@ -712,29 +712,70 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         matched_course = campaign.get("course")
         if matched_course:
             state["course"] = matched_course
-        state["welcome_sent"] = True
         state["is_target_ad"] = True
+        state["language_prompt_sent"] = True
+        state["awaiting_language"] = True
 
-        welcome_msgs = campaign.get("welcome_messages", {})
-        msg1 = welcome_msgs.get("message_1")
-        msg2 = welcome_msgs.get("message_2")
-        buttons = campaign.get("buttons") or ["Timing", "Fees", "Other questions"]
+        lang_prompt = language_loader.get_language_prompt()
+        prompt_text = lang_prompt["message"]
+        prompt_buttons = lang_prompt["buttons"]
 
-        if msg1:
-            await send_text_message_async(phone, msg1)
-            latency_sec = round(time.time() - start_time, 2) if start_time else None
-            asyncio.create_task(save_message_async(phone, "assistant", msg1, response_time_sec=latency_sec))
-            asyncio.create_task(log_message_async(phone, "ai", msg1))
-            await asyncio.sleep(1.5)
+        await send_followup_with_buttons_async(phone, prompt_text, buttons=prompt_buttons)
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", prompt_text, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "ai", prompt_text))
 
-        if msg2:
-            await send_followup_with_buttons_async(phone, msg2, buttons=buttons)
-            asyncio.create_task(save_message_async(phone, "assistant", msg2))
-            asyncio.create_task(log_message_async(phone, "ai", msg2))
-
-        arm_followup_timer(state, topic="welcome message")
         await save_user_state_async(phone, state)
         return
+
+    # Stage 2: Language selected -> send course welcome messages & buttons in that language
+    if state.get("awaiting_language") and not state.get("welcome_sent"):
+        matched_lang = language_loader.match_language(text)
+        if matched_lang:
+            state["language"] = matched_lang
+            state["language_selected"] = True
+            state["awaiting_language"] = False
+            state["welcome_sent"] = True
+
+            campaign = campaign_loader.match_campaign(referral=referral, text=text)
+            if not campaign and state.get("course"):
+                for c in campaign_loader.get_all_campaigns():
+                    if c.get("course") == state.get("course"):
+                        campaign = c
+                        break
+            if not campaign:
+                campaign = campaign_loader.get_all_campaigns()[0]
+
+            welcome_msgs = campaign_loader.get_welcome_messages(campaign, language=matched_lang)
+            msg1 = welcome_msgs.get("message_1")
+            msg2 = welcome_msgs.get("message_2")
+            buttons = campaign_loader.get_campaign_buttons(campaign, language=matched_lang)
+
+            if msg1:
+                await send_text_message_async(phone, msg1)
+                latency_sec = round(time.time() - start_time, 2) if start_time else None
+                asyncio.create_task(save_message_async(phone, "assistant", msg1, response_time_sec=latency_sec))
+                asyncio.create_task(log_message_async(phone, "ai", msg1))
+                await asyncio.sleep(1.5)
+
+            if msg2:
+                await send_followup_with_buttons_async(phone, msg2, buttons=buttons)
+                asyncio.create_task(save_message_async(phone, "assistant", msg2))
+                asyncio.create_task(log_message_async(phone, "ai", msg2))
+
+            arm_followup_timer(state, topic="welcome message")
+            await save_user_state_async(phone, state)
+            return
+        else:
+            # User bypassed language selection and asked a question directly
+            # Fallback to default configured language (English)
+            default_lang = language_loader.get_default_language()
+            state["language"] = default_lang
+            state["language_selected"] = True
+            state["awaiting_language"] = False
+            state["welcome_sent"] = True
+            await save_user_state_async(phone, state)
+            # Continues down to handle_conversation_turn_async so their question is answered immediately
 
     # Steps 3–7: All subsequent turns handled dynamically by Two-Step Semantic Architecture (zero hardcoded values)
     await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)

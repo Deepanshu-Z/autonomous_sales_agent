@@ -321,51 +321,112 @@ OFFICIAL_PLATFORM_LINKS_BLOCK = (
 
 
 def _ensure_app_website_links(text: str, user_asked_for_links: bool = False) -> str:
-    """Appends official links ONLY when the message is actively directing the user to the platform.
-    Does NOT fire on incidental mentions of 'app'/'website' in general answers (fees, teachers, etc.),
-    nor during intermediate timing/package selection turns.
+    """
+    Strict Zero-Links Policy Shield:
+    - If user_asked_for_links is False: Strips all platform, website, youtube, and generic links.
+    - If user_asked_for_links is True: Ensures official platform links are appended.
     """
     if not text:
         return text
+
+    if not user_asked_for_links:
+        link_domains = (
+            "play.google.com",
+            "apps.apple.com",
+            "shop.sensationzperformingarts.com",
+            "sensationzperformingarts.com",
+            "youtube.com",
+            "youtu.be",
+            "http://",
+            "https://",
+        )
+        lines = []
+        for line in text.splitlines():
+            line_lower = line.lower()
+            if any(d in line_lower for d in link_domains):
+                continue
+            lines.append(line)
+        cleaned = "\n".join(lines).strip()
+        return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    # Customer explicitly asked for links: provide official platform links
     t_lower = text.lower()
-    has_links = (
-        "play.google.com" in t_lower
-        or "shop.sensationzperformingarts.com" in t_lower
-        or "apps.apple.com" in t_lower
-    )
-
-    # Guard: Never keep or append links if the turn is asking the customer to choose
-    # a batch timing or package duration (unless user explicitly asked for links)
-    INTERMEDIATE_SELECTION_PATTERNS = (
-        r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(batch|timing|slot|samay)\b",
-        r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(package|duration|mahine|pack)\b",
-        r"\b(select|choose|chuniye|bataiye)\b.{0,30}\b(package duration|package|batch timing|timing)\b",
-        r"\b(timing|time slot|batch).{0,25}\b(works best|suits you|prefer)\b",
-    )
-    is_intermediate = any(re.search(p, t_lower) for p in INTERMEDIATE_SELECTION_PATTERNS)
-    if is_intermediate and not user_asked_for_links:
-        if has_links:
-            lines = [
-                line for line in text.splitlines()
-                if not any(d in line for d in ["play.google.com", "apps.apple.com", "shop.sensationzperformingarts.com"])
-            ]
-            return "\n".join(lines).strip()
-        return text
-
-    if has_links:
-        return text
-
-    # Only inject when the message explicitly directs the user to act on the platform.
-    ACTION_PATTERNS = (
-        r"\b(download|install|daalo|download kar|install kar)\b",
-        r"\b(register|sign.?up|create.{0,10}profile|profile bana|profile create)\b",
-        r"\b(check.{0,20}(schedule|timing|fees).{0,20}(app|website|platform))\b",
-        r"\b(visit.{0,10}(our|the).{0,10}(app|website|platform)|open.{0,10}(app|website))\b",
-        r"\b(trial.{0,20}(app|download|profile|steps))\b",
-    )
-    if any(re.search(p, t_lower) for p in ACTION_PATTERNS):
-        return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
+    has_links = "play.google.com" in t_lower or "shop.sensationzperformingarts.com" in t_lower
+    if not has_links:
+        from src.core import kb_loader
+        official_links = kb_loader.format_app_links_display()
+        return f"{text.rstrip()}\n\n{official_links}"
     return text
+
+    # [PREVIOUS LOGIC - AUTO LINK INJECTION (COMMENTED OUT)]:
+    # INTERMEDIATE_SELECTION_PATTERNS = (
+    #     r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(batch|timing|slot|samay)\b",
+    #     r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(package|duration|mahine|pack)\b",
+    #     r"\b(select|choose|chuniye|bataiye)\b.{0,30}\b(package duration|package|batch timing|timing)\b",
+    #     r"\b(timing|time slot|batch).{0,25}\b(works best|suits you|prefer)\b",
+    # )
+    # is_intermediate = any(re.search(p, t_lower) for p in INTERMEDIATE_SELECTION_PATTERNS)
+    # if is_intermediate and not user_asked_for_links:
+    #     if has_links:
+    #         lines = [
+    #             line for line in text.splitlines()
+    #             if not any(d in line for d in ["play.google.com", "apps.apple.com", "shop.sensationzperformingarts.com"])
+    #         ]
+    #         return "\n".join(lines).strip()
+    #     return text
+    # if has_links:
+    #     return text
+    # ACTION_PATTERNS = (
+    #     r"\b(download|install|daalo|download kar|install kar)\b",
+    #     r"\b(register|sign.?up|create.{0,10}profile|profile bana|profile create)\b",
+    #     r"\b(check.{0,20}(schedule|timing|fees).{0,20}(app|website|platform))\b",
+    #     r"\b(visit.{0,10}(our|the).{0,10}(app|website|platform)|open.{0,10}(app|website))\b",
+    #     r"\b(trial.{0,20}(app|download|profile|steps))\b",
+    # )
+    # if any(re.search(p, t_lower) for p in ACTION_PATTERNS):
+    #     return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
+    # return text
+
+
+async def dispatch_media_guide_async(
+    phone: str,
+    state: dict,
+    media_config: dict,
+    state_key: str,
+    force_resend: bool = False,
+) -> bool:
+    """
+    100% Dynamic & Resilient Media Delivery:
+    - Reads video URLs and captions directly from config (0 hardcoded values).
+    - Checks persistent state flag (0 spam: sends at most once unless force_resend is True).
+    - Tries native raw MP4 first via Interakt video API.
+    - If MP4 fails or is not configured, automatically falls back to YouTube URL.
+    """
+    if not force_resend and state.get(state_key):
+        return False
+
+    raw_mp4 = media_config.get("raw_video_url")
+    youtube_url = (
+        media_config.get("how_to_book_video_url")
+        or media_config.get("how_to_create_profile_video_url")
+    )
+    caption = media_config.get("video_caption", "")
+
+    delivered = False
+    if raw_mp4:
+        from src.services.interakt import send_video_message_async
+        delivered = await send_video_message_async(phone, raw_mp4, caption=caption)
+
+    # Fallback: Deliver YouTube URL if raw video failed or is not yet configured
+    if not delivered and youtube_url:
+        fallback_msg = f"{caption}\n{youtube_url}" if caption else f"🎬 *Video Guide:* {youtube_url}"
+        await send_text_message_async(phone, fallback_msg)
+        delivered = True
+
+    if delivered:
+        state[state_key] = True
+        return True
+    return False
 
 
 
@@ -555,48 +616,31 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
-    user_asked_links = bool(re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE))
+    user_asked_links = bool(
+        last_turn.get("intent") == "APP_LINK_REQUEST"
+        or re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE)
+    )
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links)
 
-    # Dynamic guarantee: Ensure trial tutorial video from active course KB is present whenever trial booking steps are shared
+    # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
     course_data_active = kb_loader.get_course_data(active_cid)
-    trial_video_url = course_data_active.get("trial_class", {}).get("how_to_book_video_url")
-    if trial_video_url and trial_video_url not in clean_reply:
-        if re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE):
-            if re.search(r"\b(step|download the sensationz app|profile then tap|trial links)\b", clean_reply, re.IGNORECASE):
-                video_line = f"🎬 Watch How to Book Trial Video: {trial_video_url}"
-                if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
-                    clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
-                elif "play.google.com" in clean_reply:
-                    parts = re.split(r"(?=📱\s*Android:)", clean_reply)
-                    if len(parts) == 2:
-                        clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
-                    else:
-                        clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
-                else:
-                    clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+    wants_resend = bool(last_turn.get("wants_resend_video", False))
 
-    # Dynamic guarantee: Ensure profile creation tutorial video from active course KB is present whenever directing to create profile
-    create_profile_video_url = course_data_active.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
-    if create_profile_video_url and create_profile_video_url not in clean_reply:
-        if re.search(r"\b(create.{0,15}profile|profile bana|complete.{0,15}profile|profile create)\b", clean_reply, re.IGNORECASE):
-            if "how to book trial" not in clean_reply.lower() and "watch how to book trial" not in clean_reply.lower():
-                video_line = f"🎬 Watch How to Create Profile Video: {create_profile_video_url}"
-                if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
-                    clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
-                elif "play.google.com" in clean_reply:
-                    parts = re.split(r"(?=📱\s*Android:)", clean_reply)
-                    if len(parts) == 2:
-                        clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
-                    else:
-                        clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
-                else:
-                    clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+    is_trial_turn = bool(
+        last_turn.get("wants_trial")
+        or new_state.get("wants_trial")
+        or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
+        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE)
+    )
+    is_install_turn = bool(
+        new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
+        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", clean_reply, re.IGNORECASE)
+    )
 
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
-    if clean_followup and "play.google.com" not in clean_reply:
+    if clean_followup:
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
@@ -619,6 +663,53 @@ async def handle_conversation_turn_async(
         latency_sec = round(time.time() - start_time, 2)
         await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
         asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+
+    # Dispatch media guide alongside Message 1 if applicable
+    if is_trial_turn and (re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", clean_reply, re.IGNORECASE) or wants_resend):
+        trial_cfg = (
+            course_data_active.get("trial_classes")
+            or course_data_active.get("trial_class")
+            or kb_loader.get_global_rules().get("universal_course_policies", {}).get("trial_classes", {})
+        )
+        await dispatch_media_guide_async(phone, new_state, trial_cfg, "trial_video_sent", force_resend=wants_resend)
+    elif is_install_turn and not is_trial_turn:
+        enroll_cfg = (
+            course_data_active.get("universal_enrollment_flow")
+            or kb_loader.get_global_rules().get("universal_enrollment_flow", {})
+        )
+        await dispatch_media_guide_async(phone, new_state, enroll_cfg, "app_download_video_sent", force_resend=wants_resend)
+
+    # [PREVIOUS LOGIC - INLINE TEXT VIDEO INJECTION (COMMENTED OUT)]:
+    # trial_video_url = course_data_active.get("trial_class", {}).get("how_to_book_video_url")
+    # if trial_video_url and trial_video_url not in clean_reply:
+    #     if re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE):
+    #         if re.search(r"\b(step|download the sensationz app|profile then tap|trial links)\b", clean_reply, re.IGNORECASE):
+    #             video_line = f"🎬 Watch How to Book Trial Video: {trial_video_url}"
+    #             if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
+    #                 clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
+    #             elif "play.google.com" in clean_reply:
+    #                 parts = re.split(r"(?=📱\s*Android:)", clean_reply)
+    #                 if len(parts) == 2:
+    #                     clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
+    #                 else:
+    #                     clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+    #             else:
+    #                 clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+    # create_profile_video_url = course_data_active.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
+    # if create_profile_video_url and create_profile_video_url not in clean_reply:
+    #     if re.search(r"\b(create.{0,15}profile|profile bana|complete.{0,15}profile|profile create)\b", clean_reply, re.IGNORECASE):
+    #         if "how to book trial" not in clean_reply.lower() and "watch how to book trial" not in clean_reply.lower():
+    #             video_line = f"🎬 Watch How to Create Profile Video: {create_profile_video_url}"
+    #             if OFFICIAL_PLATFORM_LINKS_BLOCK in clean_reply:
+    #                 clean_reply = clean_reply.replace(OFFICIAL_PLATFORM_LINKS_BLOCK, f"{video_line}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}")
+    #             elif "play.google.com" in clean_reply:
+    #                 parts = re.split(r"(?=📱\s*Android:)", clean_reply)
+    #                 if len(parts) == 2:
+    #                     clean_reply = f"{parts[0].rstrip()}\n\n{video_line}\n\n{parts[1].lstrip()}"
+    #                 else:
+    #                     clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
+    #             else:
+    #                 clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
     if clean_followup and clean_followup.strip():

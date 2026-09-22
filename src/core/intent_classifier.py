@@ -67,6 +67,7 @@ def _empty_flags() -> Dict[str, Any]:
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
+        "wants_resend_video": False,
     }
 
 
@@ -157,6 +158,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 14. "explicit_language_request":
     - string or null: If customer explicitly asks to change language or talk in a specific language (e.g. "talk in Hindi", "speak in English", "Hindi please", "English me bolo", "switch language to Hindi"), specify the target language name (e.g. "Hindi", "English", "Hinglish"). Otherwise null.
 
+15. "wants_resend_video":
+    - boolean: true if customer explicitly asks to send or resend a video tutorial or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video"). Otherwise false.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -172,7 +176,8 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "customer_intent": string,
   "question_summary": string | null,
   "detected_language": string,
-  "explicit_language_request": string | null
+  "explicit_language_request": string | null,
+  "wants_resend_video": boolean
 }"""
 
 

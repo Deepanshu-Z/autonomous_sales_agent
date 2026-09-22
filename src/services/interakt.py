@@ -176,3 +176,45 @@ def send_text_message(phone: str, message: str):
         elapsed = time.perf_counter() - t0
         print(f"[interakt] send_text_message error ({elapsed:.2f}s): {e}")
         return None
+
+
+async def send_video_message_async(phone: str, video_url: str, caption: str = "") -> bool:
+    """
+    Sends a native playable video file (MP4) to WhatsApp via Interakt.
+    Returns True if successfully delivered, False on timeout or failure.
+    """
+    if not video_url:
+        return False
+    country_code, number = _split_phone(phone)
+    payload = {
+        "countryCode": country_code,
+        "phoneNumber": number,
+        "type": "Video",
+        "data": {
+            "mediaUrl": video_url,
+            "caption": caption or "",
+        },
+    }
+    t0 = time.perf_counter()
+    try:
+        client = _get_async_client()
+        response = await client.post(
+            f"{BASE_URL}/message/",
+            headers=_headers(),
+            json=payload,
+        )
+        elapsed = time.perf_counter() - t0
+        if response.status_code in (200, 201):
+            print(f"[interakt] send_video_message_async SUCCESS ({elapsed:.2f}s)")
+            return True
+        else:
+            print(f"[interakt] send_video_message_async failed: {response.status_code} ({response.text})")
+            return False
+    except httpx.TimeoutException:
+        elapsed = time.perf_counter() - t0
+        print(f"[interakt] send_video_message_async TIMEOUT after {elapsed:.2f}s")
+        return False
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        print(f"[interakt] send_video_message_async error ({elapsed:.2f}s): {e}")
+        return False

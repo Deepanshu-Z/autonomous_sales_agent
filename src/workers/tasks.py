@@ -545,13 +545,19 @@ def get_flow_followup(state: dict) -> str:
             "*Note:* Offer price will be only applicable through app and Ganesh Chaturthi Offer coupon. Once the app is downloaded and the profile is created, the Ganesh Chaturthi Offer coupon will be sent here."
         )
 
-    # 3. If ready for app link (first time only)
+    # 3. If ready for app download & profile setup (first time only)
     if state.get("stage") == "READY_FOR_APP_LINK":
-        app_links = kb_loader.format_app_links_display()
+        # [PREVIOUS LOGIC - COMMENTED OUT]:
+        # app_links = kb_loader.format_app_links_display()
+        # return (
+        #     "Aapke liye ek special welcome discount code hai 🎁\n\n"
+        #     "Sirf Sensationz App download karein ya website par jayein aur apna profile banayein — "
+        #     f"uske baad *Done* ya *Yes* reply karein, aur main turant aapka coupon code bhej dunga!\n\n{app_links}"
+        # )
         return (
             "Aapke liye ek special welcome discount code hai 🎁\n\n"
-            "Sirf Sensationz App download karein ya website par jayein aur apna profile banayein — "
-            f"uske baad *Done* ya *Yes* reply karein, aur main turant aapka coupon code bhej dunga!\n\n{app_links}"
+            "Play Store ya App Store par \"Sensationz\" search karke app download karein aur Google se login karke apna profile banayein — "
+            "uske baad *Done* ya *Yes* reply karein, aur main turant aapka coupon code bhej dunga! 😊"
         )
 
     # 4. If enrollment completed, coupon sent, or app links already delivered

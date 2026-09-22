@@ -90,7 +90,9 @@
         "trial_classes": {
             "free_trials_available": true,
             "max_trials": 3,
+            "raw_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1790055283/WhatsApp_Video_2026-09-17_at_2.54.55_PM_r98gwo.mp4",
             "how_to_book_video_url": "https://youtube.com/shorts/wyJBvEqIsvU?feature=share",
+            "video_caption": "🎬 How to Book Your Free Trial Class",
             "booking_steps": [
                 "Download the Sensationz App",
                 "Login using Continue with Google",
@@ -104,7 +106,9 @@
         }
     },
     "universal_enrollment_flow": {
+        "raw_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1790055295/WhatsApp_Video_2026-09-17_at_2.54.55_PM_1_nhilvg.mp4",
         "how_to_create_profile_video_url": "https://youtube.com/shorts/EekAQFAM_HQ?feature=share",
+        "video_caption": "🎬 How to Download Sensationz App & Create Profile",
         "steps": [
             "Select preferred batch timing",
             "Select package duration (1M / 3M / 6M / 1Y)",

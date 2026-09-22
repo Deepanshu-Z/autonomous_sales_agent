@@ -68,7 +68,11 @@ def get_language_prompt() -> Dict[str, Any]:
     """Returns the initial language selection prompt message and quick-reply buttons."""
     cfg = get_language_config()
     prompt = cfg.get("prompt_message", "Welcome to Sensationz! 🙏\nPlease select your preferred language:")
-    buttons = [lang.get("button_label", lang.get("name")) for lang in cfg.get("languages", [])]
+    configured_buttons = cfg.get("prompt_buttons")
+    if configured_buttons:
+        buttons = configured_buttons
+    else:
+        buttons = [lang.get("button_label", lang.get("name")) for lang in cfg.get("languages", [])][:3]
     return {
         "message": prompt,
         "buttons": buttons

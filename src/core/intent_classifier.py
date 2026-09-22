@@ -345,6 +345,8 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     raw_text = (flags.get("_raw_text") or "").strip()
     explicit_req = flags.get("explicit_language_request")
     matched_explicit = language_loader.match_language(explicit_req) if explicit_req else None
+    if not matched_explicit and explicit_req:
+        matched_explicit = explicit_req.strip().title()
 
     # Check if raw text directly matches a language name or button
     if not matched_explicit and raw_text:
@@ -359,20 +361,59 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
             if m:
                 matched_explicit = language_loader.match_language(m.group(1))
 
+    # [PREVIOUS BEHAVIOR - COMMENTED OUT]:
+    # if matched_explicit:
+    #     new_state["language"] = matched_explicit
+    #     new_state["language_selected"] = True
+    # elif not new_state.get("language"):
+    #     # Initial fallback if language not yet selected
+    #     detected_lang = flags.get("detected_language") or language_loader.get_default_language()
+    #     _NATIVE_SCRIPT_MARKERS = (
+    #         "devanagari", "telugu", "tamil", "bengali", "gujarati",
+    #         "malayalam", "kannada", "odia", "punjabi", "arabic",
+    #         "urdu", "thai", "myanmar", "sinhala",
+    #     )
+    #     if raw_text and all(ord(c) < 256 for c in raw_text):
+    #         if detected_lang and any(m in detected_lang.lower() for m in _NATIVE_SCRIPT_MARKERS):
+    #             detected_lang = "Hinglish (Latin script)"
+    #     new_state["language"] = detected_lang
+
+    _NATIVE_SCRIPT_MARKERS = (
+        "devanagari", "telugu", "tamil", "bengali", "gujarati",
+        "malayalam", "kannada", "odia", "punjabi", "arabic",
+        "urdu", "thai", "myanmar", "sinhala",
+    )
+
+    detected_lang = flags.get("detected_language")
+    has_native_script = bool(raw_text and any(ord(c) >= 256 for c in raw_text))
+
     if matched_explicit:
         new_state["language"] = matched_explicit
         new_state["language_selected"] = True
-    elif not new_state.get("language"):
-        # Initial fallback if language not yet selected
-        detected_lang = flags.get("detected_language") or language_loader.get_default_language()
-        _NATIVE_SCRIPT_MARKERS = (
-            "devanagari", "telugu", "tamil", "bengali", "gujarati",
-            "malayalam", "kannada", "odia", "punjabi", "arabic",
-            "urdu", "thai", "myanmar", "sinhala",
-        )
-        if raw_text and all(ord(c) < 256 for c in raw_text):
-            if detected_lang and any(m in detected_lang.lower() for m in _NATIVE_SCRIPT_MARKERS):
+    elif has_native_script and detected_lang:
+        # User typed in a native script (e.g. Malayalam, Tamil, Devanagari, Telugu, etc.)
+        new_state["language"] = detected_lang
+        new_state["language_selected"] = True
+    elif not new_state.get("language_selected"):
+        # Language was not explicitly locked; dynamically adapt to detected language
+        detected_lang = detected_lang or new_state.get("language") or language_loader.get_default_language()
+        if raw_text and all(ord(c) < 256 for c in raw_text) and detected_lang:
+            d_lower = detected_lang.lower()
+            if "devanagari" in d_lower:
                 detected_lang = "Hinglish (Latin script)"
+            elif any(m in d_lower for m in _NATIVE_SCRIPT_MARKERS) and "latin" not in d_lower:
+                base_lang = detected_lang.split()[0].title()
+                detected_lang = f"{base_lang} (Latin script)"
+        new_state["language"] = detected_lang
+    elif detected_lang and "english" not in detected_lang.lower() and new_state.get("language") == "English":
+        # Dynamic switch: User had default English, but started speaking a regional language
+        if raw_text and all(ord(c) < 256 for c in raw_text):
+            d_lower = detected_lang.lower()
+            if "devanagari" in d_lower:
+                detected_lang = "Hinglish (Latin script)"
+            elif any(m in d_lower for m in _NATIVE_SCRIPT_MARKERS) and "latin" not in d_lower:
+                base_lang = detected_lang.split()[0].title()
+                detected_lang = f"{base_lang} (Latin script)"
         new_state["language"] = detected_lang
 
     new_state["_last_turn"] = {

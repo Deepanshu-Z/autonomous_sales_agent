@@ -151,12 +151,20 @@ async def handle_incoming_message(
     # The bot strictly uses the customer's selected language unless explicitly switched.
     from src.core import language_loader
 
-    locked_lang = new_state.get("language") or session_state.get("language")
-    if locked_lang:
-        detected_lang = locked_lang
+    # [PREVIOUS BEHAVIOR - COMMENTED OUT]:
+    # locked_lang = new_state.get("language") or session_state.get("language")
+    # if locked_lang:
+    #     detected_lang = locked_lang
+    # else:
+    #     _classifier_lang = flags.get("detected_language") or ""
+    #     detected_lang = _classifier_lang or language_loader.get_default_language()
+    # new_state["language"] = detected_lang
+
+    _has_native_script = any(ord(c) >= 256 for c in user_message)
+    if _has_native_script and flags.get("detected_language"):
+        detected_lang = flags.get("detected_language")
     else:
-        _classifier_lang = flags.get("detected_language") or ""
-        detected_lang = _classifier_lang or language_loader.get_default_language()
+        detected_lang = new_state.get("language") or session_state.get("language") or flags.get("detected_language") or language_loader.get_default_language()
 
     new_state["language"] = detected_lang
 

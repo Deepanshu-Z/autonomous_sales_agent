@@ -1,6 +1,11 @@
 {
   "default_language": "English",
   "prompt_message": "Welcome to Sensationz! 🙏\n\nPlease select your preferred language:\nकृपया अपनी पसंदीदा भाषा चुनें:",
+  "prompt_buttons": [
+    "English",
+    "हिन्दी (Hindi)",
+    "Hinglish"
+  ],
   "languages": [
     {
       "id": "english",
@@ -22,6 +27,62 @@
       "button_label": "Hinglish",
       "aliases": ["hinglish", "roman hindi", "3"],
       "agent_button": "Agent se baat"
+    },
+    {
+      "id": "malayalam",
+      "name": "Malayalam",
+      "button_label": "മലയാളം (Malayalam)",
+      "aliases": ["malayalam", "മലയാളം", "ml", "mal", "manglish"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "tamil",
+      "name": "Tamil",
+      "button_label": "தமிழ் (Tamil)",
+      "aliases": ["tamil", "தமிழ்", "ta", "tanglish"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "telugu",
+      "name": "Telugu",
+      "button_label": "తెలుగు (Telugu)",
+      "aliases": ["telugu", "తెలుగు", "te"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "kannada",
+      "name": "Kannada",
+      "button_label": "ಕನ್ನಡ (Kannada)",
+      "aliases": ["kannada", "ಕನ್ನಡ", "kn"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "bengali",
+      "name": "Bengali",
+      "button_label": "বাংলা (Bengali)",
+      "aliases": ["bengali", "বাংলা", "bn", "bangla"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "marathi",
+      "name": "Marathi",
+      "button_label": "मराठी (Marathi)",
+      "aliases": ["marathi", "मराठी", "mr"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "gujarati",
+      "name": "Gujarati",
+      "button_label": "ગુજરાતી (Gujarati)",
+      "aliases": ["gujarati", "ગુજરાતી", "gu"],
+      "agent_button": "Talk to Agent"
+    },
+    {
+      "id": "punjabi",
+      "name": "Punjabi",
+      "button_label": "ਪੰਜਾਬੀ (Punjabi)",
+      "aliases": ["punjabi", "ਪੰਜਾਬੀ", "pa"],
+      "agent_button": "Talk to Agent"
     }
   ]
 }

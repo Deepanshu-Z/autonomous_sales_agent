@@ -65,3 +65,6 @@ If the requested approach is insecure, unreliable, unnecessarily expensive, or t
 
 ## CORE RULE
 **Don't guess. Don't hardcode. Don't over-engineer. Verify, simplify, and build for production.**
+
+
+IF U READ AND SAVED THE RULES IN YOUR MEMORY: TYPE: RULES_SCANNED (BEFORE ANSWERING EVERY QUESTION)

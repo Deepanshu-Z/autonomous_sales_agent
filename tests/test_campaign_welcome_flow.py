@@ -77,50 +77,30 @@ async def test_first_message_welcome_and_second_message_funnel():
         # --- Turn 1: Customer arrives via ad ---
         await handle_ai_reply_async(test_phone, "Hi, I am interested in classes", [], referral=referral)
 
-        # Verify Stage 1 Language prompt sent with language buttons
-        assert len(sent_buttons) == 1
-        assert "English" in sent_buttons[0]["buttons"]
-        assert "हिन्दी (Hindi)" in sent_buttons[0]["buttons"]
-
-        # Verify state populated
-        state = await get_user_state_async(test_phone)
-        assert state.get("language_prompt_sent") is True
-        assert state.get("awaiting_language") is True
-        assert state.get("course") == "yoga"
-
-        # --- Turn 2: Customer selects English ---
-        sent_messages.clear()
-        sent_buttons.clear()
-        history = [
-            {"role": "user", "content": "Hi, I am interested in classes"},
-            {"role": "assistant", "content": "Please select your preferred language"}
-        ]
-        await handle_ai_reply_async(test_phone, "English", history, referral=referral)
-
-        # Verify Welcome message 1 sent as text
+        # Verify Welcome message 1 sent as text in both English and Hindi
         assert len(sent_messages) == 1
         assert "Welcome to Sensationz" in sent_messages[0]["text"]
-        assert "Yoga classes" in sent_messages[0]["text"]
+        assert "योग क्लासेस" in sent_messages[0]["text"] or "Sensationz में आपका स्वागत है" in sent_messages[0]["text"]
 
-        # Verify Welcome message 2 sent with 3 interactive course buttons
+        # Verify Welcome message 2 sent with interactive course buttons
         assert len(sent_buttons) == 1
-        assert "get started today" in sent_buttons[0]["text"]
+        assert "How can I help" in sent_buttons[0]["text"]
+        assert "मदद" in sent_buttons[0]["text"]
         assert sent_buttons[0]["buttons"] == ["Timing", "Fees", "Free Trial"]
 
         # Verify state populated
         state = await get_user_state_async(test_phone)
         assert state.get("welcome_sent") is True
-        assert state.get("language") == "English"
-        assert state.get("language_selected") is True
+        assert state.get("course") == "yoga"
 
-        # --- Turn 3: Customer clicks button "Fees" ---
+        # --- Turn 2: Customer clicks button "Fees" ---
         sent_messages.clear()
         sent_buttons.clear()
 
-        history.extend([
-            {"role": "user", "content": "English"},
+        history = [
+            {"role": "user", "content": "Hi, I am interested in classes"},
             {"role": "assistant", "content": sent_messages[0]["text"] if sent_messages else "welcome"}
-        ])
+        ]
         await handle_ai_reply_async(test_phone, "Fees", history, referral=referral)
 
         # Welcome flow should NOT trigger again!

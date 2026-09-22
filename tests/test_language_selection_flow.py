@@ -34,31 +34,23 @@ async def test_language_loader():
 
 
 async def test_campaign_loader_localization():
-    """Verify campaign_loader delivers localized welcome messages and buttons."""
+    """Verify campaign_loader delivers bilingual welcome messages and buttons."""
     camps = campaign_loader.get_all_campaigns()
     camp_yoga = camps[0]
 
-    # English
-    en_msgs = campaign_loader.get_welcome_messages(camp_yoga, language="English")
-    en_btns = campaign_loader.get_campaign_buttons(camp_yoga, language="English")
-    assert "Join our live Yoga classes" in en_msgs["message_1"]
-    assert en_btns == ["Timing", "Fees", "Free Trial"]
-
-    # Hindi
-    hi_msgs = campaign_loader.get_welcome_messages(camp_yoga, language="Hindi")
-    hi_btns = campaign_loader.get_campaign_buttons(camp_yoga, language="Hindi")
-    assert "प्रमाणित प्रशिक्षकों" in hi_msgs["message_1"]
-    assert "समय (Timing)" in hi_btns[0]
-    assert "फीस (Fees)" in hi_btns[1]
+    # Bilingual messages contain both English and Hindi
+    msgs = campaign_loader.get_welcome_messages(camp_yoga)
+    btns = campaign_loader.get_campaign_buttons(camp_yoga)
+    assert "Join our live Yoga classes" in msgs["message_1"]
+    assert "प्रमाणित प्रशिक्षकों" in msgs["message_1"]
+    assert btns == ["Timing", "Fees", "Free Trial"]
 
 
-async def test_two_stage_welcome_flow():
+async def test_direct_bilingual_welcome_flow():
     """
-    Simulate full multi-turn user journey:
-    Turn 1: User sends message -> Gets language prompt with buttons
-    Turn 2: User selects Hindi -> Gets Hindi course welcome and Hindi buttons
-    Turn 3: User clicks timing/fees -> Gets reply locked in Hindi
-    Turn 4: User explicitly requests English -> Switches to English
+    Simulate user journey:
+    Turn 1: User sends message from ad -> Gets bilingual course welcome and buttons directly
+    Turn 2: User replies -> Handled by conversation turn handler
     """
     test_phone = "919876543299"
     await reset_user_state_async(test_phone)
@@ -85,48 +77,27 @@ async def test_two_stage_welcome_flow():
 
         await handle_ai_reply_async(test_phone, "Hi, I am interested in yoga", [], referral=referral)
 
-        # Stage 1: User receives language prompt with language buttons
-        assert len(sent_buttons) == 1
-        assert "select your preferred language" in sent_buttons[0]["text"].lower() or "भाषा चुनें" in sent_buttons[0]["text"]
-        assert "English" in sent_buttons[0]["buttons"]
-        assert "हिन्दी (Hindi)" in sent_buttons[0]["buttons"]
-
-        state = await get_user_state_async(test_phone)
-        assert state.get("language_prompt_sent") is True
-        assert state.get("awaiting_language") is True
-
-        # --- Turn 2: User taps 'हिन्दी (Hindi)' button ---
-        sent_messages.clear()
-        sent_buttons.clear()
-
-        history = [
-            {"role": "user", "content": "Hi, I am interested in yoga"},
-            {"role": "assistant", "content": "Language prompt"}
-        ]
-        await handle_ai_reply_async(test_phone, "हिन्दी (Hindi)", history, referral=referral)
-
-        # Stage 2: Course welcome messages sent in Hindi
+        # Turn 1: User receives bilingual welcome text and buttons directly
         assert len(sent_messages) == 1
-        assert "प्रमाणित प्रशिक्षकों" in sent_messages[0]["text"]
+        assert "Welcome to Sensationz" in sent_messages[0]["text"]
+        assert "योग क्लासेस" in sent_messages[0]["text"] or "Sensationz में आपका स्वागत है" in sent_messages[0]["text"]
 
         assert len(sent_buttons) == 1
-        assert "समय (Timing)" in sent_buttons[0]["buttons"][0]
+        assert "How can I help" in sent_buttons[0]["text"]
+        assert "मदद" in sent_buttons[0]["text"]
+        assert sent_buttons[0]["buttons"] == ["Timing", "Fees", "Free Trial"]
 
-        # Verify state: language is locked to Hindi
         state = await get_user_state_async(test_phone)
-        assert state.get("language") == "Hindi"
-        assert state.get("language_selected") is True
-        assert state.get("awaiting_language") is False
         assert state.get("welcome_sent") is True
+        assert state.get("course") == "yoga"
 
     # Cleanup
     await reset_user_state_async(test_phone)
 
 
-async def test_fallback_to_default_english_if_query_sent():
+async def test_second_turn_direct_query_processing():
     """
-    If user ignores language prompt on Turn 2 and asks a question directly,
-    bot sets language to default (English) and processes the question.
+    On Turn 2, user asks a question directly, and bot processes the question via conversation handler.
     """
     test_phone = "919876543288"
     await reset_user_state_async(test_phone)
@@ -167,19 +138,21 @@ async def test_fallback_to_default_english_if_query_sent():
         referral = {"ad_id": camps[0]["ad_ids"][0]}
         await handle_ai_reply_async(test_phone, "Hi", [], referral=referral)
 
-        # Turn 2: User asks question instead of choosing language
+        state = await get_user_state_async(test_phone)
+        assert state.get("welcome_sent") is True
+
+        # Turn 2: User asks question
         sent_messages.clear()
         sent_buttons.clear()
         history = [
             {"role": "user", "content": "Hi"},
-            {"role": "assistant", "content": "Please select language"}
+            {"role": "assistant", "content": "Welcome"}
         ]
         await handle_ai_reply_async(test_phone, "What is the fee for Yoga?", history, referral=referral)
 
-        state = await get_user_state_async(test_phone)
-        assert state.get("language") == "English"
-        assert state.get("language_selected") is True
-        assert state.get("welcome_sent") is True
+        # Question handled
+        assert len(sent_messages) == 1
+        assert "₹300" in sent_messages[0]["text"]
 
     await reset_user_state_async(test_phone)
 
@@ -187,6 +160,6 @@ async def test_fallback_to_default_english_if_query_sent():
 if __name__ == "__main__":
     asyncio.run(test_language_loader())
     asyncio.run(test_campaign_loader_localization())
-    asyncio.run(test_two_stage_welcome_flow())
-    asyncio.run(test_fallback_to_default_english_if_query_sent())
+    asyncio.run(test_direct_bilingual_welcome_flow())
+    asyncio.run(test_second_turn_direct_query_processing())
     print("ALL LANGUAGE TESTS PASSED SUCCESSFULLY!")

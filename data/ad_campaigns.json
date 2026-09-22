@@ -5,105 +5,39 @@
       "120251018702180010"
     ],
     "welcome_messages": {
-      "english": {
-        "message_1": "Welcome to Sensationz! 🙏 Join our live Yoga classes, Monday to Friday, with certified instructors.",
-        "message_2": "How can I help you get started today?"
-      },
-      "hindi": {
-        "message_1": "Sensationz में आपका स्वागत है! 🙏 हमारे प्रमाणित प्रशिक्षकों के साथ सोमवार से शुक्रवार तक लाइव योग क्लासेस जॉइन करें।",
-        "message_2": "आज मैं आपकी किस प्रकार सहायता कर सकती हूँ?"
-      },
-      "hinglish": {
-        "message_1": "Welcome to Sensationz! 🙏 Hamare certified instructors ke saath Monday to Friday live Yoga classes join karein.",
-        "message_2": "Main aaj aapki kaise help kar sakti hoon?"
-      }
+      "message_1": "Welcome to Sensationz! 🙏 Join our live Yoga classes, Monday to Friday, with certified instructors. \n\n Sensationz में आपका स्वागत है! हमारे प्रमाणित प्रशिक्षकों के साथ सोमवार से शुक्रवार तक लाइव योग क्लासेस जॉइन करें।",
+      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
     },
-    "buttons": {
-      "english": [
-        "Timing",
-        "Fees",
-        "Free Trial"
-      ],
-      "hindi": [
-        "समय (Timing)",
-        "फीस (Fees)",
-        "फ्री ट्रायल (Trial)"
-      ],
-      "hinglish": [
-        "Timing",
-        "Fees",
-        "Free Trial"
-      ]
-    }
+    "buttons": [
+      "Timing",
+      "Fees",
+      "Free Trial"
+    ]
   },
   {
     "course": "kathak",
     "ad_ids": [],
     "welcome_messages": {
-      "english": {
-        "message_1": "Welcome to Sensationz! 🙏 Explore traditional Kathak Classical Dance with live interactive online classes for all skill levels.",
-        "message_2": "How can I help you get started today?"
-      },
-      "hindi": {
-        "message_1": "Sensationz में आपका स्वागत है! 🙏 सभी स्तरों के लिए लाइव इंटरएक्टिव ऑनलाइन क्लासेस के साथ पारंपरिक कथक नृत्य सीखें।",
-        "message_2": "आज मैं आपकी किस प्रकार सहायता कर सकती हूँ?"
-      },
-      "hinglish": {
-        "message_1": "Welcome to Sensationz! 🙏 Live interactive online classes ke sath traditional Kathak dance seekhein.",
-        "message_2": "Main aaj aapki kaise help kar sakti hoon?"
-      }
+      "message_1": "Welcome to Sensationz! 🙏 Explore traditional Kathak Classical Dance with live interactive online classes for all skill levels. \n\n Sensationz में आपका स्वागत है! सभी स्तरों के लिए लाइव इंटरएक्टिव ऑनलाइन क्लासेस के साथ पारंपरिक कथक नृत्य सीखें।",
+      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
     },
-    "buttons": {
-      "english": [
-        "Timing",
-        "Fees",
-        "Other questions"
-      ],
-      "hindi": [
-        "समय (Timing)",
-        "फीस (Fees)",
-        "अन्य सवाल"
-      ],
-      "hinglish": [
-        "Timing",
-        "Fees",
-        "Other questions"
-      ]
-    }
+    "buttons": [
+      "Timing",
+      "Fees",
+      "Other questions"
+    ]
   },
   {
     "course": "face_yoga",
     "ad_ids": [],
     "welcome_messages": {
-      "english": {
-        "message_1": "Welcome to Sensationz! 🙏 Discover our Online Live Interactive Face Yoga sessions for facial toning, jawline sculpting, and anti-aging wellness.",
-        "message_2": "How can I help you get started today?"
-      },
-      "hindi": {
-        "message_1": "Sensationz में आपका स्वागत है! 🙏 फेशियल टोनिंग, जॉलाइन स्कल्प्टिंग और एंटी-एजिंग वेलनेस के लिए हमारे ऑनलाइन लाइव फेस योग सत्र खोजें।",
-        "message_2": "आज मैं आपकी किस प्रकार सहायता कर सकती हूँ?"
-      },
-      "hinglish": {
-        "message_1": "Welcome to Sensationz! 🙏 Facial toning, jawline sculpting aur anti-aging wellness ke liye live Face Yoga sessions discover karein.",
-        "message_2": "Main aaj aapki kaise help kar sakti hoon?"
-      }
+      "message_1": "Welcome to Sensationz! 🙏 Discover our Online Live Interactive Face Yoga sessions for facial toning, jawline sculpting, and anti-aging wellness. \n\n Sensationz में आपका स्वागत है! फेशियल टोनिंग, जॉलाइन स्कल्प्टिंग और एंटी-एजिंग वेलनेस के लिए हमारे ऑनलाइन लाइव फेस योग सत्र खोजें।",
+      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
     },
-    "buttons": {
-      "english": [
-        "Timing",
-        "Fees",
-        "Other questions"
-      ],
-      "hindi": [
-        "समय (Timing)",
-        "फीस (Fees)",
-        "अन्य सवाल"
-      ],
-      "hinglish": [
-        "Timing",
-        "Fees",
-        "Other questions"
-      ]
-    }
+    "buttons": [
+      "Timing",
+      "Fees",
+      "Other questions"
+    ]
   }
 ]

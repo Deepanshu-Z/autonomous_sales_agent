@@ -328,30 +328,41 @@ OFFICIAL_PLATFORM_LINKS_BLOCK = (
 )
 
 
-def _ensure_app_website_links(text: str, user_asked_for_links: bool = False) -> str:
+def _ensure_app_website_links(
+    text: str,
+    user_asked_for_links: bool = False,
+    allow_demo_links: bool = False,
+) -> str:
     """
     Strict Zero-Links Policy Shield:
-    - If user_asked_for_links is False: Strips all platform, website, youtube, and generic links.
+    - If user_asked_for_links is False: Strips unrequested platform/store download links.
+    - If allow_demo_links is True: Preserves YouTube demo/sample video links requested by user.
     - If user_asked_for_links is True: Ensures official platform links are appended.
     """
     if not text:
         return text
 
     if not user_asked_for_links:
-        link_domains = (
+        platform_domains = (
             "play.google.com",
             "apps.apple.com",
             "shop.sensationzperformingarts.com",
             "sensationzperformingarts.com",
+        )
+        youtube_domains = (
             "youtube.com",
             "youtu.be",
-            "http://",
-            "https://",
         )
         lines = []
         for line in text.splitlines():
             line_lower = line.lower()
-            if any(d in line_lower for d in link_domains):
+            if any(d in line_lower for d in platform_domains):
+                continue
+            if any(d in line_lower for d in youtube_domains):
+                if allow_demo_links:
+                    lines.append(line)
+                continue
+            if ("http://" in line_lower or "https://" in line_lower) and not allow_demo_links:
                 continue
             lines.append(line)
         cleaned = "\n".join(lines).strip()
@@ -626,10 +637,17 @@ async def handle_conversation_turn_async(
 
     user_asked_links = bool(
         last_turn.get("intent") == "APP_LINK_REQUEST"
-        or re.search(r"\b(link|links|download link|app link|website link|site link)\b", text_clean, re.IGNORECASE)
+        or re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link)\b", text_clean, re.IGNORECASE)
+        or (re.search(r"\b(link|links)\b", text_clean, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", text_clean, re.IGNORECASE))
+    )
+    user_asked_demo = bool(
+        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", text_clean, re.IGNORECASE)
+        or "demo" in (last_turn.get("question_summary") or "").lower()
+        or last_turn.get("wants_resend_video")
+        or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
     )
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
-    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
 
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
@@ -649,7 +667,7 @@ async def handle_conversation_turn_async(
 
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:
-        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links)
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
     if clean_followup and "play.google.com" in clean_reply:

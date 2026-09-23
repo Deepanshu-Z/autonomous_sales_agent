@@ -141,5 +141,37 @@ class TestZeroLinksAndMedia(unittest.TestCase):
         self.assertFalse(flags["wants_resend_video"])
 
 
+    def test_demo_videos_preserved_when_allowed(self):
+        """Verify that _ensure_app_website_links preserves YouTube demo links when allow_demo_links=True,
+        while still stripping unrequested app/store download links."""
+        text_with_demos_and_app_links = (
+            "Yes, we have demo videos available for some of our instructors. You can check out the teaching styles of the following teachers:\n"
+            "• Suman Lata: https://youtu.be/IiVVdu4NkwI?si=leLgCK40Uo5Qhr0V\n"
+            "• Mradula: https://youtu.be/vXZ6UtrWpM8?si=WYpuo8Us7xIkXT8n\n"
+            "• Priya Mathur: https://youtu.be/M2Zh9SaHpX4?si=RXg-HXGI5n_ftxs-\n"
+            "📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+            "💻 Website: https://shop.sensationzperformingarts.com/"
+        )
+
+        cleaned = _ensure_app_website_links(
+            text_with_demos_and_app_links,
+            user_asked_for_links=False,
+            allow_demo_links=True,
+        )
+
+        # Demo links MUST be preserved
+        self.assertIn("https://youtu.be/IiVVdu4NkwI", cleaned)
+        self.assertIn("https://youtu.be/vXZ6UtrWpM8", cleaned)
+        self.assertIn("https://youtu.be/M2Zh9SaHpX4", cleaned)
+        self.assertIn("Suman Lata", cleaned)
+        self.assertIn("Mradula", cleaned)
+        self.assertIn("Priya Mathur", cleaned)
+
+        # App Store / Website download links MUST still be stripped
+        self.assertNotIn("play.google.com", cleaned)
+        self.assertNotIn("shop.sensationzperformingarts.com", cleaned)
+
+
 if __name__ == "__main__":
     unittest.main()
+

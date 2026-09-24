@@ -140,7 +140,11 @@ async def handle_incoming_message(
                 new_state["profile_claim_unverified"] = True
                 new_state["coupon_sent"] = False
                 # Revert stage so it does not advance to PROFILE_COMPLETED or COUPON_SENT
-                new_state["stage"] = session_state.get("stage") or "APP_LINK_SENT"
+                prev_stage = session_state.get("stage") or "APP_LINK_SENT"
+                if prev_stage in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]:
+                    new_state["stage"] = "APP_LINK_SENT"
+                else:
+                    new_state["stage"] = prev_stage
         except Exception as e:
             logger.warning(f"Error checking production app DB: {e}")
 

@@ -129,13 +129,107 @@ async def test_trial_vs_package_stage_and_bonus():
     print("✅ PASS: Trial protection, coupon gating, and in-chat bonus tip delivery verified!")
 
 
+async def test_unverified_profile_blocked():
+    print("\n--- Test 5: Unverified Profile Blocked (Zero Coupon & Zero Leak) ---")
+    from src.core.conversation_handler import handle_incoming_message
+
+    state = {
+        "course": "yoga",
+        "stage": "READY_FOR_APP_LINK",
+        "package": "1 Month",
+        "fee": 210,
+    }
+    user_msg = "Google Login Done 👍"
+
+    # Call with non-existent phone number 7503736651
+    res = await handle_incoming_message(
+        user_message=user_msg,
+        session_state=state,
+        conversation_history=[],
+        course_id="yoga",
+        phone="7503736651",
+    )
+
+    new_st = res["new_state"]
+    print(f"Unverified User 7503736651 -> profile_created: {new_st.get('profile_created')}, profile_claim_unverified: {new_st.get('profile_claim_unverified')}, stage: {new_st.get('stage')}")
+    assert new_st.get("profile_created") is False, "Unverified user MUST NOT have profile_created=True"
+    assert new_st.get("profile_claim_unverified") is True, "Must set profile_claim_unverified=True"
+    assert not new_st.get("coupon_sent"), "Must NOT send coupon"
+    assert not new_st.get("bonus_tip_sent"), "Must NOT send bonus tip"
+    assert "YOGA70" not in res["reply"], "Coupon code MUST NOT be leaked to unverified user"
+    assert "Pre-Class Morning Routine" not in res["reply"], "Bonus tip MUST NOT be delivered"
+    print("✅ PASS: Unverified phone number 7503736651 blocked from receiving coupon & bonus tip!")
+
+
+async def test_different_phone_manual_verification_escalation():
+    print("\n--- Test 6: Different Phone Number Claim -> Immediate Manual Verification Handoff ---")
+    from src.core import intent_classifier
+    from src.core.conversation_handler import handle_incoming_message, handle_conversation_turn_async
+    from unittest.mock import patch, AsyncMock
+
+    # 1. Test intent classification & extractor extraction
+    state_after_unverified = {
+        "course": "yoga",
+        "stage": "APP_LINK_SENT",
+        "profile_claim_unverified": True,
+    }
+    customer_msg = "maine doosre number 9876543210 se banaya hai"
+    flags = await intent_classifier.extract_intent_and_state_changes(
+        text=customer_msg,
+        state=state_after_unverified,
+        history=[{"role": "assistant", "content": "Kya aapne kisi doosre number se register kiya hai?"}],
+    )
+    print(f"Extractor output: intent={flags.get('customer_intent')}, claims_diff={flags.get('claims_different_phone_or_account')}, diff_num={flags.get('different_phone_number')}")
+    assert flags.get("claims_different_phone_or_account") is True, "Must detect claims_different_phone_or_account"
+    assert flags.get("different_phone_number") == "9876543210", f"Expected '9876543210', got {flags.get('different_phone_number')}"
+    assert flags.get("customer_intent") == "DIFFERENT_NUMBER_CLAIM", f"Expected DIFFERENT_NUMBER_CLAIM, got {flags.get('customer_intent')}"
+
+    # 2. Test handle_incoming_message immediate response
+    res = await handle_incoming_message(
+        user_message=customer_msg,
+        session_state=state_after_unverified,
+        conversation_history=[],
+        course_id="yoga",
+        phone="7503736651",
+    )
+    print(f"Incoming message response: {res.get('reply')[:120]}...")
+    assert "9876543210" in res.get("reply", ""), "Reply must mention the alternate phone number"
+    assert "manual verification" in res.get("reply", "").lower() or "connect" in res.get("reply", "").lower(), "Must mention manual verification or team connect"
+
+    # 3. Test handle_conversation_turn_async immediate agent escalation
+    with patch("src.core.conversation_handler.execute_agent_handoff_async", new_callable=AsyncMock) as mock_handoff, \
+         patch("src.core.conversation_handler.get_user_state_async", new_callable=AsyncMock) as mock_get_state, \
+         patch("src.core.conversation_handler.save_user_state_async", new_callable=AsyncMock) as mock_save_state:
+
+        mock_get_state.return_value = state_after_unverified
+
+        turn_res = await handle_conversation_turn_async(
+            phone="7503736651",
+            text=customer_msg,
+            history=[],
+        )
+        print(f"Turn Result: status={turn_res.get('status')}")
+        assert turn_res.get("status") == "handed_off_different_number", f"Expected handed_off_different_number, got {turn_res.get('status')}"
+        assert mock_handoff.called, "execute_agent_handoff_async MUST be called immediately"
+        call_args = mock_handoff.call_args
+        escalation_reason = call_args[1].get("escalation_reason", "")
+        print(f"Escalation Reason: {escalation_reason}")
+        assert "Manual Verification Needed" in escalation_reason, f"Unexpected escalation reason: {escalation_reason}"
+        assert "9876543210" in escalation_reason, "Escalation reason must include alternate phone number"
+
+    print("✅ PASS: Customer claiming different phone number is immediately assigned to agent for manual verification!")
+
+
 async def main():
     test_bonus_tips()
     test_agent_nudge_no_hardcoding()
     await test_prod_db_verification()
     await test_trial_vs_package_stage_and_bonus()
+    await test_unverified_profile_blocked()
+    await test_different_phone_manual_verification_escalation()
     print("\n🎉 ALL PSYCHOLOGY FUNNEL & PROD DB VERIFIER TESTS PASSED!")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

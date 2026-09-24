@@ -243,9 +243,12 @@ def format_system_prompt(
     app_str = "CONFIRMED" if s.get("app_installed") else "PENDING"
 
     profile_confirmed = bool(
-        s.get("profile_created")
-        or s.get("coupon_sent")
-        or s.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT"]
+        not s.get("profile_claim_unverified")
+        and (
+            s.get("profile_created")
+            or s.get("coupon_sent")
+            or s.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]
+        )
     )
 
     from src.core.coupons import build_coupon_context
@@ -299,6 +302,21 @@ def format_system_prompt(
 
     gst_pct = kb_loader.get_course_gst_percentage(cid)
 
+    if s.get("profile_claim_unverified"):
+        profile_str = "NOT FOUND IN APP DATABASE (Customer claims registered, but no account exists under this WhatsApp number in Sensationz App DB)"
+        coupon_instruction = (
+            "⚠️ UNVERIFIED PROFILE ALERT (STRICT FRAUD & PRIVACY GUARD):\n"
+            "The customer claimed they completed Google Login or registration, but their profile was NOT found in the Sensationz production database!\n"
+            "- STRICT PROHIBITION: NEVER congratulate them on completing their profile or payment!\n"
+            "- STRICT PROHIBITION: NEVER unlock, reveal, or mention ANY coupon code (e.g. YOGA70) or confirm enrollment!\n"
+            "- In Message #1: Warmly and politely explain that you cannot find a registered profile under this mobile number in the Sensationz system yet.\n"
+            "- In Message #2: Ask them if they used a different mobile number or Google account in the Sensationz app, or guide them to complete their signup in the app."
+        )
+    elif profile_confirmed:
+        profile_str = "CONFIRMED & VERIFIED (unlocked)"
+    else:
+        profile_str = "PENDING (locked)"
+
     state_context = (
         f"- Active Course Session: {active_title}\n"
         f"- Active Course GST Slab: {gst_pct}% (Mandatory rule: GST is NOT included in listed price; {gst_pct}% GST is added at checkout on app/website)\n"
@@ -309,13 +327,14 @@ def format_system_prompt(
         f"- Package Fee: {fee_str}\n"
         f"- Funnel Stage: {stage_str}\n"
         f"- App Installed: {app_str}\n"
-        f"- Profile Created: {'CONFIRMED (unlocked)' if profile_confirmed else 'PENDING (locked)'}\n"
+        f"- Profile Created: {profile_str}\n"
         f"- Official App & Platform Links:\n{app_platforms_str}\n"
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
 
     should_include_coupons = bool(
         profile_confirmed
+        and not s.get("profile_claim_unverified")
         and (not s.get("wants_trial") or s.get("package") or s.get("is_coupon_requested"))
     )
     course_json_str = kb_loader.get_course_prompt_str(

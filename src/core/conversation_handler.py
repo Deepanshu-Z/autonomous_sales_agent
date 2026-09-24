@@ -127,6 +127,7 @@ async def handle_incoming_message(
                 new_state["profile_created"] = True
                 new_state["app_installed"] = True
                 new_state["profile_db_verified"] = True
+                new_state["profile_claim_unverified"] = False
                 if db_res.get("full_name"):
                     new_state["customer_name"] = db_res["full_name"]
                 if db_res.get("has_trial"):
@@ -134,9 +135,35 @@ async def handle_incoming_message(
                 if db_res.get("has_enrollment"):
                     new_state["db_course_enrolled"] = True
             elif profile_claimed and not db_res.get("error"):
+                new_state["profile_created"] = False
                 new_state["profile_db_verified"] = False
+                new_state["profile_claim_unverified"] = True
+                new_state["coupon_sent"] = False
+                # Revert stage so it does not advance to PROFILE_COMPLETED or COUPON_SENT
+                new_state["stage"] = session_state.get("stage") or "APP_LINK_SENT"
         except Exception as e:
             logger.warning(f"Error checking production app DB: {e}")
+
+    # 2c. Immediate Routing for Alternate Phone / Account Claim (Manual Verification)
+    if (
+        flags.get("claims_different_phone_or_account")
+        or flags.get("customer_intent") == "DIFFERENT_NUMBER_CLAIM"
+        or new_state.get("_last_turn", {}).get("claims_different_phone_or_account")
+    ):
+        alt_phone = flags.get("different_phone_number") or new_state.get("alternate_phone_number")
+        alt_phone_text = f" ({alt_phone})" if alt_phone else ""
+        handoff_reply = (
+            f"Ji bilkul! Maine aapka alternate number{alt_phone_text} note kar liya hai. "
+            "Humari team manual verification ke liye aapse turant connect kar rahi hai. Ek minute hold kijiye! 😊\n\n"
+            f"Got it! I have noted your alternate phone number{alt_phone_text}. "
+            "Our team is connecting with you shortly for manual account verification! 🙏"
+        )
+        return {
+            "reply": handoff_reply,
+            "followup": None,
+            "buttons": [],
+            "new_state": new_state,
+        }
 
     # A customer can switch topics mid-conversation ("what about Kathak
     # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
@@ -249,7 +276,11 @@ async def handle_incoming_message(
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.
-    if new_state.get("profile_created") and new_state.get("stage") == "PROFILE_COMPLETED":
+    if (
+        new_state.get("profile_created")
+        and not new_state.get("profile_claim_unverified")
+        and new_state.get("stage") == "PROFILE_COMPLETED"
+    ):
         if new_state.get("wants_trial"):
             new_state["stage"] = "TRIAL_CONFIRMED"
         else:
@@ -258,9 +289,10 @@ async def handle_incoming_message(
 
     # In-chat bonus tip delivery (1 per course, no PDF, prefilled text)
     if (
-        new_state.get("profile_created")
-        or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]
-    ) and not new_state.get("bonus_tip_sent"):
+        (new_state.get("profile_created") or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"])
+        and not new_state.get("profile_claim_unverified")
+        and not new_state.get("bonus_tip_sent")
+    ):
         from src.core import kb_loader
         tip = kb_loader.get_course_bonus_tip(effective_course_id)
         if tip:
@@ -560,6 +592,31 @@ async def handle_conversation_turn_async(
     followup_msg = result.get("followup")
     new_state = result.get("new_state", state)
     last_turn = new_state.get("_last_turn", {})
+
+    # Check for Different Phone Number Claim -> Immediate Manual Verification Handoff
+    claims_diff_num = (
+        last_turn.get("claims_different_phone_or_account")
+        or last_turn.get("intent") == "DIFFERENT_NUMBER_CLAIM"
+        or new_state.get("claims_different_phone_or_account")
+    )
+    if claims_diff_num:
+        alt_phone = last_turn.get("different_phone_number") or new_state.get("alternate_phone_number")
+        alt_str = f" ({alt_phone})" if alt_phone else ""
+        reason = (
+            f"Manual Verification Needed: Customer claims profile created with different number/account"
+            f"{alt_str}. Primary WhatsApp: {phone}"
+        )
+        new_state["is_escalated"] = True
+        new_state["escalation_reason"] = reason
+        await execute_agent_handoff_async(
+            phone,
+            user_reply_text=reply_text,
+            escalation_reason=reason,
+            start_time=start_time,
+            send_connecting_notice=False,
+        )
+        await save_user_state_async(phone, new_state)
+        return {"status": "handed_off_different_number", "reply": reply_text}
 
     # Check for Human Agent Escalation
     if last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST":

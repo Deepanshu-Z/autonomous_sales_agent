@@ -68,6 +68,8 @@ def _empty_flags() -> Dict[str, Any]:
         "question_summary": None,
         "detected_language": "English",
         "wants_resend_video": False,
+        "claims_different_phone_or_account": False,
+        "different_phone_number": None,
     }
 
 
@@ -141,6 +143,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
+    - "DIFFERENT_NUMBER_CLAIM": Customer states or explains they registered/created their profile with a different mobile number, someone else's phone number, or another account (e.g. "maine dusre number se banaya hai", "different number used",  "husband ke number se login kiya", "mummy ke phone se kiya hai", "doosre number pe register hai").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
 12. "question_summary":
@@ -161,6 +164,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 15. "wants_resend_video":
     - boolean: true if customer explicitly asks to send or resend a video tutorial or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video"). Otherwise false.
 
+16. "claims_different_phone_or_account":
+    - boolean: true if customer states, claims, or explains that they created their profile, registered, or logged in using a different phone number, someone else's phone/account (e.g. husband/wife/parent/friend), or another mobile number (e.g. "maine dusre number se kiya hai", "different number used", "profile is under another number", "mummy ke phone se banaya",  "doosre number pe banaya hai", "different account"). Also true if the bot previously asked if they registered with a different number and the customer replies with a phone number or says "yes doosre number se". Otherwise false.
+
+17. "different_phone_number":
+    - string or null: If the customer specifies or mentions an alternate 10-digit mobile number or phone number in their message (e.g. "9876543210", "+919876543210", "09876543210"), extract ONLY the 10 digits as a clean string (e.g. "9876543210"). If no alternate number is mentioned, return null.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -177,7 +186,9 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "question_summary": string | null,
   "detected_language": string,
   "explicit_language_request": string | null,
-  "wants_resend_video": boolean
+  "wants_resend_video": boolean,
+  "claims_different_phone_or_account": boolean,
+  "different_phone_number": string | null
 }"""
 
 
@@ -275,6 +286,40 @@ async def extract_intent_and_state_changes(
         if chosen_course:
             clean["selected_course"] = chosen_course
 
+        # Heuristic / Safety net for alternate phone number or different account claim
+        raw_text_lower = text.lower().strip()
+        import re
+        phone_match = re.search(r"(?:\+?91[\-\s]?)?[6-9]\d{9}\b", text)
+        extracted_phone = None
+        if phone_match:
+            digits_only = re.sub(r"\D", "", phone_match.group(0))
+            if len(digits_only) >= 10:
+                extracted_phone = digits_only[-10:]
+
+        diff_number_markers = [
+            "dusre number", "doosre number", "dusra number", "doosra number",
+            "different number", "different phone", "another number", "another phone",
+            "other number", "other phone", "alag number", "alag phone", "kisi aur number",
+            "different mobile", "another mobile", "dusre mobile", "doosre mobile",
+            "dusre account", "doosre account", "different account", "another account",
+            "mummy ke", "papa ke", "husband ke", "wife ke", "bhai ke", "sister ke",
+            "dusre phone", "doosre phone", "another device", "dusre device", "doosre device",
+            "dusre no", "doosre no", "different no", "another no",
+        ]
+        has_diff_marker = any(m in raw_text_lower for m in diff_number_markers)
+        is_after_unverified = bool(s.get("profile_claim_unverified")) or any(
+            phrase in (last_ai or "").lower()
+            for phrase in ["doosre number", "dusre number", "different number", "another number"]
+        )
+
+        if has_diff_marker or (is_after_unverified and extracted_phone):
+            clean["claims_different_phone_or_account"] = True
+            clean["customer_intent"] = "DIFFERENT_NUMBER_CLAIM"
+            if extracted_phone and not clean.get("different_phone_number"):
+                clean["different_phone_number"] = extracted_phone
+        elif clean.get("claims_different_phone_or_account") and extracted_phone and not clean.get("different_phone_number"):
+            clean["different_phone_number"] = extracted_phone
+
         return clean
     except Exception as e:
         print(f"[intent_classifier] Extractor error (falling back to safe defaults): {e}")
@@ -286,6 +331,20 @@ async def extract_intent_and_state_changes(
                 flags["selected_course"] = detected_course
             if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
+
+            import re
+            phone_match = re.search(r"(?:\+?91[\-\s]?)?[6-9]\d{9}\b", text)
+            ext_phone = re.sub(r"\D", "", phone_match.group(0))[-10:] if phone_match else None
+            diff_phrases = [
+                "dusre number", "doosre number", "dusra number", "doosra number",
+                "different number", "different phone", "another number", "another phone",
+                "other number", "other phone", "alag number", "alag phone", "kisi aur",
+                "mummy ke", "papa ke", "husband ke", "wife ke", "different account",
+            ]
+            if any(m in text.lower() for m in diff_phrases) or (bool((state or {}).get("profile_claim_unverified")) and ext_phone):
+                flags["claims_different_phone_or_account"] = True
+                flags["customer_intent"] = "DIFFERENT_NUMBER_CLAIM"
+                flags["different_phone_number"] = ext_phone
         except Exception:
             pass
         return flags
@@ -416,6 +475,11 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
                 detected_lang = f"{base_lang} (Latin script)"
         new_state["language"] = detected_lang
 
+    if flags.get("claims_different_phone_or_account"):
+        new_state["claims_different_phone_or_account"] = True
+        if flags.get("different_phone_number"):
+            new_state["alternate_phone_number"] = flags["different_phone_number"]
+
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
         "wants_trial": flags.get("wants_trial", False),
@@ -425,6 +489,8 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "is_complaint_or_refund": flags.get("is_complaint_or_refund", False),
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
+        "claims_different_phone_or_account": flags.get("claims_different_phone_or_account", False),
+        "different_phone_number": flags.get("different_phone_number"),
     }
 
     return new_state

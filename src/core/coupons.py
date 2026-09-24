@@ -231,7 +231,7 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             "  - ZERO FABRICATION RULE: You do NOT have any coupon codes. NEVER invent, fabricate, guess, or output ANY coupon code string (e.g. NEVER make up codes like 'WELCOME100', 'DISCOUNT50', or ANY code string).",
             "  - If customer asks for a coupon or code for ANY package (e.g. '6 month ka coupon do', 'coupon code kya hai', 'give coupon'):",
             "    1. Warmly explain that Ganesh Chaturthi Offer coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
-            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is \u20b91,000, 1 Month is \u20b9300).",
+            "    2. Quote the official offer price for their package directly from COURSE_DATA.",
             "    3. Guide them to complete their profile on the Sensationz App or website using the official links:",
         ]
         if profile_video:

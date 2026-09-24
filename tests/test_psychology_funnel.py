@@ -95,7 +95,7 @@ async def test_trial_vs_package_stage_and_bonus():
         assert "5-Minute Pre-Class Morning Routine" in res["reply"], "Bonus tip content must be appended to reply"
 
     # Case B: Paid Package User completing profile
-    mock_reply_paid = '{"reply": "Congratulations on completing your profile! Here is your coupon: YOGA300", "followup": "Ready to checkout?", "buttons": ["Proceed 👍"]}'
+    mock_reply_paid = '{"reply": "Congratulations on completing your profile! Here is your coupon: YOGA70", "followup": "Ready to checkout?", "buttons": ["Proceed 👍"]}'
     with patch("src.core.conversation_handler._get_reply_llm") as mock_get_llm:
         mock_llm_instance = AsyncMock()
         mock_llm_instance.ainvoke.return_value = AIMessage(content=mock_reply_paid)
@@ -105,7 +105,7 @@ async def test_trial_vs_package_stage_and_bonus():
             "course": "yoga",
             "wants_trial": False,
             "package": "1 Month",
-            "fee": 300,
+            "fee": 210,
             "timing": "7:00 AM",
             "stage": "READY_FOR_APP_LINK",
         }

@@ -135,7 +135,7 @@ DECISION OUTCOMES:
 STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
 - When generating `reply_message` for PROVIDE_SOLUTION:
   • You MUST strictly quote the Active Course Name and its details provided in the ACTIVE COURSE CONTEXT.
-  • NEVER assume, invent, or mention 'Yoga' or '₹300' unless the active course is explicitly Yoga.
+  • NEVER assume, invent, or fabricate course names, fees, or packages not present in ACTIVE COURSE CONTEXT.
   • Share YouTube demo videos if present in ACTIVE COURSE CONTEXT.
   • If no active course is known: DO NOT quote fees or specific course names. Warmly ask which course they are exploring.
 

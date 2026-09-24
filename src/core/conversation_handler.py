@@ -119,6 +119,7 @@ async def handle_incoming_message(
         or is_profile_completed_signal(user_message, session_state)
     )
 
+    profile_claim_just_failed = False
     if phone and (profile_claimed or session_state.get("profile_created")):
         from src.services.app_db_verifier import verify_user_in_production_db_async
         try:
@@ -134,19 +135,34 @@ async def handle_incoming_message(
                     new_state["db_trial_booked"] = True
                 if db_res.get("has_enrollment"):
                     new_state["db_course_enrolled"] = True
-            elif profile_claimed and not db_res.get("error"):
+            else:
+                # ZERO TRUST: If not verified in RDS DB (either no profile exists OR DB error/unreachable),
+                # customer is strictly UNVERIFIED. NEVER unlock coupon or confirm profile!
                 new_state["profile_created"] = False
                 new_state["profile_db_verified"] = False
                 new_state["profile_claim_unverified"] = True
                 new_state["coupon_sent"] = False
+                profile_claim_just_failed = bool(profile_claimed)
                 # Revert stage so it does not advance to PROFILE_COMPLETED or COUPON_SENT
                 prev_stage = session_state.get("stage") or "APP_LINK_SENT"
                 if prev_stage in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]:
                     new_state["stage"] = "APP_LINK_SENT"
                 else:
                     new_state["stage"] = prev_stage
+                if db_res.get("error"):
+                    logger.error(f"[conversation_handler] DB verification error for {phone}: {db_res.get('error')}")
         except Exception as e:
-            logger.warning(f"Error checking production app DB: {e}")
+            logger.error(f"Error checking production app DB: {e}")
+            new_state["profile_created"] = False
+            new_state["profile_db_verified"] = False
+            new_state["profile_claim_unverified"] = True
+            new_state["coupon_sent"] = False
+            profile_claim_just_failed = bool(profile_claimed)
+            prev_stage = session_state.get("stage") or "APP_LINK_SENT"
+            if prev_stage in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]:
+                new_state["stage"] = "APP_LINK_SENT"
+            else:
+                new_state["stage"] = prev_stage
 
     # 2c. Immediate Routing for Alternate Phone / Account Claim (Manual Verification)
     if (
@@ -166,6 +182,35 @@ async def handle_incoming_message(
             "reply": handoff_reply,
             "followup": None,
             "buttons": [],
+            "new_state": new_state,
+        }
+
+    # 2d. Deterministic Handling for Unverified Profile Claim (Zero Hallucination / Zero Coupon Leak)
+    if profile_claim_just_failed or (profile_claimed and new_state.get("profile_claim_unverified")):
+        user_lang = new_state.get("language") or "English"
+        is_hindi = "hinglish" in user_lang.lower() or "hindi" in user_lang.lower()
+
+        if is_hindi:
+            unverified_reply = (
+                f"Aapka profile is WhatsApp number (+{phone}) par abhi Sensationz App me register nahi dikh raha hai. 📱\n\n"
+                "Agar aapne Google se login kar liya hai, to kya aapne kisi *doosre mobile number* ya doosre Google account se kiya hai? "
+                "Agar doosre number se kiya hai to kripya apna wo number batayein, ya pehle Sensationz App me login complete karein! 😊"
+            )
+            unverified_followup = "Kya aapne kisi doosre number se sign up kiya hai?"
+            unverified_buttons = ["Haan, Dusre Number Se 👍", "App Me Login Kar Raha Hoon 📱"]
+        else:
+            unverified_reply = (
+                f"We couldn't find a registered profile under this mobile number (+{phone}) in the Sensationz App yet. 📱\n\n"
+                "If you logged in with Google, did you use a different mobile number or Google account? "
+                "If you used another number, please share it here so our team can verify it, or complete your signup in the Sensationz App! 😊"
+            )
+            unverified_followup = "Did you sign up using a different phone number?"
+            unverified_buttons = ["Yes, Different Number 👍", "Logging In Now 📱"]
+
+        return {
+            "reply": unverified_reply,
+            "followup": unverified_followup,
+            "buttons": unverified_buttons,
             "new_state": new_state,
         }
 
@@ -328,9 +373,12 @@ def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional
     from src.core.coupons import get_coupon_details
 
     profile_confirmed = bool(
-        state.get("profile_created")
-        or state.get("coupon_sent")
-        or state.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
+        not state.get("profile_claim_unverified")
+        and (
+            state.get("profile_created")
+            or state.get("coupon_sent")
+            or state.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
+        )
     )
 
     coupons = kb_loader.get_course_coupons(course_id)

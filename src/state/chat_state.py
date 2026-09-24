@@ -707,6 +707,7 @@ def is_profile_completed_signal(text: str, state: dict = None) -> bool:
         return True
 
     _EXPLICIT_COMPLETION_PHRASES = [
+        "google login done", "login done", "google login", "google done",
         "profile created", "profile done", "profile complete", "created profile",
         "profile ban gayi", "profile ban gai", "profile bana li", "profile banali",
         "profile bna li", "profile bnali", "profile ready", "profile set",

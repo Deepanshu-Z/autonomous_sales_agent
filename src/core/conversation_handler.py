@@ -95,6 +95,7 @@ async def handle_incoming_message(
     session_state: Dict[str, Any],
     conversation_history: List[Dict[str, str]],
     course_id: Optional[str] = None,
+    phone: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Returns {"reply": str, "new_state": dict} — the caller persists
@@ -110,6 +111,32 @@ async def handle_incoming_message(
     # 2. Pure state merge.
     flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
+
+    # 2b. Production App Database Verification (Real PostgreSQL RDS)
+    from src.state.chat_state import is_profile_completed_signal
+    profile_claimed = bool(
+        flags.get("profile_created_stated") == "confirmed"
+        or is_profile_completed_signal(user_message, session_state)
+    )
+
+    if phone and (profile_claimed or session_state.get("profile_created")):
+        from src.services.app_db_verifier import verify_user_in_production_db_async
+        try:
+            db_res = await verify_user_in_production_db_async(phone)
+            if db_res.get("verified"):
+                new_state["profile_created"] = True
+                new_state["app_installed"] = True
+                new_state["profile_db_verified"] = True
+                if db_res.get("full_name"):
+                    new_state["customer_name"] = db_res["full_name"]
+                if db_res.get("has_trial"):
+                    new_state["db_trial_booked"] = True
+                if db_res.get("has_enrollment"):
+                    new_state["db_course_enrolled"] = True
+            elif profile_claimed and not db_res.get("error"):
+                new_state["profile_db_verified"] = False
+        except Exception as e:
+            logger.warning(f"Error checking production app DB: {e}")
 
     # A customer can switch topics mid-conversation ("what about Kathak
     # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
@@ -223,8 +250,22 @@ async def handle_incoming_message(
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.
     if new_state.get("profile_created") and new_state.get("stage") == "PROFILE_COMPLETED":
-        new_state["stage"] = "COUPON_SENT"
-        new_state["coupon_sent"] = True
+        if new_state.get("wants_trial"):
+            new_state["stage"] = "TRIAL_CONFIRMED"
+        else:
+            new_state["stage"] = "COUPON_SENT"
+            new_state["coupon_sent"] = True
+
+    # In-chat bonus tip delivery (1 per course, no PDF, prefilled text)
+    if (
+        new_state.get("profile_created")
+        or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]
+    ) and not new_state.get("bonus_tip_sent"):
+        from src.core import kb_loader
+        tip = kb_loader.get_course_bonus_tip(effective_course_id)
+        if tip:
+            main_reply = f"{main_reply}\n\n{tip}".strip()
+            new_state["bonus_tip_sent"] = True
 
     # Guarantee dedicated "Talk to Agent" button in user's language (max 3 buttons total on WhatsApp)
     if followup_msg and buttons is not None:
@@ -512,6 +553,7 @@ async def handle_conversation_turn_async(
         session_state=state,
         conversation_history=history or [],
         course_id=active_course,
+        phone=phone,
     )
 
     reply_text = result.get("reply", "")

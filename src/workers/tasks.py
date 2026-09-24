@@ -70,6 +70,9 @@ AGENT_POOL = [e for e in [PRIORITY_AGENT_EMAIL_ANOTHER_1, PRIORITY_AGENT_EMAIL_A
 AGENT_TRIGGER_WORDS = ["agent", "human", "talk to someone", "real person", "representative", "support"]
 
 
+SUPPORT_PHONE_NUMBER = os.getenv("SUPPORT_PHONE_NUMBER", "").strip() or os.getenv("AGENT_CALL_NUMBER", "").strip()
+
+
 def _agent_nudge(user_text: str) -> str:
     """
     Returns the 'contact agent' nudge message in the user's language.
@@ -80,14 +83,15 @@ def _agent_nudge(user_text: str) -> str:
     has_devanagari = any("\u0900" <= ch <= "\u097F" for ch in user_text)
     has_hindi_word = any(w in text_lower.split() for w in hindi_markers)
 
+    phone_part_hi = f", ya hamare support team se seedha baat karein: *{SUPPORT_PHONE_NUMBER}*" if SUPPORT_PHONE_NUMBER else ""
+    phone_part_en = f", or call us directly at *{SUPPORT_PHONE_NUMBER}*" if SUPPORT_PHONE_NUMBER else ""
+
     if has_devanagari or has_hindi_word:
         return (
-            "\n\n💬 Iske baare mein aur jaankari ke liye aap *agent* type karein, "
-            "ya hamare support team se seedha baat karein: *9898989898*"
+            f"\n\n💬 Iske baare mein aur jaankari ke liye aap *agent* type karein{phone_part_hi}."
         )
     return (
-        "\n\n💬 To know more, type *agent* to connect with our support team, "
-        "or call us directly at *9898989898*."
+        f"\n\n💬 To know more, type *agent* to connect with our support team{phone_part_en}."
     )
 def _format_for_whatsapp(text: str) -> str:
     """

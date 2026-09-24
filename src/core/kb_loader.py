@@ -384,6 +384,13 @@ def format_app_links_display() -> str:
     )
 
 
+def get_course_bonus_tip(course_id: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """Returns the pre-filled text bonus tip for the course from course JSON, if defined."""
+    cid = (course_id or "yoga").lower().strip()
+    data = get_course_data(cid)
+    return data.get("bonus_tip")
+
+
 # ── Fallback-only utilities ─────────────────────────────────────────────
 # Deterministic keyword/fuzzy matching. These exist SOLELY as a resilience
 # fallback for when the semantic LLM extractor (intent_classifier.py) fails
@@ -441,3 +448,18 @@ def is_app_link_request_fallback(text: str) -> bool:
 
 # Backward-compatible alias for existing test suites and modules
 detect_course_from_text = detect_course_from_text_fallback
+
+
+def get_course_bonus_tip(course_id: Optional[str] = None) -> Optional[str]:
+    """Retrieves the prefilled bonus tip content for a given course directly from course JSON.
+    Zero hardcoded values, dynamic per course.
+    """
+    if not course_id:
+        return None
+    data = get_course_data(course_id)
+    bonus = data.get("bonus_tip")
+    if isinstance(bonus, dict):
+        return bonus.get("content")
+    elif isinstance(bonus, str):
+        return bonus
+    return None

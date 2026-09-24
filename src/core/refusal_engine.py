@@ -68,7 +68,8 @@ ANALYSIS CRITERIA:
 1. REFUSAL DETECTION:
    - Is the customer refusing, declining, dropping out, or showing disinterest in taking the course/classes?
    - Examples: "Not interested", "Nahi chahiye", "No thanks", "Rehne do", "Cancel", "Too expensive", "I don't have time", "Nahi lena".
-   - Note: If `Refusal Stage` is 1, the customer is now responding with their reason for earlier refusal — treat their reply as the reason even if it doesn't sound like a new refusal.
+   - Note: If `Refusal Stage` is 1, the customer is now responding with their reason for earlier refusal — treat their reply as the reason only if they are actually explaining an objection.
+   - CRITICAL NEGATIVE GUARD: "Lock My Seat", "Lock Seat", "Proceed", "Book Seat", "Book Slot", selecting a package/timing, or ANY affirmative CTA is strictly NEVER a refusal. Set `resolution_type` = "NOT_A_REFUSAL" immediately!
 
 2. REASON PRESENCE:
    - Did the customer specify WHY they are refusing?
@@ -213,8 +214,9 @@ async def evaluate_refusal_async(
                 f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
             )
 
-    # Quick pre-filter: if text is empty, ignore
-    if not text or not text.strip():
+    # Quick pre-filter: if text is empty or customer is locking seat / proceeding, NOT a refusal
+    from src.core.intent_classifier import is_seat_lock_signal
+    if not text or not text.strip() or is_seat_lock_signal(text):
         return {
             "is_refusal": False,
             "has_reason": False,

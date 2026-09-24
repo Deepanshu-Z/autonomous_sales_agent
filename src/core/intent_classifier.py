@@ -127,6 +127,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Contextual: Customer explicitly states that an unmet requirement is a dealbreaker preventing enrollment, ONLY AFTER having been informed of our policy (e.g. "then I won't join", "offline nahi hai to rehne do", "fixed schedule nahi ho payega mujhse, cancel karo").
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
+    - CRITICAL NEGATIVE GUARD: "Lock My Seat", "Lock Seat", "Proceed", "Book Seat", or clicking any affirmative action button is strictly NEVER disinterest!
 
 10. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
@@ -136,7 +137,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
-    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
+    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR customer clicks "Lock My Seat" / asks to proceed / lock their seat.
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
@@ -320,6 +321,10 @@ async def extract_intent_and_state_changes(
         elif clean.get("claims_different_phone_or_account") and extracted_phone and not clean.get("different_phone_number"):
             clean["different_phone_number"] = extracted_phone
 
+        if is_seat_lock_signal(text):
+            clean["is_disinterested"] = False
+            clean["customer_intent"] = "APP_LINK_REQUEST"
+
         return clean
     except Exception as e:
         print(f"[intent_classifier] Extractor error (falling back to safe defaults): {e}")
@@ -329,8 +334,9 @@ async def extract_intent_and_state_changes(
             detected_course = kb_loader.detect_course_from_text_fallback(text, default_course=None)
             if detected_course:
                 flags["selected_course"] = detected_course
-            if kb_loader.is_app_link_request_fallback(text):
+            if is_seat_lock_signal(text) or kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
+                flags["is_disinterested"] = False
 
             import re
             phone_match = re.search(r"(?:\+?91[\-\s]?)?[6-9]\d{9}\b", text)
@@ -350,10 +356,43 @@ async def extract_intent_and_state_changes(
         return flags
 
 
+def is_seat_lock_signal(text: str) -> bool:
+    """
+    Detects if the user wants to lock their seat, book their slot, or proceed
+    (e.g., clicking 'Lock My Seat 🔒', saying 'seat lock kardo', 'proceed', etc.).
+    """
+    if not text:
+        return False
+    t = text.lower().strip()
+    import re
+    patterns = [
+        r"\block\s*(?:my\s*)?seat\b",
+        r"\block\s*(?:my\s*)?slot\b",
+        r"\bseat\s*lock\b",
+        r"\bslot\s*lock\b",
+        r"\bbook\s*(?:my\s*)?seat\b",
+        r"\bbook\s*(?:my\s*)?slot\b",
+        r"\bseat\s*book\b",
+        r"\bslot\s*book\b",
+        r"\bbook\s*now\b",
+        r"\bproceed\b",
+        r"\bcontinue\b",
+        r"\block\s*k(?:ar|r)\s*do\b",
+        r"\bseat\s*confirm\b",
+        r"\bconfirm\s*seat\b",
+        r"\bconfirm\s*slot\b",
+        r"\breserve\s*(?:my\s*)?seat\b",
+        r"\bhold\s*(?:my\s*)?seat\b",
+        r"सीट\s*लॉक",
+        r"स्लॉट\s*लॉक",
+    ]
+    return any(re.search(p, t) for p in patterns)
+
+
 def is_app_link_request(text: str) -> bool:
     """Backward compatibility helper for app link check."""
     t = (text or "").lower()
-    return any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
+    return is_seat_lock_signal(text) or any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
 
 
 def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,6 +401,12 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     Pure data merge, no LLM calls, safe to unit-test.
     """
     new_state = dict(state)
+    raw_text = (flags.get("_raw_text") or "").strip()
+
+    if is_seat_lock_signal(raw_text) or flags.get("customer_intent") == "APP_LINK_REQUEST":
+        new_state["refusal_stage"] = 0
+        if new_state.get("stage") in ["NEW", "TIMING_SELECTED", "PACKAGE_SELECTED"]:
+            new_state["stage"] = "APP_LINK_SENT"
 
     if flags.get("app_installed_stated") == "confirmed":
         new_state["app_installed"] = True

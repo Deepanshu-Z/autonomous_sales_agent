@@ -685,25 +685,24 @@ async def handle_conversation_turn_async(
     # route through the refusal engine (3-step lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated).
     current_refusal_stage = new_state.get("refusal_stage", 0)
 
-    # Only reset refusal_stage back to 0 if customer actively accepts an enrollment step (timing, package, trial)
-    if current_refusal_stage >= 2 and not last_turn.get("is_disinterested"):
-        if last_turn.get("wants_trial") or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED"]:
-            new_state["refusal_stage"] = 0
-            current_refusal_stage = 0
-
-    # BUG2 FIX: If stage==1 (we asked "why are you refusing?") and the customer is no longer
-    # disinterested (they changed topic or asked a normal question), exit the refusal lifecycle.
-    if current_refusal_stage == 1 and not last_turn.get("is_disinterested"):
-        if last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT", "OTHER", None):
-            new_state["refusal_stage"] = 0
-            current_refusal_stage = 0
+    from src.core.intent_classifier import is_seat_lock_signal
+    # Reset refusal lifecycle if customer is no longer refusing:
+    # 1. Customer clicked "Lock My Seat" or sent a positive proceed / seat-locking signal
+    # 2. Customer selected a timing, package, requested trial, app link, or profile completion
+    # 3. Customer asked a question or is no longer disinterested
+    if (
+        is_seat_lock_signal(text_clean)
+        or last_turn.get("wants_trial")
+        or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED", "APP_LINK_REQUEST"]
+        or (not last_turn.get("is_disinterested") and last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT"))
+    ):
+        new_state["refusal_stage"] = 0
+        current_refusal_stage = 0
 
     is_refusal_or_complaint = (
-        last_turn.get("is_disinterested")
-        or last_turn.get("is_complaint_or_refund")
-        or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
-        or current_refusal_stage > 0
-    )
+        (last_turn.get("is_disinterested") or last_turn.get("is_complaint_or_refund") or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST"))
+        and not is_seat_lock_signal(text_clean)
+    ) or (current_refusal_stage > 0 and not is_seat_lock_signal(text_clean))
 
     if is_refusal_or_complaint:
         eval_res = await evaluate_refusal_async(

@@ -472,15 +472,18 @@ def get_course_conversion_hook(course_id: Optional[str] = None, seed: Optional[i
         course_id: The course identifier (e.g. 'yoga', 'kathak', 'face_yoga').
         seed: Optional integer seed for deterministic selection (e.g. based on message count).
     """
-    if not course_id:
-        return None
     import random
-    data = get_course_data(course_id)
+    cid = (course_id or "yoga").lower().strip()
+    data = get_course_data(cid)
     hooks = data.get("conversion_hooks")
     if not isinstance(hooks, list) or not hooks:
-        return None
+        data = get_course_data("yoga")
+        hooks = data.get("conversion_hooks")
+    if not isinstance(hooks, list) or not hooks:
+        return "Live interactive yoga practice with certified female master teachers produces 2x better consistency and posture alignment than recorded videos."
     if seed is not None:
         rng = random.Random(seed)
         return rng.choice(hooks)
     return random.choice(hooks)
+
 

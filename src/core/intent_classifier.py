@@ -73,6 +73,7 @@ def _empty_flags() -> Dict[str, Any]:
         "user_goal": None,
         "user_experience": None,
         "scheduling_constraint": None,
+        "user_timeline": None,
         "objection_type": "NONE",
     }
 
@@ -179,12 +180,15 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - string or null: Personal fitness, health, or learning goal stated by the customer (e.g. "weight loss", "flexibility", "stress relief", "back pain", "peace of mind", "hobby", "classical dance", "tone face", "glow"). If none stated, return null.
 
 19. "user_experience":
-    - string or null: Prior experience level stated by the customer ("beginner", "intermediate", "advanced", "never done before", "used to do years ago"). If none stated, return null.
+    - string or null: Prior experience level / Current Status stated by the customer ("beginner", "intermediate", "advanced", "never done before", "used to do years ago", "watching YouTube"). If none stated, return null.
 
 20. "scheduling_constraint":
     - string or null: Timing or routine constraint stated by the customer (e.g. "morning only", "evening after office", "weekend only", "flexible", "before 8am"). If none stated, return null.
 
-21. "objection_type":
+21. "user_timeline":
+    - string or null: When the customer wants to start or their timeline constraint (e.g. "immediately", "this week", "next week", "from tomorrow", "next month", "exploring for later"). If none stated, return null.
+
+22. "objection_type":
     Must be EXACTLY ONE of:
     - "PRICE_PUSHBACK": Customer pushes back on price or asks for extra discounts ("expensive", "fees too high", "discount do", "budget kam hai", "can I pay less?", "too costly").
     - "THINK_ABOUT_IT": Customer hesitates or delays decision ("soch kar bataunga", "will let you know", "need time to decide", "family se pooch kar", "baad me dekhte hain").
@@ -215,6 +219,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "user_goal": string | null,
   "user_experience": string | null,
   "scheduling_constraint": string | null,
+  "user_timeline": string | null,
   "objection_type": "PRICE_PUSHBACK" | "THINK_ABOUT_IT" | "COMPARING_OTHER_APP" | "TIMING_CONFLICT" | "SKEPTICAL_ONLINE" | "NONE"
 }"""
 
@@ -493,14 +498,28 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
 
-    # Persist discovery facts so later turns can naturally reference them
+    # Persist qualification & discovery facts in state (persists directly in Redis schema)
+    qualification = dict(new_state.get("qualification") or {})
     discovery = dict(new_state.get("discovery") or {})
-    if flags.get("user_goal"):
-        discovery["goal"] = flags["user_goal"]
+
     if flags.get("user_experience"):
+        qualification["current_status"] = flags["user_experience"]
         discovery["experience"] = flags["user_experience"]
-    if flags.get("scheduling_constraint"):
+    if flags.get("user_goal"):
+        qualification["goal"] = flags["user_goal"]
+        discovery["goal"] = flags["user_goal"]
+    if flags.get("user_timeline"):
+        qualification["timeline"] = flags["user_timeline"]
+        discovery["timeline"] = flags["user_timeline"]
+    elif flags.get("scheduling_constraint"):
         discovery["schedule"] = flags["scheduling_constraint"]
+        if not qualification.get("timeline"):
+            qualification["timeline"] = flags["scheduling_constraint"]
+
+    is_qualified = bool(qualification.get("current_status") and qualification.get("goal"))
+    qualification["is_qualified"] = is_qualified
+
+    new_state["qualification"] = qualification
     if discovery:
         new_state["discovery"] = discovery
 

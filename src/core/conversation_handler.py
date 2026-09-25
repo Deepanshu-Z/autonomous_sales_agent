@@ -413,28 +413,38 @@ def _strip_trailing_question(text: str, followup: Optional[str] = None) -> str:
     if not text:
         return text
     text_clean = text.strip()
-    lines = text_clean.split("\n")
+    lines = [line.strip() for line in text_clean.split("\n")]
     if len(lines) <= 1:
         return text_clean
 
-    last_line = lines[-1].strip()
+    while len(lines) > 1:
+        last_line = lines[-1].strip()
+        if not last_line:
+            lines.pop()
+            continue
 
-    # 1. If followup is provided and last line matches followup text
-    if followup:
-        f_clean = followup.strip().rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
-        l_clean = last_line.rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
-        if f_clean and l_clean and (f_clean in l_clean or l_clean in f_clean):
-            return "\n".join(lines[:-1]).strip()
+        # 1. If followup is provided and last line matches followup text
+        if followup:
+            f_clean = followup.strip().rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+            l_clean = last_line.rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+            if f_clean and l_clean and (f_clean in l_clean or l_clean in f_clean):
+                lines.pop()
+                continue
 
-    # 2. If last line ends with a question mark (possibly followed by emojis, punctuation, or spaces)
-    if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
-        return "\n".join(lines[:-1]).strip()
+        # 2. If last line ends with a question mark (possibly followed by emojis, punctuation, or spaces)
+        if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
+            lines.pop()
+            continue
 
-    # 3. If last line is a call to action prompting for 'Done' / 'Yes' (e.g. 'Done' ya 'Yes' likhein / लिखें)
-    if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
-        return "\n".join(lines[:-1]).strip()
+        # 3. If last line is a call to action prompting for 'Done' / 'Yes' (e.g. 'Done' ya 'Yes' likhein / लिखें)
+        if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
+            lines.pop()
+            continue
 
-    return text_clean
+        break
+
+    return "\n".join(lines).strip()
+
 
 
 def _format_for_whatsapp(text: str) -> str:

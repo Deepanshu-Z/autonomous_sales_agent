@@ -759,3 +759,5 @@ async def handle_conversation_turn_async(
     await save_user_state_async(phone, new_state)
 
     return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": result.get("buttons", [])}
+
+    return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": result.get("buttons", [])}

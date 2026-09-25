@@ -217,7 +217,7 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
     profile_created = bool(
         s.get("profile_created")
         or s.get("coupon_sent")
-        or s.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED")
+        or s.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
     )
 
     course_kb = kb_loader.get_course_data(course_id)
@@ -231,22 +231,15 @@ def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str 
             "  - ZERO FABRICATION RULE: You do NOT have any coupon codes. NEVER invent, fabricate, guess, or output ANY coupon code string (e.g. NEVER make up codes like 'WELCOME100', 'DISCOUNT50', or ANY code string).",
             "  - If customer asks for a coupon or code for ANY package (e.g. '6 month ka coupon do', 'coupon code kya hai', 'give coupon'):",
             "    1. Warmly explain that Ganesh Chaturthi Offer coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
-            "    2. Quote the official offer price for their package directly from COURSE_DATA.",
+            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is \u20b91,000, 1 Month is \u20b9300).",
             "    3. Guide them to complete their profile on the Sensationz App or website using the official links:",
         ]
         if profile_video:
             lines.append(f"       \u2022 Tutorial Video: {profile_video}")
-        platforms = kb_loader.get_global_rules().get("access_platforms", {})
-        android_url = platforms.get("android_app", "")
-        ios_url = platforms.get("ios_app", "")
-        web_url = platforms.get("website_portal", "")
-        if android_url:
-            lines.append(f"       \u2022 Android App: {android_url}")
-        if ios_url:
-            lines.append(f"       \u2022 iOS App: {ios_url}")
-        if web_url:
-            lines.append(f"       \u2022 Website: {web_url}")
         lines.extend([
+            "       \u2022 Android App: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
+            "       \u2022 iOS App: https://apps.apple.com/us/app/sensationz/id6761418351",
+            "       \u2022 Website: https://shop.sensationzperformingarts.com/",
             "  - PROFILE COMPLETION TRIGGER (STRICT PAST TENSE AFFIRMATION ONLY):",
             "    \u2022 Emit [UNLOCK_COUPON] ONLY IF the customer states they ALREADY finished/created/completed their profile or registered.",
             "    \u2022 STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",

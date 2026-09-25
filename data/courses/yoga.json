@@ -422,16 +422,5 @@
         ],
         "medical_disclaimer": "Course is for general wellness only. Not a substitute for medical treatment. Advise users to consult a doctor for medical conditions.",
         "prenatal_yoga_instruction": "Do NOT mention Mradula's prenatal certification when answering about Prenatal Yoga. Simply state we do not currently offer it."
-    },
-    "bonus_tip": {
-        "title": "5-Minute Pre-Class Morning Routine",
-        "content": "🎁 *Bonus: 5-Minute Pre-Class Morning Routine* 🧘‍♀️\n\n1️⃣ *Warm Water:* Class se 30 min pehle 1 glass gunguna paani piyein (boosts digestion & muscle flexibility).\n2️⃣ *Deep Belly-Breathing:* 2 minute slow deep breathing karein to relax your spine.\n3️⃣ *Gentle Cat-Cow Stretch:* 5 slow spine movements karein to open stiff morning muscles.\n\nYe simple routine kal ki live class ko 2x effective banayegi! ✨"
-    },
-    "conversion_hooks": [
-        "⚡ Yoga students who practice 3x per week show a 23% reduction in cortisol (stress hormone) within just 6 weeks — that's science-backed stress relief from your own home.",
-        "⚡ Research shows that live, interactive yoga (with real-time posture correction) is 2x more effective than self-paced videos for beginners — because someone is actually watching and guiding you.",
-        "⚡ Did you know? Most of our students say the biggest transformation they notice after 30 days is not physical — it's mental clarity and better sleep quality.",
-        "⚡ Our morning batch students (5–7 AM) report feeling more productive and focused throughout the day compared to evening practitioners — starting the day with intention changes everything.",
-        "⚡ At Rs. 7 per day (1 Month offer price), our Yoga course costs less than a single cup of chai — but the impact lasts a lifetime."
-    ]
+    }
 }

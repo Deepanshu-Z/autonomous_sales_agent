@@ -68,13 +68,6 @@ def _empty_flags() -> Dict[str, Any]:
         "question_summary": None,
         "detected_language": "English",
         "wants_resend_video": False,
-        "claims_different_phone_or_account": False,
-        "different_phone_number": None,
-        "user_goal": None,
-        "user_experience": None,
-        "scheduling_constraint": None,
-        "user_timeline": None,
-        "objection_type": "NONE",
     }
 
 
@@ -132,7 +125,6 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Contextual: Customer explicitly states that an unmet requirement is a dealbreaker preventing enrollment, ONLY AFTER having been informed of our policy (e.g. "then I won't join", "offline nahi hai to rehne do", "fixed schedule nahi ho payega mujhse, cancel karo").
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
-    - CRITICAL NEGATIVE GUARD: "Lock My Seat", "Lock Seat", "Proceed", "Book Seat", or clicking any affirmative action button is strictly NEVER disinterest!
 
 10. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
@@ -142,14 +134,13 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
-    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR customer clicks "Lock My Seat" / asks to proceed / lock their seat. (NEVER assign if customer is confirming profile creation or Google Login — use "PROFILE_COMPLETED").
+    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
-    - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup, or clicked 'Google Login Done', or states they logged in or installed the app (e.g. "Google Login Done", "done", "profile completed", "profile bana li", "login ho gaya").
+    - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
-    - "DIFFERENT_NUMBER_CLAIM": Customer states or explains they registered/created their profile with a different mobile number, someone else's phone number, or another account (e.g. "maine dusre number se banaya hai", "different number used",  "husband ke number se login kiya", "mummy ke phone se kiya hai", "doosre number pe register hai").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
 12. "question_summary":
@@ -170,33 +161,6 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 15. "wants_resend_video":
     - boolean: true if customer explicitly asks to send or resend a video tutorial or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video"). Otherwise false.
 
-16. "claims_different_phone_or_account":
-    - boolean: true if customer states, claims, or explains that they created their profile, registered, or logged in using a different phone number, someone else's phone/account (e.g. husband/wife/parent/friend), or another mobile number (e.g. "maine dusre number se kiya hai", "different number used", "profile is under another number", "mummy ke phone se banaya",  "doosre number pe banaya hai", "different account"). Also true if the bot previously asked if they registered with a different number and the customer replies with a phone number or says "yes doosre number se". Otherwise false.
-
-17. "different_phone_number":
-    - string or null: If the customer specifies or mentions an alternate 10-digit mobile number or phone number in their message (e.g. "9876543210", "+919876543210", "09876543210"), extract ONLY the 10 digits as a clean string (e.g. "9876543210"). If no alternate number is mentioned, return null.
-
-18. "user_goal":
-    - string or null: Personal fitness, health, or learning goal stated by the customer (e.g. "weight loss", "flexibility", "stress relief", "back pain", "peace of mind", "hobby", "classical dance", "tone face", "glow"). If none stated, return null.
-
-19. "user_experience":
-    - string or null: Prior experience level / Current Status stated by the customer ("beginner", "intermediate", "advanced", "never done before", "used to do years ago", "watching YouTube"). If none stated, return null.
-
-20. "scheduling_constraint":
-    - string or null: Timing or routine constraint stated by the customer (e.g. "morning only", "evening after office", "weekend only", "flexible", "before 8am"). If none stated, return null.
-
-21. "user_timeline":
-    - string or null: When the customer wants to start or their timeline constraint (e.g. "immediately", "this week", "next week", "from tomorrow", "next month", "exploring for later"). If none stated, return null.
-
-22. "objection_type":
-    Must be EXACTLY ONE of:
-    - "PRICE_PUSHBACK": Customer pushes back on price or asks for extra discounts ("expensive", "fees too high", "discount do", "budget kam hai", "can I pay less?", "too costly").
-    - "THINK_ABOUT_IT": Customer hesitates or delays decision ("soch kar bataunga", "will let you know", "need time to decide", "family se pooch kar", "baad me dekhte hain").
-    - "COMPARING_OTHER_APP": Customer mentions watching free YouTube videos or comparing to other platforms/apps ("YouTube pe dekh lungi", "Cultfit", "other app").
-    - "TIMING_CONFLICT": Customer says batch timing clashes with office, college, or chores ("timing match nahi kar rahi", "office clash", "busy at that time").
-    - "SKEPTICAL_ONLINE": Customer doubts if online learning works ("online samajh aayega?", "online effective hai?", "offline better hota").
-    - "NONE": No active objection expressed.
-
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -213,14 +177,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "question_summary": string | null,
   "detected_language": string,
   "explicit_language_request": string | null,
-  "wants_resend_video": boolean,
-  "claims_different_phone_or_account": boolean,
-  "different_phone_number": string | null,
-  "user_goal": string | null,
-  "user_experience": string | null,
-  "scheduling_constraint": string | null,
-  "user_timeline": string | null,
-  "objection_type": "PRICE_PUSHBACK" | "THINK_ABOUT_IT" | "COMPARING_OTHER_APP" | "TIMING_CONFLICT" | "SKEPTICAL_ONLINE" | "NONE"
+  "wants_resend_video": boolean
 }"""
 
 
@@ -318,52 +275,6 @@ async def extract_intent_and_state_changes(
         if chosen_course:
             clean["selected_course"] = chosen_course
 
-        # Heuristic / Safety net for alternate phone number or different account claim
-        raw_text_lower = text.lower().strip()
-        import re
-        phone_match = re.search(r"(?:\+?91[\-\s]?)?[6-9]\d{9}\b", text)
-        extracted_phone = None
-        if phone_match:
-            digits_only = re.sub(r"\D", "", phone_match.group(0))
-            if len(digits_only) >= 10:
-                extracted_phone = digits_only[-10:]
-
-        diff_number_markers = [
-            "dusre number", "doosre number", "dusra number", "doosra number",
-            "different number", "different phone", "another number", "another phone",
-            "other number", "other phone", "alag number", "alag phone", "kisi aur number",
-            "different mobile", "another mobile", "dusre mobile", "doosre mobile",
-            "dusre account", "doosre account", "different account", "another account",
-            "mummy ke", "papa ke", "husband ke", "wife ke", "bhai ke", "sister ke",
-            "dusre phone", "doosre phone", "another device", "dusre device", "doosre device",
-            "dusre no", "doosre no", "different no", "another no",
-        ]
-        has_diff_marker = any(m in raw_text_lower for m in diff_number_markers)
-        is_after_unverified = bool(s.get("profile_claim_unverified")) or any(
-            phrase in (last_ai or "").lower()
-            for phrase in ["doosre number", "dusre number", "different number", "another number"]
-        )
-
-        if has_diff_marker or (is_after_unverified and extracted_phone):
-            clean["claims_different_phone_or_account"] = True
-            clean["customer_intent"] = "DIFFERENT_NUMBER_CLAIM"
-            if extracted_phone and not clean.get("different_phone_number"):
-                clean["different_phone_number"] = extracted_phone
-        elif clean.get("claims_different_phone_or_account") and extracted_phone and not clean.get("different_phone_number"):
-            clean["different_phone_number"] = extracted_phone
-
-        import re
-        actual_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text, flags=re.DOTALL).strip()
-        from src.state.chat_state import is_profile_completed_signal
-        if is_profile_completed_signal(actual_text, state) or is_profile_completed_signal(text, state):
-            clean["is_disinterested"] = False
-            clean["customer_intent"] = "PROFILE_COMPLETED"
-            clean["profile_created_stated"] = "confirmed"
-            clean["app_installed_stated"] = "confirmed"
-        elif is_seat_lock_signal(actual_text) or is_seat_lock_signal(text):
-            clean["is_disinterested"] = False
-            clean["customer_intent"] = "APP_LINK_REQUEST"
-
         return clean
     except Exception as e:
         print(f"[intent_classifier] Extractor error (falling back to safe defaults): {e}")
@@ -373,71 +284,17 @@ async def extract_intent_and_state_changes(
             detected_course = kb_loader.detect_course_from_text_fallback(text, default_course=None)
             if detected_course:
                 flags["selected_course"] = detected_course
-            from src.state.chat_state import is_profile_completed_signal
-            if is_profile_completed_signal(text, state):
-                flags["customer_intent"] = "PROFILE_COMPLETED"
-                flags["profile_created_stated"] = "confirmed"
-                flags["app_installed_stated"] = "confirmed"
-                flags["is_disinterested"] = False
-            elif is_seat_lock_signal(text) or kb_loader.is_app_link_request_fallback(text):
+            if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
-                flags["is_disinterested"] = False
-
-            import re
-            phone_match = re.search(r"(?:\+?91[\-\s]?)?[6-9]\d{9}\b", text)
-            ext_phone = re.sub(r"\D", "", phone_match.group(0))[-10:] if phone_match else None
-            diff_phrases = [
-                "dusre number", "doosre number", "dusra number", "doosra number",
-                "different number", "different phone", "another number", "another phone",
-                "other number", "other phone", "alag number", "alag phone", "kisi aur",
-                "mummy ke", "papa ke", "husband ke", "wife ke", "different account",
-            ]
-            if any(m in text.lower() for m in diff_phrases) or (bool((state or {}).get("profile_claim_unverified")) and ext_phone):
-                flags["claims_different_phone_or_account"] = True
-                flags["customer_intent"] = "DIFFERENT_NUMBER_CLAIM"
-                flags["different_phone_number"] = ext_phone
         except Exception:
             pass
         return flags
 
 
-def is_seat_lock_signal(text: str) -> bool:
-    """
-    Detects if the user wants to lock their seat, book their slot, or proceed
-    (e.g., clicking 'Lock My Seat 🔒', saying 'seat lock kardo', 'proceed', etc.).
-    """
-    if not text:
-        return False
-    t = text.lower().strip()
-    import re
-    patterns = [
-        r"\block\s*(?:my\s*)?seat\b",
-        r"\block\s*(?:my\s*)?slot\b",
-        r"\bseat\s*lock\b",
-        r"\bslot\s*lock\b",
-        r"\bbook\s*(?:my\s*)?seat\b",
-        r"\bbook\s*(?:my\s*)?slot\b",
-        r"\bseat\s*book\b",
-        r"\bslot\s*book\b",
-        r"\bbook\s*now\b",
-        r"\bproceed\b",
-        r"\bcontinue\b",
-        r"\block\s*k(?:ar|r)\s*do\b",
-        r"\bseat\s*confirm\b",
-        r"\bconfirm\s*seat\b",
-        r"\bconfirm\s*slot\b",
-        r"\breserve\s*(?:my\s*)?seat\b",
-        r"\bhold\s*(?:my\s*)?seat\b",
-        r"सीट\s*लॉक",
-        r"स्लॉट\s*लॉक",
-    ]
-    return any(re.search(p, t) for p in patterns)
-
-
 def is_app_link_request(text: str) -> bool:
     """Backward compatibility helper for app link check."""
     t = (text or "").lower()
-    return is_seat_lock_signal(text) or any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
+    return any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
 
 
 def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> Dict[str, Any]:
@@ -446,12 +303,6 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     Pure data merge, no LLM calls, safe to unit-test.
     """
     new_state = dict(state)
-    raw_text = (flags.get("_raw_text") or "").strip()
-
-    if is_seat_lock_signal(raw_text) or flags.get("customer_intent") == "APP_LINK_REQUEST":
-        new_state["refusal_stage"] = 0
-        if new_state.get("stage") in ["NEW", "TIMING_SELECTED", "PACKAGE_SELECTED"]:
-            new_state["stage"] = "APP_LINK_SENT"
 
     if flags.get("app_installed_stated") == "confirmed":
         new_state["app_installed"] = True
@@ -470,19 +321,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("selected_package") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
         from src.core.coupons import normalize_package_name
-        from src.core import kb_loader
         course_for_pkg = new_state.get("course") or "yoga"
         canonical_pkg = normalize_package_name(flags["selected_package"], course_id=course_for_pkg)
         new_state["package"] = canonical_pkg or flags["selected_package"]
-        # Synchronize exact package fee dynamically from course JSON
-        coupons = kb_loader.get_course_coupons(course_for_pkg)
-        pkg_details = coupons.get(new_state["package"])
-        if pkg_details and pkg_details.get("offer_price") is not None:
-            new_state["fee"] = pkg_details["offer_price"]
-        elif pkg_details and pkg_details.get("base_price") is not None:
-            new_state["fee"] = pkg_details["base_price"]
-    elif not new_state.get("package"):
-        new_state["fee"] = None
 
     if flags.get("selected_course"):
         from src.core import kb_loader
@@ -497,38 +338,6 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
-
-    # Persist qualification & discovery facts in state (persists directly in Redis schema)
-    qualification = dict(new_state.get("qualification") or {})
-    discovery = dict(new_state.get("discovery") or {})
-
-    if flags.get("user_experience"):
-        qualification["current_status"] = flags["user_experience"]
-        discovery["experience"] = flags["user_experience"]
-    if flags.get("user_goal"):
-        qualification["goal"] = flags["user_goal"]
-        discovery["goal"] = flags["user_goal"]
-    if flags.get("user_timeline"):
-        qualification["timeline"] = flags["user_timeline"]
-        discovery["timeline"] = flags["user_timeline"]
-    elif flags.get("scheduling_constraint"):
-        discovery["schedule"] = flags["scheduling_constraint"]
-        if not qualification.get("timeline"):
-            qualification["timeline"] = flags["scheduling_constraint"]
-
-    is_qualified = bool(qualification.get("current_status") and qualification.get("goal"))
-    qualification["is_qualified"] = is_qualified
-
-    new_state["qualification"] = qualification
-    if discovery:
-        new_state["discovery"] = discovery
-
-    # Track active objection
-    obj = flags.get("objection_type")
-    if obj and obj != "NONE":
-        new_state["active_objection"] = obj
-    elif is_seat_lock_signal(raw_text) or flags.get("customer_intent") in ("TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED"):
-        new_state.pop("active_objection", None)
 
     # Language management: Lock selected language until explicitly changed
     from src.core import language_loader
@@ -607,11 +416,6 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
                 detected_lang = f"{base_lang} (Latin script)"
         new_state["language"] = detected_lang
 
-    if flags.get("claims_different_phone_or_account"):
-        new_state["claims_different_phone_or_account"] = True
-        if flags.get("different_phone_number"):
-            new_state["alternate_phone_number"] = flags["different_phone_number"]
-
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
         "wants_trial": flags.get("wants_trial", False),
@@ -621,8 +425,6 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "is_complaint_or_refund": flags.get("is_complaint_or_refund", False),
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
-        "claims_different_phone_or_account": flags.get("claims_different_phone_or_account", False),
-        "different_phone_number": flags.get("different_phone_number"),
     }
 
     return new_state

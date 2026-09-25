@@ -68,8 +68,7 @@ ANALYSIS CRITERIA:
 1. REFUSAL DETECTION:
    - Is the customer refusing, declining, dropping out, or showing disinterest in taking the course/classes?
    - Examples: "Not interested", "Nahi chahiye", "No thanks", "Rehne do", "Cancel", "Too expensive", "I don't have time", "Nahi lena".
-   - Note: If `Refusal Stage` is 1, the customer is now responding with their reason for earlier refusal — treat their reply as the reason only if they are actually explaining an objection.
-   - CRITICAL NEGATIVE GUARD: "Lock My Seat", "Lock Seat", "Proceed", "Book Seat", "Book Slot", selecting a package/timing, or ANY affirmative CTA is strictly NEVER a refusal. Set `resolution_type` = "NOT_A_REFUSAL" immediately!
+   - Note: If `Refusal Stage` is 1, the customer is now responding with their reason for earlier refusal — treat their reply as the reason even if it doesn't sound like a new refusal.
 
 2. REASON PRESENCE:
    - Did the customer specify WHY they are refusing?
@@ -136,7 +135,7 @@ DECISION OUTCOMES:
 STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
 - When generating `reply_message` for PROVIDE_SOLUTION:
   • You MUST strictly quote the Active Course Name and its details provided in the ACTIVE COURSE CONTEXT.
-  • NEVER assume, invent, or fabricate course names, fees, or packages not present in ACTIVE COURSE CONTEXT.
+  • NEVER assume, invent, or mention 'Yoga' or '₹300' unless the active course is explicitly Yoga.
   • Share YouTube demo videos if present in ACTIVE COURSE CONTEXT.
   • If no active course is known: DO NOT quote fees or specific course names. Warmly ask which course they are exploring.
 
@@ -214,9 +213,8 @@ async def evaluate_refusal_async(
                 f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
             )
 
-    # Quick pre-filter: if text is empty or customer is locking seat / proceeding, NOT a refusal
-    from src.core.intent_classifier import is_seat_lock_signal
-    if not text or not text.strip() or is_seat_lock_signal(text):
+    # Quick pre-filter: if text is empty, ignore
+    if not text or not text.strip():
         return {
             "is_refusal": False,
             "has_reason": False,

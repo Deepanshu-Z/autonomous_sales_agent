@@ -16,7 +16,6 @@ def check_env_vars():
         "INTERAKT_API_KEY",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
-        "PROD_APP_DB_URL",
     ]
 
 
@@ -76,8 +75,7 @@ if __name__ == "__main__":
         "main:app",
         host=host,
         port=port,
-        reload=True,
+        workers=1,  # Single worker — in-memory state requires it
         log_level="info",
     )
-
 

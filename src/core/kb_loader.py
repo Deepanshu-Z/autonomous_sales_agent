@@ -384,13 +384,6 @@ def format_app_links_display() -> str:
     )
 
 
-def get_course_bonus_tip(course_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-    """Returns the pre-filled text bonus tip for the course from course JSON, if defined."""
-    cid = (course_id or "yoga").lower().strip()
-    data = get_course_data(cid)
-    return data.get("bonus_tip")
-
-
 # ── Fallback-only utilities ─────────────────────────────────────────────
 # Deterministic keyword/fuzzy matching. These exist SOLELY as a resilience
 # fallback for when the semantic LLM extractor (intent_classifier.py) fails
@@ -448,42 +441,3 @@ def is_app_link_request_fallback(text: str) -> bool:
 
 # Backward-compatible alias for existing test suites and modules
 detect_course_from_text = detect_course_from_text_fallback
-
-
-def get_course_bonus_tip(course_id: Optional[str] = None) -> Optional[str]:
-    """Retrieves the prefilled bonus tip content for a given course directly from course JSON.
-    Zero hardcoded values, dynamic per course.
-    """
-    if not course_id:
-        return None
-    data = get_course_data(course_id)
-    bonus = data.get("bonus_tip")
-    if isinstance(bonus, dict):
-        return bonus.get("content")
-    elif isinstance(bonus, str):
-        return bonus
-    return None
-
-
-def get_course_conversion_hook(course_id: Optional[str] = None, seed: Optional[int] = None) -> Optional[str]:
-    """Returns a random course fact from the conversion_hooks list for use as a persuasion drip.
-    Zero hardcoded values — dynamically read from course JSON.
-    Args:
-        course_id: The course identifier (e.g. 'yoga', 'kathak', 'face_yoga').
-        seed: Optional integer seed for deterministic selection (e.g. based on message count).
-    """
-    import random
-    cid = (course_id or "yoga").lower().strip()
-    data = get_course_data(cid)
-    hooks = data.get("conversion_hooks")
-    if not isinstance(hooks, list) or not hooks:
-        data = get_course_data("yoga")
-        hooks = data.get("conversion_hooks")
-    if not isinstance(hooks, list) or not hooks:
-        return "Live interactive yoga practice with certified female master teachers produces 2x better consistency and posture alignment than recorded videos."
-    if seed is not None:
-        rng = random.Random(seed)
-        return rng.choice(hooks)
-    return random.choice(hooks)
-
-

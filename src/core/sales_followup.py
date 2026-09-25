@@ -47,7 +47,7 @@ _SUPPRESS_ON_REPLY_KWS = [
 
 
 # Stages where no sales follow-up is ever added
-_SKIP_STAGES = {"PROFILE_COMPLETED", "COUPON_SENT", "APP_LINK_SENT", "TRIAL_REQUESTED", "TRIAL_STEPS_SENT"}
+_SKIP_STAGES = {"PROFILE_COMPLETED", "COUPON_SENT", "READY_FOR_APP_LINK", "APP_LINK_SENT", "TRIAL_REQUESTED", "TRIAL_STEPS_SENT"}
 
 
 
@@ -173,16 +173,12 @@ _QUESTION_BANK = [
             "kaise chalata", "kaise join",
         ],
         "hindi": (
-            "Google login sirf 2 taps mein hota hai:\n"
-            "1️⃣ App open karo → 'Continue with Google' tap karo\n"
-            "2️⃣ Apna Gmail select karo → 10 seconds mein done! 😊\n"
-            "Kya aapka phone Android hai ya iPhone?"
+            "App download karna kaafi simple hai — 5 minutes mein set ho jaata hai. "
+            "Kya aapko download steps mein help chahiye? 😊"
         ),
         "english": (
-            "Google login is just 2 taps:\n"
-            "1️⃣ Open App → Tap 'Continue with Google'\n"
-            "2️⃣ Select your Gmail → Done in 10 seconds! 😊\n"
-            "Is your phone Android or iPhone?"
+            "Downloading the app is a simple 5-minute process. "
+            "Would you like help with the download steps? 😊"
         ),
     },
 ]
@@ -193,28 +189,24 @@ _QUESTION_BANK = [
 
 _FALLBACK_BY_STAGE = {
     "NEW": {
-        "hindi": "Kya aap jaanna chahte hain ki 1 month baad aap kaisi feel karenge? Hamari students kehti hain: 'Pehle week ke baad hi body mein fark dikh gaya!' Kaunsa time aapke liye best hai — subah ya shaam? 😊",
-        "english": "Curious what our students say after just 1 week? 'I already feel a difference!' Which time works for your schedule — morning or evening? 😊",
+        "hindi": "Classes ke baare mein kuch aur jaanna chahte hain, ya timing discuss karein? 😊",
+        "english": "Would you like to know more about the classes, or shall we discuss timings? 😊",
     },
     "ENROLL_ASKED": {
         "hindi": "Kya aap available timings dekhna chahenge? 😊",
         "english": "Would you like to see the available timings? 😊",
     },
     "ENROLL_CONFIRMED": {
-        "hindi": "Subah ya shaam — kaun sa time aapke daily routine mein fit hoga? 😊",
-        "english": "Morning or evening — which time fits your daily routine? 😊",
+        "hindi": "Subah ya shaam — kaun sa time aapke liye best rahega? 😊",
+        "english": "Morning or evening — which time suits you better? 😊",
     },
     "TIMING_SELECTED": {
-        "hindi": "Sirf 1 step aur — package choose kar lo aur seat lock! 1 month se shuru karein ya 3 months ka full transformation plan? 😊",
-        "english": "Just 1 more step — pick a package and lock your seat! Start with 1 month or go for the 3-month transformation? 😊",
+        "hindi": "Kitne time ke liye join karna chahenge — 1 month trial se shuru karein ya seedha 3 months? 😊",
+        "english": "How long would you like to join — start with 1 month or go for 3 months? 😊",
     },
     "PACKAGE_SELECTED": {
-        "hindi": "Setup 80% complete hai — sirf Google login bacha hai (10 seconds ka kaam)! App open karo, 'Continue with Google' tap karo, aur Gmail select karo. Android hai ya iPhone? 📲",
-        "english": "Setup is 80% done — just Google login left (10 seconds)! Open the app, tap 'Continue with Google', and select your Gmail. Android or iPhone? 📲",
-    },
-    "READY_FOR_APP_LINK": {
-        "hindi": "Setup 80% complete hai — sirf Google login bacha hai (10 seconds ka kaam)! App open karo, 'Continue with Google' tap karo, aur Gmail select karo. Android hai ya iPhone? 📲",
-        "english": "Setup is 80% done — just Google login left (10 seconds)! Open the app, tap 'Continue with Google', and select your Gmail. Android or iPhone? 📲",
+        "hindi": "Bahut badiya! App download karne mein koi help chahiye? 😊",
+        "english": "Great choice! Need help downloading the app? 😊",
     },
 }
 

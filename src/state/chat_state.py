@@ -138,12 +138,6 @@ def get_default_state(phone: str) -> dict:
         "next_follow_up_due_at": 0,
         "last_topic": 0,
         "refusal_stage": 0,           # 3-step refusal lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated
-        "qualification": {
-            "current_status": None,   # Skill level / background: beginner, intermediate, YouTube/apps
-            "goal": None,             # Desired outcome: weight loss, back pain relief, flexibility
-            "timeline": None,         # Timeline / schedule constraint: this week, immediately, morning/evening
-            "is_qualified": False,    # True once current_status & goal are identified
-        },
     }
 
 
@@ -713,7 +707,6 @@ def is_profile_completed_signal(text: str, state: dict = None) -> bool:
         return True
 
     _EXPLICIT_COMPLETION_PHRASES = [
-        "google login done", "login done", "google login", "google done",
         "profile created", "profile done", "profile complete", "created profile",
         "profile ban gayi", "profile ban gai", "profile bana li", "profile banali",
         "profile bna li", "profile bnali", "profile ready", "profile set",

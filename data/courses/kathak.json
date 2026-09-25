@@ -342,16 +342,5 @@
             "Leave or class pause",
             "Refunds"
         ]
-    },
-    "bonus_tip": {
-        "title": "3-Minute Footwork & Posture Warm-Up",
-        "content": "🎁 *Bonus: 3-Minute Kathak Posture & Ankle Warm-Up* 💃\n\n1️⃣ *Samapada Alignment:* Spine straight, shoulders back, feet at 45 degrees.\n2️⃣ *Ankle Rotations:* Tatkar (footwork) se pehle dono ankles ko 10 times rotate karein for injury-free practice.\n3️⃣ *Pataka Mudra Stretch:* Haathon ko stretch karke 1 minute hold karein for finger grace.\n\nKal ke live batch ke liye ye perfect warm-up hai! 🎶"
-    },
-    "conversion_hooks": [
-        "⚡ Kathak is India's most expressive classical dance — and our students say it's the one thing they wish they had started 10 years earlier.",
-        "⚡ Live Kathak with a real instructor correcting your 'tatkar' footwork and hand mudras in real-time is COMPLETELY different from any YouTube tutorial — you feel the difference in Week 1.",
-        "⚡ Did you know? Studies show that classical dance like Kathak improves memory, coordination, and posture faster than most gym workouts — because it trains both body and mind simultaneously.",
-        "⚡ Our Kathak classes welcome ALL ages (5 years and above) and ALL experience levels — most of our students start as absolute beginners with zero dance background.",
-        "⚡ Twice-weekly live batches mean you get 2 full hours of personal instructor attention per week — structured, progressive, and fun."
-    ]
+    }
 }

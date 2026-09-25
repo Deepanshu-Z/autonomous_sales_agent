@@ -95,7 +95,6 @@ async def handle_incoming_message(
     session_state: Dict[str, Any],
     conversation_history: List[Dict[str, str]],
     course_id: Optional[str] = None,
-    phone: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Returns {"reply": str, "new_state": dict} — the caller persists
@@ -111,108 +110,6 @@ async def handle_incoming_message(
     # 2. Pure state merge.
     flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
-
-    # 2b. Production App Database Verification (Real PostgreSQL RDS)
-    from src.state.chat_state import is_profile_completed_signal
-    profile_claimed = bool(
-        flags.get("profile_created_stated") == "confirmed"
-        or is_profile_completed_signal(user_message, session_state)
-    )
-
-    profile_claim_just_failed = False
-    if phone and (profile_claimed or session_state.get("profile_created")):
-        from src.services.app_db_verifier import verify_user_in_production_db_async
-        try:
-            db_res = await verify_user_in_production_db_async(phone)
-            if db_res.get("verified"):
-                new_state["profile_created"] = True
-                new_state["app_installed"] = True
-                new_state["profile_db_verified"] = True
-                new_state["profile_claim_unverified"] = False
-                if db_res.get("full_name"):
-                    new_state["customer_name"] = db_res["full_name"]
-                if db_res.get("has_trial"):
-                    new_state["db_trial_booked"] = True
-                if db_res.get("has_enrollment"):
-                    new_state["db_course_enrolled"] = True
-            else:
-                # ZERO TRUST: If not verified in RDS DB (either no profile exists OR DB error/unreachable),
-                # customer is strictly UNVERIFIED. NEVER unlock coupon or confirm profile!
-                new_state["profile_created"] = False
-                new_state["profile_db_verified"] = False
-                new_state["profile_claim_unverified"] = True
-                new_state["coupon_sent"] = False
-                profile_claim_just_failed = bool(profile_claimed)
-                # Revert stage so it does not advance to PROFILE_COMPLETED or COUPON_SENT
-                prev_stage = session_state.get("stage") or "APP_LINK_SENT"
-                if prev_stage in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]:
-                    new_state["stage"] = "APP_LINK_SENT"
-                else:
-                    new_state["stage"] = prev_stage
-                if db_res.get("error"):
-                    logger.error(f"[conversation_handler] DB verification error for {phone}: {db_res.get('error')}")
-        except Exception as e:
-            logger.error(f"Error checking production app DB: {e}")
-            new_state["profile_created"] = False
-            new_state["profile_db_verified"] = False
-            new_state["profile_claim_unverified"] = True
-            new_state["coupon_sent"] = False
-            profile_claim_just_failed = bool(profile_claimed)
-            prev_stage = session_state.get("stage") or "APP_LINK_SENT"
-            if prev_stage in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]:
-                new_state["stage"] = "APP_LINK_SENT"
-            else:
-                new_state["stage"] = prev_stage
-
-    # 2c. Immediate Routing for Alternate Phone / Account Claim (Manual Verification)
-    if (
-        flags.get("claims_different_phone_or_account")
-        or flags.get("customer_intent") == "DIFFERENT_NUMBER_CLAIM"
-        or new_state.get("_last_turn", {}).get("claims_different_phone_or_account")
-    ):
-        alt_phone = flags.get("different_phone_number") or new_state.get("alternate_phone_number")
-        alt_phone_text = f" ({alt_phone})" if alt_phone else ""
-        handoff_reply = (
-            f"Ji bilkul! Maine aapka alternate number{alt_phone_text} note kar liya hai. "
-            "Humari team manual verification ke liye aapse turant connect kar rahi hai. Ek minute hold kijiye! 😊\n\n"
-            f"Got it! I have noted your alternate phone number{alt_phone_text}. "
-            "Our team is connecting with you shortly for manual account verification! 🙏"
-        )
-        return {
-            "reply": handoff_reply,
-            "followup": None,
-            "buttons": [],
-            "new_state": new_state,
-        }
-
-    # 2d. Deterministic Handling for Unverified Profile Claim (Zero Hallucination / Zero Coupon Leak)
-    if profile_claim_just_failed or (profile_claimed and new_state.get("profile_claim_unverified")):
-        user_lang = new_state.get("language") or "English"
-        is_hindi = "hinglish" in user_lang.lower() or "hindi" in user_lang.lower()
-
-        if is_hindi:
-            unverified_reply = (
-                f"Aapka profile is WhatsApp number (+{phone}) par abhi Sensationz App me register nahi dikh raha hai. 📱\n\n"
-                "Agar aapne Google se login kar liya hai, to kya aapne kisi *doosre mobile number* ya doosre Google account se kiya hai? "
-                "Agar doosre number se kiya hai to kripya apna wo number batayein, ya pehle Sensationz App me login complete karein! 😊"
-            )
-            unverified_followup = "Kya aapne kisi doosre number se sign up kiya hai?"
-            unverified_buttons = ["Haan, Dusre Number Se 👍", "App Me Login Kar Raha Hoon 📱"]
-        else:
-            unverified_reply = (
-                f"We couldn't find a registered profile under this mobile number (+{phone}) in the Sensationz App yet. 📱\n\n"
-                "If you logged in with Google, did you use a different mobile number or Google account? "
-                "If you used another number, please share it here so our team can verify it, or complete your signup in the Sensationz App! 😊"
-            )
-            unverified_followup = "Did you sign up using a different phone number?"
-            unverified_buttons = ["Yes, Different Number 👍", "Logging In Now 📱"]
-
-        return {
-            "reply": unverified_reply,
-            "followup": unverified_followup,
-            "buttons": unverified_buttons,
-            "new_state": new_state,
-        }
 
     # A customer can switch topics mid-conversation ("what about Kathak
     # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
@@ -271,19 +168,6 @@ async def handle_incoming_message(
 
     new_state["language"] = detected_lang
 
-    turn_count = len([t for t in (conversation_history or []) if t.get("role") in ("user", "customer")]) + 1
-    new_state["turn_count"] = turn_count
-
-    past_phrases = []
-    for t in (conversation_history or []):
-        if t.get("role") in ("assistant", "ai"):
-            c = (t.get("content") or "").strip()
-            if c:
-                first_line = c.split("\n")[0].strip()
-                if first_line:
-                    past_phrases.append(first_line[:90])
-    new_state["used_phrases"] = past_phrases[-6:]
-
     system_prompt = prompt_module.format_system_prompt(
         new_state, course_id=effective_course_id, detected_language=detected_lang
     )
@@ -338,17 +222,9 @@ async def handle_incoming_message(
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.
-    if (
-        new_state.get("profile_created")
-        and not new_state.get("profile_claim_unverified")
-        and new_state.get("stage") == "PROFILE_COMPLETED"
-    ):
-        if new_state.get("wants_trial"):
-            new_state["stage"] = "TRIAL_CONFIRMED"
-        else:
-            new_state["stage"] = "COUPON_SENT"
-            new_state["coupon_sent"] = True
-
+    if new_state.get("profile_created") and new_state.get("stage") == "PROFILE_COMPLETED":
+        new_state["stage"] = "COUPON_SENT"
+        new_state["coupon_sent"] = True
 
     # Guarantee dedicated "Talk to Agent" button in user's language (max 3 buttons total on WhatsApp)
     if followup_msg and buttons is not None:
@@ -375,12 +251,9 @@ def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional
     from src.core.coupons import get_coupon_details
 
     profile_confirmed = bool(
-        not state.get("profile_claim_unverified")
-        and (
-            state.get("profile_created")
-            or state.get("coupon_sent")
-            or state.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
-        )
+        state.get("profile_created")
+        or state.get("coupon_sent")
+        or state.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
     )
 
     coupons = kb_loader.get_course_coupons(course_id)
@@ -413,38 +286,28 @@ def _strip_trailing_question(text: str, followup: Optional[str] = None) -> str:
     if not text:
         return text
     text_clean = text.strip()
-    lines = [line.strip() for line in text_clean.split("\n")]
+    lines = text_clean.split("\n")
     if len(lines) <= 1:
         return text_clean
 
-    while len(lines) > 1:
-        last_line = lines[-1].strip()
-        if not last_line:
-            lines.pop()
-            continue
+    last_line = lines[-1].strip()
 
-        # 1. If followup is provided and last line matches followup text
-        if followup:
-            f_clean = followup.strip().rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
-            l_clean = last_line.rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
-            if f_clean and l_clean and (f_clean in l_clean or l_clean in f_clean):
-                lines.pop()
-                continue
+    # 1. If followup is provided and last line matches followup text
+    if followup:
+        f_clean = followup.strip().rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+        l_clean = last_line.rstrip("?!.। \t\n\r😊🙏✨🌸👍").lower()
+        if f_clean and l_clean and (f_clean in l_clean or l_clean in f_clean):
+            return "\n".join(lines[:-1]).strip()
 
-        # 2. If last line ends with a question mark (possibly followed by emojis, punctuation, or spaces)
-        if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
-            lines.pop()
-            continue
+    # 2. If last line ends with a question mark (possibly followed by emojis, punctuation, or spaces)
+    if re.search(r"(\?|[?？])\s*[\U00010000-\U0010ffff\s]*$", last_line):
+        return "\n".join(lines[:-1]).strip()
 
-        # 3. If last line is a call to action prompting for 'Done' / 'Yes' (e.g. 'Done' ya 'Yes' likhein / लिखें)
-        if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
-            lines.pop()
-            continue
+    # 3. If last line is a call to action prompting for 'Done' / 'Yes' (e.g. 'Done' ya 'Yes' likhein / लिखें)
+    if re.search(r"['\"]?(?:done|yes)['\"]?.{0,25}(?:likh|type|bata|bhejo|लिख|टाइप|बता)", last_line, re.IGNORECASE):
+        return "\n".join(lines[:-1]).strip()
 
-        break
-
-    return "\n".join(lines).strip()
-
+    return text_clean
 
 
 def _format_for_whatsapp(text: str) -> str:
@@ -604,8 +467,7 @@ async def handle_conversation_turn_async(
     start_time = start_time or time.time()
     state = await get_user_state_async(phone)
     text_clean = (text or "").strip()
-    actual_user_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.DOTALL).strip()
-    cmd = actual_user_text.lower()
+    cmd = text_clean.lower()
 
     # ── Control Commands (Tester / Dev Reset & Unescalate) ────────────────────
     if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
@@ -650,38 +512,12 @@ async def handle_conversation_turn_async(
         session_state=state,
         conversation_history=history or [],
         course_id=active_course,
-        phone=phone,
     )
 
     reply_text = result.get("reply", "")
     followup_msg = result.get("followup")
     new_state = result.get("new_state", state)
     last_turn = new_state.get("_last_turn", {})
-
-    # Check for Different Phone Number Claim -> Immediate Manual Verification Handoff
-    claims_diff_num = (
-        last_turn.get("claims_different_phone_or_account")
-        or last_turn.get("intent") == "DIFFERENT_NUMBER_CLAIM"
-        or new_state.get("claims_different_phone_or_account")
-    )
-    if claims_diff_num:
-        alt_phone = last_turn.get("different_phone_number") or new_state.get("alternate_phone_number")
-        alt_str = f" ({alt_phone})" if alt_phone else ""
-        reason = (
-            f"Manual Verification Needed: Customer claims profile created with different number/account"
-            f"{alt_str}. Primary WhatsApp: {phone}"
-        )
-        new_state["is_escalated"] = True
-        new_state["escalation_reason"] = reason
-        await execute_agent_handoff_async(
-            phone,
-            user_reply_text=reply_text,
-            escalation_reason=reason,
-            start_time=start_time,
-            send_connecting_notice=False,
-        )
-        await save_user_state_async(phone, new_state)
-        return {"status": "handed_off_different_number", "reply": reply_text}
 
     # Check for Human Agent Escalation
     if last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST":
@@ -698,25 +534,25 @@ async def handle_conversation_turn_async(
     # route through the refusal engine (3-step lifecycle: 0=normal, 1=asked reason, 2=solution offered, 3=escalated).
     current_refusal_stage = new_state.get("refusal_stage", 0)
 
-    from src.core.intent_classifier import is_seat_lock_signal
-    # Reset refusal lifecycle if customer is no longer refusing:
-    # 1. Customer clicked "Lock My Seat" or sent a positive proceed / seat-locking signal
-    # 2. Customer selected a timing, package, requested trial, app link, or profile completion
-    # 3. Customer asked a question or is no longer disinterested
-    if (
-        is_seat_lock_signal(actual_user_text)
-        or is_seat_lock_signal(text_clean)
-        or last_turn.get("wants_trial")
-        or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED", "APP_LINK_REQUEST"]
-        or (not last_turn.get("is_disinterested") and last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT"))
-    ):
-        new_state["refusal_stage"] = 0
-        current_refusal_stage = 0
+    # Only reset refusal_stage back to 0 if customer actively accepts an enrollment step (timing, package, trial)
+    if current_refusal_stage >= 2 and not last_turn.get("is_disinterested"):
+        if last_turn.get("wants_trial") or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED"]:
+            new_state["refusal_stage"] = 0
+            current_refusal_stage = 0
+
+    # BUG2 FIX: If stage==1 (we asked "why are you refusing?") and the customer is no longer
+    # disinterested (they changed topic or asked a normal question), exit the refusal lifecycle.
+    if current_refusal_stage == 1 and not last_turn.get("is_disinterested"):
+        if last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT", "OTHER", None):
+            new_state["refusal_stage"] = 0
+            current_refusal_stage = 0
 
     is_refusal_or_complaint = (
-        (last_turn.get("is_disinterested") or last_turn.get("is_complaint_or_refund") or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST"))
-        and not is_seat_lock_signal(actual_user_text)
-    ) or (current_refusal_stage > 0 and not is_seat_lock_signal(actual_user_text))
+        last_turn.get("is_disinterested")
+        or last_turn.get("is_complaint_or_refund")
+        or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
+        or current_refusal_stage > 0
+    )
 
     if is_refusal_or_complaint:
         eval_res = await evaluate_refusal_async(
@@ -799,51 +635,39 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
-    explicit_link_in_text = bool(
-        re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link|send link|link bhejo|link do)\b", actual_user_text, re.IGNORECASE)
-        or (re.search(r"\b(link|links)\b", actual_user_text, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", actual_user_text, re.IGNORECASE))
-    )
-    user_already_registered = bool(
-        new_state.get("profile_created")
-        or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]
-    )
     user_asked_links = bool(
-        (last_turn.get("intent") == "APP_LINK_REQUEST" and not user_already_registered)
-        or explicit_link_in_text
+        last_turn.get("intent") == "APP_LINK_REQUEST"
+        or re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link)\b", text_clean, re.IGNORECASE)
+        or (re.search(r"\b(link|links)\b", text_clean, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", text_clean, re.IGNORECASE))
     )
     user_asked_demo = bool(
-        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", actual_user_text, re.IGNORECASE)
+        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", text_clean, re.IGNORECASE)
         or "demo" in (last_turn.get("question_summary") or "").lower()
         or last_turn.get("wants_resend_video")
         or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
     )
-
-    is_trial_turn = bool(
-        last_turn.get("wants_trial")
-        or new_state.get("wants_trial")
-        or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
-        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", main_reply, re.IGNORECASE)
-    )
-    is_install_turn = bool(
-        new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
-        or is_seat_lock_signal(actual_user_text)
-        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile|links below|app using the links)\b", main_reply, re.IGNORECASE)
-    )
-
-    allow_platform_links = bool(user_asked_links or is_install_turn or is_trial_turn)
-
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
-    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_platform_links, allow_demo_links=user_asked_demo)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
 
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
     course_data_active = kb_loader.get_course_data(active_cid)
     wants_resend = bool(last_turn.get("wants_resend_video", False))
 
+    is_trial_turn = bool(
+        last_turn.get("wants_trial")
+        or new_state.get("wants_trial")
+        or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
+        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE)
+    )
+    is_install_turn = bool(
+        new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
+        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", clean_reply, re.IGNORECASE)
+    )
+
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:
-        # Follow-up messages accompany WhatsApp interactive quick reply buttons and must NEVER have platform links appended
-        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=False)
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
     if clean_followup and "play.google.com" in clean_reply:

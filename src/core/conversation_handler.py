@@ -271,6 +271,19 @@ async def handle_incoming_message(
 
     new_state["language"] = detected_lang
 
+    turn_count = len([t for t in (conversation_history or []) if t.get("role") in ("user", "customer")]) + 1
+    new_state["turn_count"] = turn_count
+
+    past_phrases = []
+    for t in (conversation_history or []):
+        if t.get("role") in ("assistant", "ai"):
+            c = (t.get("content") or "").strip()
+            if c:
+                first_line = c.split("\n")[0].strip()
+                if first_line:
+                    past_phrases.append(first_line[:90])
+    new_state["used_phrases"] = past_phrases[-6:]
+
     system_prompt = prompt_module.format_system_prompt(
         new_state, course_id=effective_course_id, detected_language=detected_lang
     )
@@ -336,17 +349,6 @@ async def handle_incoming_message(
             new_state["stage"] = "COUPON_SENT"
             new_state["coupon_sent"] = True
 
-    # In-chat bonus tip delivery (1 per course, no PDF, prefilled text)
-    if (
-        (new_state.get("profile_created") or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"])
-        and not new_state.get("profile_claim_unverified")
-        and not new_state.get("bonus_tip_sent")
-    ):
-        from src.core import kb_loader
-        tip = kb_loader.get_course_bonus_tip(effective_course_id)
-        if tip:
-            main_reply = f"{main_reply}\n\n{tip}".strip()
-            new_state["bonus_tip_sent"] = True
 
     # Guarantee dedicated "Talk to Agent" button in user's language (max 3 buttons total on WhatsApp)
     if followup_msg and buttons is not None:
@@ -805,24 +807,28 @@ async def handle_conversation_turn_async(
         or last_turn.get("wants_resend_video")
         or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
     )
-    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
-    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
-
-    # Dynamic Media Configuration for Trial and App Download/Install
-    active_cid = active_course or state.get("course") or ""
-    course_data_active = kb_loader.get_course_data(active_cid)
-    wants_resend = bool(last_turn.get("wants_resend_video", False))
 
     is_trial_turn = bool(
         last_turn.get("wants_trial")
         or new_state.get("wants_trial")
         or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
-        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE)
+        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", main_reply, re.IGNORECASE)
     )
     is_install_turn = bool(
         new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
-        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", clean_reply, re.IGNORECASE)
+        or is_seat_lock_signal(actual_user_text)
+        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile|links below|app using the links)\b", main_reply, re.IGNORECASE)
     )
+
+    allow_platform_links = bool(user_asked_links or is_install_turn or is_trial_turn)
+
+    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_platform_links, allow_demo_links=user_asked_demo)
+
+    # Dynamic Media Configuration for Trial and App Download/Install
+    active_cid = active_course or state.get("course") or ""
+    course_data_active = kb_loader.get_course_data(active_cid)
+    wants_resend = bool(last_turn.get("wants_resend_video", False))
 
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:

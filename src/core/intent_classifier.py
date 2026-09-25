@@ -70,6 +70,10 @@ def _empty_flags() -> Dict[str, Any]:
         "wants_resend_video": False,
         "claims_different_phone_or_account": False,
         "different_phone_number": None,
+        "user_goal": None,
+        "user_experience": None,
+        "scheduling_constraint": None,
+        "objection_type": "NONE",
     }
 
 
@@ -171,6 +175,24 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 17. "different_phone_number":
     - string or null: If the customer specifies or mentions an alternate 10-digit mobile number or phone number in their message (e.g. "9876543210", "+919876543210", "09876543210"), extract ONLY the 10 digits as a clean string (e.g. "9876543210"). If no alternate number is mentioned, return null.
 
+18. "user_goal":
+    - string or null: Personal fitness, health, or learning goal stated by the customer (e.g. "weight loss", "flexibility", "stress relief", "back pain", "peace of mind", "hobby", "classical dance", "tone face", "glow"). If none stated, return null.
+
+19. "user_experience":
+    - string or null: Prior experience level stated by the customer ("beginner", "intermediate", "advanced", "never done before", "used to do years ago"). If none stated, return null.
+
+20. "scheduling_constraint":
+    - string or null: Timing or routine constraint stated by the customer (e.g. "morning only", "evening after office", "weekend only", "flexible", "before 8am"). If none stated, return null.
+
+21. "objection_type":
+    Must be EXACTLY ONE of:
+    - "PRICE_PUSHBACK": Customer pushes back on price or asks for extra discounts ("expensive", "fees too high", "discount do", "budget kam hai", "can I pay less?", "too costly").
+    - "THINK_ABOUT_IT": Customer hesitates or delays decision ("soch kar bataunga", "will let you know", "need time to decide", "family se pooch kar", "baad me dekhte hain").
+    - "COMPARING_OTHER_APP": Customer mentions watching free YouTube videos or comparing to other platforms/apps ("YouTube pe dekh lungi", "Cultfit", "other app").
+    - "TIMING_CONFLICT": Customer says batch timing clashes with office, college, or chores ("timing match nahi kar rahi", "office clash", "busy at that time").
+    - "SKEPTICAL_ONLINE": Customer doubts if online learning works ("online samajh aayega?", "online effective hai?", "offline better hota").
+    - "NONE": No active objection expressed.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -189,7 +211,11 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "explicit_language_request": string | null,
   "wants_resend_video": boolean,
   "claims_different_phone_or_account": boolean,
-  "different_phone_number": string | null
+  "different_phone_number": string | null,
+  "user_goal": string | null,
+  "user_experience": string | null,
+  "scheduling_constraint": string | null,
+  "objection_type": "PRICE_PUSHBACK" | "THINK_ABOUT_IT" | "COMPARING_OTHER_APP" | "TIMING_CONFLICT" | "SKEPTICAL_ONLINE" | "NONE"
 }"""
 
 
@@ -439,9 +465,19 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("selected_package") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
         from src.core.coupons import normalize_package_name
+        from src.core import kb_loader
         course_for_pkg = new_state.get("course") or "yoga"
         canonical_pkg = normalize_package_name(flags["selected_package"], course_id=course_for_pkg)
         new_state["package"] = canonical_pkg or flags["selected_package"]
+        # Synchronize exact package fee dynamically from course JSON
+        coupons = kb_loader.get_course_coupons(course_for_pkg)
+        pkg_details = coupons.get(new_state["package"])
+        if pkg_details and pkg_details.get("offer_price") is not None:
+            new_state["fee"] = pkg_details["offer_price"]
+        elif pkg_details and pkg_details.get("base_price") is not None:
+            new_state["fee"] = pkg_details["base_price"]
+    elif not new_state.get("package"):
+        new_state["fee"] = None
 
     if flags.get("selected_course"):
         from src.core import kb_loader
@@ -456,6 +492,24 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
+
+    # Persist discovery facts so later turns can naturally reference them
+    discovery = dict(new_state.get("discovery") or {})
+    if flags.get("user_goal"):
+        discovery["goal"] = flags["user_goal"]
+    if flags.get("user_experience"):
+        discovery["experience"] = flags["user_experience"]
+    if flags.get("scheduling_constraint"):
+        discovery["schedule"] = flags["scheduling_constraint"]
+    if discovery:
+        new_state["discovery"] = discovery
+
+    # Track active objection
+    obj = flags.get("objection_type")
+    if obj and obj != "NONE":
+        new_state["active_objection"] = obj
+    elif is_seat_lock_signal(raw_text) or flags.get("customer_intent") in ("TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED"):
+        new_state.pop("active_objection", None)
 
     # Language management: Lock selected language until explicitly changed
     from src.core import language_loader

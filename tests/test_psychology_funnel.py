@@ -88,11 +88,9 @@ async def test_trial_vs_package_stage_and_bonus():
         )
 
         new_st = res["new_state"]
-        print(f"Trial User -> Stage: {new_st.get('stage')}, Coupon Sent: {new_st.get('coupon_sent')}, Bonus Tip Sent: {new_st.get('bonus_tip_sent')}")
+        print(f"Trial User -> Stage: {new_st.get('stage')}, Coupon Sent: {new_st.get('coupon_sent')}")
         assert new_st.get("stage") == "TRIAL_CONFIRMED", f"Expected TRIAL_CONFIRMED, got {new_st.get('stage')}"
         assert not new_st.get("coupon_sent"), "Trial user must NOT have coupon_sent set"
-        assert new_st.get("bonus_tip_sent") is True, "Bonus tip must be marked sent"
-        assert "5-Minute Pre-Class Morning Routine" in res["reply"], "Bonus tip content must be appended to reply"
 
     # Case B: Paid Package User completing profile
     mock_reply_paid = '{"reply": "Congratulations on completing your profile! Here is your coupon: YOGA70", "followup": "Ready to checkout?", "buttons": ["Proceed 👍"]}'
@@ -120,13 +118,11 @@ async def test_trial_vs_package_stage_and_bonus():
         )
 
         new_st_paid = res_paid["new_state"]
-        print(f"Paid User -> Stage: {new_st_paid.get('stage')}, Coupon Sent: {new_st_paid.get('coupon_sent')}, Bonus Tip Sent: {new_st_paid.get('bonus_tip_sent')}")
+        print(f"Paid User -> Stage: {new_st_paid.get('stage')}, Coupon Sent: {new_st_paid.get('coupon_sent')}")
         assert new_st_paid.get("stage") == "COUPON_SENT", f"Expected COUPON_SENT, got {new_st_paid.get('stage')}"
         assert new_st_paid.get("coupon_sent") is True, "Paid user must have coupon_sent set"
-        assert new_st_paid.get("bonus_tip_sent") is True, "Bonus tip must be marked sent"
-        assert "5-Minute Pre-Class Morning Routine" in res_paid["reply"], "Bonus tip content must be appended to reply"
 
-    print("✅ PASS: Trial protection, coupon gating, and in-chat bonus tip delivery verified!")
+    print("✅ PASS: Trial protection, coupon gating verified without bonus tip!")
 
 
 async def test_unverified_profile_blocked():

@@ -103,7 +103,6 @@ class TestNoLinksSpam(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("apps.apple.com", reply)
             self.assertNotIn("shop.sensationzperformingarts.com", reply)
             self.assertIn("YOGA70", reply)
-            self.assertIn("Pre-Class Morning Routine", reply)
 
             # Zero platform links in Message #2 (follow-up)
             self.assertIsNotNone(followup)

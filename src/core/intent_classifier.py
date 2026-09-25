@@ -137,9 +137,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
-    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR customer clicks "Lock My Seat" / asks to proceed / lock their seat.
+    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR customer clicks "Lock My Seat" / asks to proceed / lock their seat. (NEVER assign if customer is confirming profile creation or Google Login — use "PROFILE_COMPLETED").
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
-    - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
+    - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup, or clicked 'Google Login Done', or states they logged in or installed the app (e.g. "Google Login Done", "done", "profile completed", "profile bana li", "login ho gaya").
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
@@ -321,7 +321,15 @@ async def extract_intent_and_state_changes(
         elif clean.get("claims_different_phone_or_account") and extracted_phone and not clean.get("different_phone_number"):
             clean["different_phone_number"] = extracted_phone
 
-        if is_seat_lock_signal(text):
+        import re
+        actual_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text, flags=re.DOTALL).strip()
+        from src.state.chat_state import is_profile_completed_signal
+        if is_profile_completed_signal(actual_text, state) or is_profile_completed_signal(text, state):
+            clean["is_disinterested"] = False
+            clean["customer_intent"] = "PROFILE_COMPLETED"
+            clean["profile_created_stated"] = "confirmed"
+            clean["app_installed_stated"] = "confirmed"
+        elif is_seat_lock_signal(actual_text) or is_seat_lock_signal(text):
             clean["is_disinterested"] = False
             clean["customer_intent"] = "APP_LINK_REQUEST"
 
@@ -334,7 +342,13 @@ async def extract_intent_and_state_changes(
             detected_course = kb_loader.detect_course_from_text_fallback(text, default_course=None)
             if detected_course:
                 flags["selected_course"] = detected_course
-            if is_seat_lock_signal(text) or kb_loader.is_app_link_request_fallback(text):
+            from src.state.chat_state import is_profile_completed_signal
+            if is_profile_completed_signal(text, state):
+                flags["customer_intent"] = "PROFILE_COMPLETED"
+                flags["profile_created_stated"] = "confirmed"
+                flags["app_installed_stated"] = "confirmed"
+                flags["is_disinterested"] = False
+            elif is_seat_lock_signal(text) or kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
                 flags["is_disinterested"] = False
 

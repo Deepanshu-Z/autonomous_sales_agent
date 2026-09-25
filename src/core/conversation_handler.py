@@ -592,7 +592,8 @@ async def handle_conversation_turn_async(
     start_time = start_time or time.time()
     state = await get_user_state_async(phone)
     text_clean = (text or "").strip()
-    cmd = text_clean.lower()
+    actual_user_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.DOTALL).strip()
+    cmd = actual_user_text.lower()
 
     # ── Control Commands (Tester / Dev Reset & Unescalate) ────────────────────
     if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
@@ -691,7 +692,8 @@ async def handle_conversation_turn_async(
     # 2. Customer selected a timing, package, requested trial, app link, or profile completion
     # 3. Customer asked a question or is no longer disinterested
     if (
-        is_seat_lock_signal(text_clean)
+        is_seat_lock_signal(actual_user_text)
+        or is_seat_lock_signal(text_clean)
         or last_turn.get("wants_trial")
         or last_turn.get("intent") in ["TIMING_SELECTION", "PACKAGE_SELECTION", "PROFILE_COMPLETED", "APP_LINK_REQUEST"]
         or (not last_turn.get("is_disinterested") and last_turn.get("intent") not in ("DISINTEREST", "COMPLAINT"))
@@ -701,8 +703,8 @@ async def handle_conversation_turn_async(
 
     is_refusal_or_complaint = (
         (last_turn.get("is_disinterested") or last_turn.get("is_complaint_or_refund") or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST"))
-        and not is_seat_lock_signal(text_clean)
-    ) or (current_refusal_stage > 0 and not is_seat_lock_signal(text_clean))
+        and not is_seat_lock_signal(actual_user_text)
+    ) or (current_refusal_stage > 0 and not is_seat_lock_signal(actual_user_text))
 
     if is_refusal_or_complaint:
         eval_res = await evaluate_refusal_async(
@@ -785,13 +787,20 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
+    explicit_link_in_text = bool(
+        re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link|send link|link bhejo|link do)\b", actual_user_text, re.IGNORECASE)
+        or (re.search(r"\b(link|links)\b", actual_user_text, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", actual_user_text, re.IGNORECASE))
+    )
+    user_already_registered = bool(
+        new_state.get("profile_created")
+        or new_state.get("stage") in ["PROFILE_COMPLETED", "COUPON_SENT", "TRIAL_CONFIRMED"]
+    )
     user_asked_links = bool(
-        last_turn.get("intent") == "APP_LINK_REQUEST"
-        or re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link)\b", text_clean, re.IGNORECASE)
-        or (re.search(r"\b(link|links)\b", text_clean, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", text_clean, re.IGNORECASE))
+        (last_turn.get("intent") == "APP_LINK_REQUEST" and not user_already_registered)
+        or explicit_link_in_text
     )
     user_asked_demo = bool(
-        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", text_clean, re.IGNORECASE)
+        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", actual_user_text, re.IGNORECASE)
         or "demo" in (last_turn.get("question_summary") or "").lower()
         or last_turn.get("wants_resend_video")
         or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
@@ -817,7 +826,8 @@ async def handle_conversation_turn_async(
 
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:
-        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
+        # Follow-up messages accompany WhatsApp interactive quick reply buttons and must NEVER have platform links appended
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=False)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
     if clean_followup and "play.google.com" in clean_reply:

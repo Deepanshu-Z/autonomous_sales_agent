@@ -1,10 +1,10 @@
 {
-  "default_language": "Hinglish",
+  "default_language": "English",
   "prompt_message": "Welcome to Sensationz! 🙏\n\nPlease select your preferred language:\nकृपया अपनी पसंदीदा भाषा चुनें:",
   "prompt_buttons": [
-    "Hinglish",
     "English",
-    "हिन्दी (Hindi)"
+    "हिन्दी (Hindi)",
+    "Hinglish"
   ],
   "languages": [
     {

@@ -66,7 +66,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_complaint_or_refund": False,
         "customer_intent": "QUESTION",
         "question_summary": None,
-        "detected_language": "Hinglish (Latin script)",
+        "detected_language": "English",
         "wants_resend_video": False,
     }
 
@@ -151,8 +151,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - STRICT SCRIPT RULES — READ CAREFULLY:
       • LATIN/ROMAN ALPHABET = NEVER DEVANAGARI: If the customer's message contains ONLY standard ASCII/Latin characters (a-z, A-Z, 0-9, punctuation, spaces), it is physically impossible for it to be Devanagari script. You MUST classify it as "Hinglish (Latin script)" (if Indic/Hindi meaning) or "English" (if pure English).
       • Hinglish (Latin script): Any message typed in the Latin alphabet that uses Hindi/Urdu words, shortened forms, or phonetic transliterations. Examples: "fees kya h", "teachers kon h", "trial kon leta h", "mjhe tumpe trust nhi hora", "kya timing h", "nhi kathak ki fees bta", "seekhna h", "acha", "fees bta do", "kya h", "kon h", "kab h", "batao", "nahi lena", "thik h", "hnji", "kaise hoga", "mujhe chahiye", "mam", "sir", "plz", "pls". ALL of these MUST be classified as "Hinglish (Latin script)".
+      • English: Message is in standard English words with no Hindi/Urdu terms.
       • Classify as "Hindi (Devanagari script)" ONLY IF the customer's message literally contains Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते", "क्या टाइमिंग है"). If you do NOT see actual Devanagari characters (अ आ इ ई etc.) in the message, NEVER output "Hindi (Devanagari script)"!
-      • GREETINGS & SHORT QUERIES: If the customer message is a greeting ('hi', 'hello', 'hey', 'hii', 'start') or casual query without full English sentences, default to "Hinglish (Latin script)" as the system default language.
       • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
 14. "explicit_language_request":

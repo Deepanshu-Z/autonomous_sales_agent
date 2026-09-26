@@ -646,9 +646,6 @@ async def handle_conversation_turn_async(
         or last_turn.get("wants_resend_video")
         or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
     )
-    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
-    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
-
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
     course_data_active = kb_loader.get_course_data(active_cid)
@@ -658,19 +655,28 @@ async def handle_conversation_turn_async(
         last_turn.get("wants_trial")
         or new_state.get("wants_trial")
         or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
-        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", clean_reply, re.IGNORECASE)
+        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", main_reply, re.IGNORECASE)
     )
     is_install_turn = bool(
         new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
-        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", clean_reply, re.IGNORECASE)
+        or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", main_reply, re.IGNORECASE)
     )
+
+    will_send_trial_video = is_trial_turn and (re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", main_reply, re.IGNORECASE) or wants_resend) and (wants_resend or not new_state.get("trial_video_sent"))
+    will_send_install_video = is_install_turn and not is_trial_turn and (wants_resend or not new_state.get("app_download_video_sent"))
+    sending_video = will_send_trial_video or will_send_install_video
+
+    allow_app_links = user_asked_links or sending_video
+
+    clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=user_asked_demo)
 
     clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:
-        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=user_asked_links, allow_demo_links=user_asked_demo)
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=user_asked_demo)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
-    if clean_followup and "play.google.com" in clean_reply:
+    if clean_followup and ("play.google.com" in clean_reply or "sensationzperformingarts.com" in clean_reply):
         REDUNDANT_LINK_QUESTIONS = (
             r"\b(would you like|do you want|kya aapko|chahiye).{0,30}\b(links?|download links?)\b",
             r"\b(links?.{0,25}(download|app|website)\b.*\?)",
@@ -691,14 +697,14 @@ async def handle_conversation_turn_async(
         asyncio.create_task(log_message_async(phone, "ai", clean_reply))
 
     # Dispatch media guide alongside Message 1 if applicable
-    if is_trial_turn and (re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", clean_reply, re.IGNORECASE) or wants_resend):
+    if will_send_trial_video:
         trial_cfg = (
             course_data_active.get("trial_classes")
             or course_data_active.get("trial_class")
             or kb_loader.get_global_rules().get("universal_course_policies", {}).get("trial_classes", {})
         )
         await dispatch_media_guide_async(phone, new_state, trial_cfg, "trial_video_sent", force_resend=wants_resend)
-    elif is_install_turn and not is_trial_turn:
+    elif will_send_install_video:
         enroll_cfg = (
             course_data_active.get("universal_enrollment_flow")
             or kb_loader.get_global_rules().get("universal_enrollment_flow", {})

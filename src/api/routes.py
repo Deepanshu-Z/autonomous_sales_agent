@@ -30,6 +30,7 @@ from src.state.chat_state import (
 )
 from src.workers.batching import add_message_to_batch_async
 from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email
+from src.services.agent_handoff import OWNER_EMAIL, execute_agent_handoff_async
 from src.core.lead_logger import log_lead_action, extract_lead_details
 
 router = APIRouter()
@@ -259,16 +260,18 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         )
         return {"status": "escalated"}
 
-    agent, _agent_index = get_next_agent_email()
-    if agent:
-        await assign_chat_to_agent_async(phone, agent)
+    if not state.get("already_assigned"):
+        if OWNER_EMAIL:
+            success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)
+            if success:
+                state["already_assigned"] = True
+                state["assigned_agent_email"] = OWNER_EMAIL
+                await save_user_state_async(phone, state)
 
     text_lower = text.lower()
     if matches_any(text_lower, AGENT_TRIGGER_WORDS):
         reply = "Connecting you with our team now. Someone will be with you shortly!"
-        await send_text_message_async(phone, reply)
-        await mark_escalated_async(phone)
-        await save_message_async(phone, "assistant", reply)
+        await execute_agent_handoff_async(phone, user_reply_text=reply, escalation_reason="Customer requested human agent (Handed off to support team)")
         log_lead_action(
             lead_no=phone,
             lead_details=lead_details,

@@ -109,32 +109,40 @@ async def send_agent_summary_async(
     """
     Generates a Hinglish summary of the customer conversation
     and sends it to the matching agent WhatsApp number.
+
+    NOTE: Summary sending to agents has been disabled as requested.
+    All dispatch logic is commented out below.
     """
-    if not AGENT_NUMBER_POOL:
-        print("[agent_summary] No agent numbers configured -- skipping summary")
-        return
+    print(f"[agent_summary] Summary sending disabled -- skipping summary dispatch for {customer_phone}")
+    return
 
-    idx = agent_index % len(AGENT_NUMBER_POOL)
-    agent_number = AGENT_NUMBER_POOL[idx]
+    # --- Commented out dispatch logic ---
+    # if not AGENT_NUMBER_POOL:
+    #     print("[agent_summary] No agent numbers configured -- skipping summary")
+    #     return
+    #
+    # idx = agent_index % len(AGENT_NUMBER_POOL)
+    # agent_number = AGENT_NUMBER_POOL[idx]
+    #
+    # try:
+    #     history = get_recent_history(customer_phone, limit=10)
+    #     state = get_user_state(customer_phone)
+    # except Exception as e:
+    #     print(f"[agent_summary] Failed to fetch history/state: {e}")
+    #     history = []
+    #     state = {}
+    #
+    # summary = await _generate_summary_llm(history, state, escalation_reason)
+    #
+    # message = (
+    #     f"*New Customer Assigned*\n"
+    #     f"Customer: +{customer_phone}\n\n"
+    #     f"{summary}\n\n"
+    #     f"Interakt mein open karo aur reply karo."
+    # )
+    # print(f"[agent_summary] Sending summary to agent {agent_number} (index={idx})")
+    # try:
+    #     await send_text_message_async(agent_number, message)
+    # except Exception as e:
+    #     print(f"[agent_summary] Failed to send summary to agent: {e}")
 
-    try:
-        history = get_recent_history(customer_phone, limit=10)
-        state = get_user_state(customer_phone)
-    except Exception as e:
-        print(f"[agent_summary] Failed to fetch history/state: {e}")
-        history = []
-        state = {}
-
-    summary = await _generate_summary_llm(history, state, escalation_reason)
-
-    message = (
-        f"*New Customer Assigned*\n"
-        f"Customer: +{customer_phone}\n\n"
-        f"{summary}\n\n"
-        f"Interakt mein open karo aur reply karo."
-    )
-    print(f"[agent_summary] Sending summary to agent {agent_number} (index={idx})")
-    try:
-        await send_text_message_async(agent_number, message)
-    except Exception as e:
-        print(f"[agent_summary] Failed to send summary to agent: {e}")

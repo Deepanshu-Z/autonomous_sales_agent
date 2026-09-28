@@ -59,13 +59,8 @@ load_dotenv()
 
 redis_conn = get_redis_connection()
 
-# --- Agent Config ---
-PRIORITY_AGENT_EMAIL = os.getenv("PRIORITY_AGENT_EMAIL")
-PRIORITY_AGENT_EMAIL_ANOTHER_1 = os.getenv("PRIORITY_AGENT_EMAIL_ANOTHER_1")
-PRIORITY_AGENT_EMAIL_ANOTHER_2 = os.getenv("PRIORITY_AGENT_EMAIL_ANOTHER_2")
-
-# Round-robin pool (only non-None entries)
-AGENT_POOL = [e for e in [PRIORITY_AGENT_EMAIL_ANOTHER_1, PRIORITY_AGENT_EMAIL_ANOTHER_2] if e]
+# --- Agent Config (Centralized in agent_handoff.py) ---
+from src.services.agent_handoff import AGENT_POOL, PRIORITY_AGENT_EMAIL, OWNER_EMAIL
 
 AGENT_TRIGGER_WORDS = ["agent", "human", "talk to someone", "real person", "representative", "support"]
 
@@ -314,22 +309,7 @@ AGENT_SUGGEST_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# ---------------------------------------------------------------------------
-# Round-robin agent selection (Redis INCR — atomic, multi-process safe)
-# ---------------------------------------------------------------------------
-def get_next_agent_email() -> tuple:
-    """
-    Returns (agent_email, agent_index) in round-robin order.
-    Uses Redis INCR for atomicity across concurrent requests and processes.
-    agent_index is used to send the summary to the matching agent phone number.
-    """
-    if not AGENT_POOL:
-        return PRIORITY_AGENT_EMAIL, 0  # fallback
-    counter = redis_conn.incr("agent_round_robin_counter")
-    index = (counter - 1) % len(AGENT_POOL)
-    agent = AGENT_POOL[index]
-    print(f"[round-robin] counter={counter} -> agent[{index}] = {agent}")
-    return agent, index
+# Round-robin agent selection imported from src.services.agent_handoff
 
 
 def is_welcome_trigger(text: str) -> bool:
@@ -844,12 +824,14 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         )
         return
 
-    # Round-robin agent assignment (async, non-blocking)
-    if PRIORITY_AGENT_EMAIL and not state.get("already_assigned"):
-        success = await assign_chat_to_agent_async(phone, PRIORITY_AGENT_EMAIL)
-        if success:
-            state["already_assigned"] = True
-            await save_user_state_async(phone, state)
+    # Initial lead assignment to Supreme Owner for monitoring
+    if not state.get("already_assigned"):
+        if OWNER_EMAIL:
+            success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)
+            if success:
+                state["already_assigned"] = True
+                state["assigned_agent_email"] = OWNER_EMAIL
+                await save_user_state_async(phone, state)
 
     # Check for human agent trigger words
     text_lower = text.lower()

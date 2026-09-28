@@ -29,20 +29,18 @@ from src.services.agent_handoff import get_next_agent_email, AGENT_POOL
 
 
 # ---------------------------------------------------------------------------
-# Test 1: Agent Pool Configuration (User constraint: 2 agents from .env)
+# Test 1: Agent Pool Configuration (32 agents from data/agents.json)
 # ---------------------------------------------------------------------------
 def test_agent_pool_configuration():
     print("\n--- Test 1: Agent Pool Configuration ---")
-    assert len(AGENT_POOL) == 2, f"Expected exactly 2 agents in pool, got {len(AGENT_POOL)}: {AGENT_POOL}"
+    assert len(AGENT_POOL) == 32, f"Expected 32 agents in pool, got {len(AGENT_POOL)}: {AGENT_POOL}"
     agent1, idx1 = get_next_agent_email()
     agent2, idx2 = get_next_agent_email()
-    agent3, idx3 = get_next_agent_email()
     print(f"Agent turn 1: {agent1} (idx={idx1})")
     print(f"Agent turn 2: {agent2} (idx={idx2})")
-    print(f"Agent turn 3: {agent3} (idx={idx3})")
-    assert agent1 != agent2, "Round robin should alternate between the 2 agents"
-    assert agent1 == agent3, "Agent 3 should loop back to agent 1"
-    print("  -> Round robin between 2 agents passed!")
+    assert agent1 != agent2, "Round robin should advance to next agent"
+    print("  -> Round robin between agents passed!")
+
 
 
 # ---------------------------------------------------------------------------

@@ -126,13 +126,13 @@ async def sweep_once():
                 await mark_escalated_async(phone)
                 await save_message_async(phone, "assistant", reply)
                 await log_message_async(phone, "agent", reply)
-                # Send Hinglish summary to the assigned agent's WhatsApp number
-                asyncio.create_task(
-                    send_agent_summary_async(
-                        phone, agent_index,
-                        escalation_reason="2 follow-up messages ka jawab nahi aaya (silence)"
-                    )
-                )
+                # Send Hinglish summary to the assigned agent's WhatsApp number (commented out as requested)
+                # asyncio.create_task(
+                #     send_agent_summary_async(
+                #         phone, agent_index,
+                #         escalation_reason="2 follow-up messages ka jawab nahi aaya (silence)"
+                #     )
+                # )
 
                 await asyncio.to_thread(
                     lambda: supabase.table("user_session_state").update({

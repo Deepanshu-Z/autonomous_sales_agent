@@ -51,15 +51,20 @@ def check_env_vars():
         "SUPABASE_URL",
         "SUPABASE_KEY",
         "INTERAKT_API_KEY",
+    ]
+
+    has_redis = os.getenv("REDIS_URL") or (os.getenv("UPSTASH_REDIS_REST_URL") and os.getenv("UPSTASH_REDIS_REST_TOKEN"))
+    if not has_redis:
+        required.append("REDIS_URL (or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN)")
+
+    optional = [
+        "REDIS_URL",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
-    ]
-    optional = [
         "QDRANT_URL",
         "QDRANT_API_KEY",
         "PRIORITY_AGENT_EMAIL",
-        "PRIORITY_AGENT_EMAIL_ANOTHER_1",
-        "PRIORITY_AGENT_EMAIL_ANOTHER_2",
+        "OWNER_EMAIL",
         "TARGET_AD_ID",
         "TARGET_MESSAGE_TEXT",
     ]

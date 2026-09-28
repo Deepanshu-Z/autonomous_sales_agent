@@ -36,33 +36,39 @@ class UpstashRedisWrapper:
 
 def get_upstash_redis():
     """
-    Returns Upstash REST client (from upstash_redis import Redis) wrapped to fix hset mapping compatibility.
+    Returns Redis client.
+    If REDIS_URL is configured, connects directly to self-hosted native Redis.
+    Otherwise uses Upstash REST client if credentials configured.
     """
-    from upstash_redis import Redis as UpstashRedis
+    if REDIS_URL:
+        from redis import Redis as StandardRedis
+        return StandardRedis.from_url(REDIS_URL, decode_responses=True)
 
     if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+        from upstash_redis import Redis as UpstashRedis
         client = UpstashRedis(url=UPSTASH_REST_URL, token=UPSTASH_REST_TOKEN)
         return UpstashRedisWrapper(client)
     
     from redis import Redis as StandardRedis
-    url = REDIS_URL or "redis://localhost:6379"
-    return StandardRedis.from_url(url, decode_responses=True)
+    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True)
 
 
 def get_redis_connection():
     """
-    Returns TCP Redis connection for RQ task queues, locks, and workers.
-    Automatically connects to Upstash via TLS rediss:// if REST credentials are configured.
+    Returns TCP Redis connection for task queues, locks, and round-robin.
+    If REDIS_URL is set, connects to self-hosted Redis natively.
     """
     from redis import Redis as StandardRedis
+
+    if REDIS_URL:
+        return StandardRedis.from_url(REDIS_URL, decode_responses=True)
 
     if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
         tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
         return StandardRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
 
-    url = REDIS_URL or "redis://localhost:6379"
-    return StandardRedis.from_url(url, decode_responses=True)
+    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True)
 
 
 _async_redis_client = None
@@ -79,13 +85,16 @@ def get_async_redis_connection():
 
     from redis.asyncio import Redis as AsyncRedis
 
+    if REDIS_URL:
+        _async_redis_client = AsyncRedis.from_url(REDIS_URL, decode_responses=True)
+        return _async_redis_client
+
     if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
         tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
         _async_redis_client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
         return _async_redis_client
 
-    url = REDIS_URL or "redis://localhost:6379"
-    _async_redis_client = AsyncRedis.from_url(url, decode_responses=True)
+    _async_redis_client = AsyncRedis.from_url("redis://localhost:6379", decode_responses=True)
     return _async_redis_client
 

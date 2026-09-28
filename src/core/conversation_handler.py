@@ -784,7 +784,10 @@ async def handle_conversation_turn_async(
     will_send_install_video = is_install_turn and not is_trial_turn and (wants_resend or not new_state.get("app_download_video_sent"))
     sending_video = will_send_trial_video or will_send_install_video
 
-    allow_app_links = user_asked_links or sending_video
+    # STRICT ZERO-LINKS: App/platform links are injected into the text reply ONLY when the customer
+    # explicitly asked for them. Video dispatch is handled separately by dispatch_media_guide_async
+    # and must NOT trigger link injection in the text reply.
+    allow_app_links = user_asked_links
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(

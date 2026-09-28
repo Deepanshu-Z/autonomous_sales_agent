@@ -68,6 +68,7 @@ def _empty_flags() -> Dict[str, Any]:
         "question_summary": None,
         "detected_language": "English",
         "wants_resend_video": False,
+        "claims_payment_or_enrollment": False,
     }
 
 
@@ -90,6 +91,7 @@ EXTRACTION FIELDS:
    - "confirmed": Customer states/confirms they created their profile, account, or finished signup ("profile bana li", "done", "yes done", "banadi", "created", "account ban gaya", "sab kar diya", "haan ho gaya", "krlia"). Note: If the customer replies "done", "yes", or "krlia" after the bot asked them to create their profile or install the app, this is "confirmed".
    - "denied": Customer states they have NOT created their profile or skipped it ("profile abhi nahi", "profile skip kar diya", "profile nahi banayi", "haven't done profile yet").
    - "unmentioned": Not stated.
+   - CRITICAL NEGATIVE GUARD: If customer says "paid", "payment done", "paise bhej diye", or "fees bhar di", this is a PAYMENT CLAIM, NOT profile creation! Set profile_created_stated to "unmentioned" unless they explicitly mentioned app profile/signup.
 
 CRITICAL PARTIAL / NEGATION RULE:
 If customer says "app to ho gaya but profile abhi nahi" -> app_installed_stated: "confirmed", profile_created_stated: "denied".
@@ -141,6 +143,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
+    - "PAYMENT_CLAIM": Customer states they completed payment, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment ("paid", "payment done", "maine pay kar diya", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
 12. "question_summary":
@@ -161,6 +164,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 15. "wants_resend_video":
     - boolean: true if customer explicitly asks to send or resend a video tutorial or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video"). Otherwise false.
 
+16. "claims_payment_or_enrollment":
+    - boolean: true if customer states they already paid, completed payment, transferred money, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment / confirm admission ("paid", "payment done", "maine payment kar di", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo", "is my payment received?"). Otherwise false.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -177,7 +183,8 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "question_summary": string | null,
   "detected_language": string,
   "explicit_language_request": string | null,
-  "wants_resend_video": boolean
+  "wants_resend_video": boolean,
+  "claims_payment_or_enrollment": boolean
 }"""
 
 
@@ -425,6 +432,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "is_complaint_or_refund": flags.get("is_complaint_or_refund", False),
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
+        "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
     }
 
     return new_state

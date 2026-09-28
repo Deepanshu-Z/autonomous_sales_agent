@@ -30,7 +30,7 @@ import asyncio
 import re
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +219,11 @@ async def handle_incoming_message(
     # Enforce exact coupons directly from the active course's JSON (zero hallucination, zero hardcode)
     main_reply = _enforce_json_coupons(main_reply, new_state, effective_course_id)
 
+    # Strictly intercept and sanitize any hallucinated confirmation of enrollment, trial, or payment
+    main_reply, followup_msg = _sanitize_confirmation_guardrails(
+        main_reply, followup_msg, language=detected_lang
+    )
+
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.
@@ -377,34 +382,147 @@ def _ensure_app_website_links(
         return f"{text.rstrip()}\n\n{official_links}"
     return text
 
-    # [PREVIOUS LOGIC - AUTO LINK INJECTION (COMMENTED OUT)]:
-    # INTERMEDIATE_SELECTION_PATTERNS = (
-    #     r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(batch|timing|slot|samay)\b",
-    #     r"\b(which|kaunsa|kaunsi|kya)\b.{0,30}\b(package|duration|mahine|pack)\b",
-    #     r"\b(select|choose|chuniye|bataiye)\b.{0,30}\b(package duration|package|batch timing|timing)\b",
-    #     r"\b(timing|time slot|batch).{0,25}\b(works best|suits you|prefer)\b",
-    # )
-    # is_intermediate = any(re.search(p, t_lower) for p in INTERMEDIATE_SELECTION_PATTERNS)
-    # if is_intermediate and not user_asked_for_links:
-    #     if has_links:
-    #         lines = [
-    #             line for line in text.splitlines()
-    #             if not any(d in line for d in ["play.google.com", "apps.apple.com", "shop.sensationzperformingarts.com"])
-    #         ]
-    #         return "\n".join(lines).strip()
-    #     return text
-    # if has_links:
-    #     return text
-    # ACTION_PATTERNS = (
-    #     r"\b(download|install|daalo|download kar|install kar)\b",
-    #     r"\b(register|sign.?up|create.{0,10}profile|profile bana|profile create)\b",
-    #     r"\b(check.{0,20}(schedule|timing|fees).{0,20}(app|website|platform))\b",
-    #     r"\b(visit.{0,10}(our|the).{0,10}(app|website|platform)|open.{0,10}(app|website))\b",
-    #     r"\b(trial.{0,20}(app|download|profile|steps))\b",
-    # )
-    # if any(re.search(p, t_lower) for p in ACTION_PATTERNS):
-    #     return f"{text.rstrip()}\n\n{OFFICIAL_PLATFORM_LINKS_BLOCK}"
-    # return text
+# ── Strict Non-Confirmation Guardrails (Payment, Trial, Enrollment) ───────────
+# The AI MUST NEVER confirm any enrollment, free trial booking, or payment under any circumstances.
+
+_PAYMENT_CONFIRMATION_PATTERNS = [
+    # Latin / Hinglish
+    r"\b(?:aapka|aapki|apka|apki|humne|humein|hume|maine)?\s*(?:payment|paise|fees?|amount|transaction|screenshot)\s*(?:receive|received|mil\s*gay[aei]?|aa\s*gay[aei]?|verify|verified|confirm|ho\s*gay[aei]?|successful)",
+    r"\b(?:payment|paise|fees?|amount)\s+(?:mil\s*chuki?\s*hai|mil\s*gayi?\s*hai|receive\s*ho\s*gayi?\s*hai|verify\s*ho\s*gayi?\s*hai|confirm\s*ho\s*gayi?\s*hai|successful\s*hai)",
+    r"\b(?:screenshot|slip)\s*(?:check\s*ho\s*gay[aei]?|dekh\s*li(?:ya)?|verify\s*ho\s*gay[aei]?|confirm\s*ho\s*gay[aei]?)",
+    # English
+    r"\b(?:your\s+)?(?:payment|fees?|amount|transaction|screenshot)\s+(?:has\s+been\s+|is\s+)?(?:received|verified|confirmed|successful|approved)\b",
+    r"\b(?:we\s+have|i\s+have)\s+received\s+(?:your\s+)?(?:payment|fees?|amount|money|screenshot)\b",
+    r"\b(?:payment|transaction)\s+is\s+successful\b",
+    # Devanagari
+    r"(?:पेमेंट|पैसे|फीस)\s*(?:मिल\s*ग[यायीएई]|प्राप्त\s*हो\s*ग[यायीएई]|वेरिफाई\s*हो\s*ग[यायीएई]|कन्फर्म\s*हो\s*ग[यायीएई])",
+]
+
+_TRIAL_CONFIRMATION_PATTERNS = [
+    # Latin / Hinglish
+    r"\b(?:aapka|aapki|apka|apki)?\s*(?:free\s+)?(?:trial|demo\s*class|trial\s*class)\s*(?:confirm\s*ho\s*gay[aei]?|book\s*ho\s*gay[aei]?|kar\s*di(?:ya)?|fix\s*ho\s*gay[aei]?|ho\s*chuk[aei]?|pakki?\s*hai|pakka\s*hai)\b",
+    r"\b(?:kal|aaj)\s*(?:ke\s*liye\s*)?(?:aapka|aapki)?\s*(?:trial|demo)\s*(?:book|confirm|fix)\s*ho\s*gay[aei]?\b",
+    r"\b(?:maine|humne)\s*(?:aapka|aapki)?\s*(?:trial|demo)\s*(?:book|confirm)\s*kar\s*di(?:ya)?\b",
+    # English
+    r"\b(?:your\s+)?(?:free\s+)?(?:trial|trial\s+class|demo\s+class|demo)\s+(?:has\s+been\s+|is\s+)?(?:confirmed|booked|scheduled|reserved)\b",
+    r"\b(?:i've|i\s+have|we've|we\s+have)\s+(?:booked|confirmed|scheduled)\s+your\s+(?:free\s+)?(?:trial|demo)\b",
+    r"\b(?:trial|demo)\s+(?:is|has\s+been)\s+(?:booked|confirmed)\s+for\b",
+    r"\b(?:trial|free\s*trial)\s+booked\s+successfully\b",
+    # Devanagari
+    r"(?:ट्रायल|डेमो)\s*(?:क्लास\s*)?(?:बुक\s*हो\s*ग[यायीएई]|कन्फर्म\s*हो\s*ग[यायीएई]|पक्की?\s*हो\s*ग[यायीएई]|कर\s*दि[याए])",
+]
+
+_ENROLLMENT_CONFIRMATION_PATTERNS = [
+    # Latin / Hinglish
+    r"\b(?:aapka|aapki|apka|apki)?\s*(?:enrollment|admission|seat)\s*(?:confirm\s*ho\s*gay[aei]?|book\s*ho\s*gay[aei]?|ho\s*chuk[aei]?|kar\s*di(?:ya)?|reserve\s*ho\s*gay[aei]?|pakki?\s*hai|pakka\s*hai|final\s*ho\s*gay[aei]?)\b",
+    r"\b(?:aap\s+enroll\s+ho\s*gaye|aapka\s+admission\s+ho\s*gaya|seat\s+reserve\s+ho\s*gayi)\b",
+    # English
+    r"\b(?:your\s+)?(?:enrollment|admission|seat)\s+(?:has\s+been\s+|is\s+)?(?:confirmed|booked|finalized|reserved)\b",
+    r"\b(?:you\s+are|you've\s+been)\s+(?:successfully\s+)?(?:enrolled|admitted)\b",
+    r"\b(?:confirming|confirmed)\s+your\s+(?:enrollment|admission|seat)\b",
+    r"\b(?:enrollment|admission)\s+confirmed\s+successfully\b",
+    # Devanagari
+    r"(?:एनरोलमेंट|एडमिशन|सीट)\s*(?:कन्फर्म\s*हो\s*ग[यायीएई]|बुक\s*हो\s*ग[यायीएई]|पक्की?\s*हो\s*ग[यायीएई]|कर\s*दि[याए])",
+]
+
+
+def _sanitize_confirmation_guardrails(
+    reply: str,
+    followup: Optional[str] = None,
+    language: Optional[str] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    Deterministic Guardrail: Strictly intercepts and sanitizes any false confirmation
+    of course enrollment, free trial booking, or payment verification.
+    """
+    if not reply:
+        return reply, followup
+
+    full_check = f"{reply} {followup or ''}"
+    has_devanagari = any(ord(c) >= 0x0900 and ord(c) <= 0x097F for c in full_check)
+    is_english = bool(language and "english" in language.lower() and "hinglish" not in language.lower())
+
+    # 1. Check Payment Confirmation
+    if any(re.search(p, full_check, re.IGNORECASE) for p in _PAYMENT_CONFIRMATION_PATTERNS):
+        logger.warning(f"[guardrails] Payment confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
+        if has_devanagari:
+            sanitized_reply = (
+                "कृपया ध्यान दें कि हमारे AI असिस्टेंट के पास बैंक अकाउंट या पेमेंट रिकॉर्ड्स का सीधा एक्सेस नहीं होता है। "
+                "यदि आपने Sensationz ऐप या वेबसाइट पर पेमेंट किया है, तो वह आपके अकाउंट में अपने आप अपडेट हो जाता है। "
+                "यदि आपने UPI या ट्रांसफर किया है, तो हमारी अकाउंट्स टीम इसे मैन्युअली वेरीफाई करती है। "
+                "पेमेंट वेरिफिकेशन के लिए कृपया *agent* टाइप करें ताकि हमारी टीम तुरंत आपकी मदद कर सके! 😊"
+            )
+        elif is_english:
+            sanitized_reply = (
+                "Please note that as an AI assistant, I do not have access to bank accounts or payment verification systems. "
+                "If you completed payment through our official Sensationz App or website checkout, it will reflect automatically under your account. "
+                "If you transferred via UPI or shared a receipt, our human accounts team verifies all transactions directly. "
+                "Please type *agent* so a support coordinator can check and confirm your payment! 😊"
+            )
+        else:
+            sanitized_reply = (
+                "Dhyan dein ki hamare AI assistant ke paas bank accounts ya payment verification ka direct access nahi hota hai. "
+                "Agar aapne official Sensationz App ya website par checkout kiya hai, toh payment aapke account mein automatically update ho jata hai. "
+                "Agar aapne manual UPI ya transfer kiya hai, toh hamari accounts team transaction verify karti hai. "
+                "Kripya *agent* type karein taaki humari team aapka payment verify kar sake! 😊"
+            )
+        return sanitized_reply, None
+
+    # 2. Check Free Trial Confirmation
+    if any(re.search(p, full_check, re.IGNORECASE) for p in _TRIAL_CONFIRMATION_PATTERNS):
+        logger.warning(f"[guardrails] Trial confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
+        if has_devanagari:
+            sanitized_reply = (
+                "कृपया ध्यान दें कि व्हाट्सएप चैट पर AI द्वारा ट्रायल क्लास सीधे बुक या कन्फर्म नहीं की जा सकती। "
+                "अपनी फ्री ट्रायल क्लास कन्फर्म करने के लिए कृपया Sensationz ऐप में जाएं "
+                "(Profile -> Trial Links -> बैच टाइमिंग और टीचर चुनें -> Confirm Trial Enrollment पर टैप करें)। "
+                "ऐप में कन्फर्म करते ही आपकी ट्रायल क्लास सक्रिय हो जाएगी! 😊"
+            )
+            sanitized_followup = "क्या आपको ऐप में ट्रायल बैच टाइमिंग चुनने में कोई मदद चाहिए? 😊"
+        elif is_english:
+            sanitized_reply = (
+                "Please note that free trial classes cannot be booked or confirmed directly over chat by the AI. "
+                "To confirm your free trial, please open the Sensationz App "
+                "(Go to Profile -> Trial Links -> Select your preferred batch timing & teacher -> Tap Confirm Trial Enrollment). "
+                "Once confirmed in the app, your free trial class is activated! 😊"
+            )
+            sanitized_followup = "Would you like any help selecting your trial batch timing in the app? 😊"
+        else:
+            sanitized_reply = (
+                "Dhyan dein ki WhatsApp chat par AI ke dwara trial class book ya confirm nahi hoti hai. "
+                "Free trial confirm karne ke liye Sensationz App open karein "
+                "(Profile -> Trial Links -> Batch timing aur teacher select karein -> Tap Confirm Trial Enrollment). "
+                "Wahan tap karte hi aapki free trial class confirm ho jayegi! 😊"
+            )
+            sanitized_followup = "Kya aapko app mein trial batch timing select karne mein koi madad chahiye? 😊"
+        return sanitized_reply, sanitized_followup
+
+    # 3. Check Course Enrollment / Admission Confirmation
+    if any(re.search(p, full_check, re.IGNORECASE) for p in _ENROLLMENT_CONFIRMATION_PATTERNS):
+        logger.warning(f"[guardrails] Enrollment confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
+        if has_devanagari:
+            sanitized_reply = (
+                "कृपया ध्यान दें कि व्हाट्सएप चैट पर AI द्वारा सीधे एनरोलमेंट कन्फर्म नहीं होता है। "
+                "अपना एनरोलमेंट पूरा करने के लिए Sensationz ऐप या आधिकारिक वेबसाइट (shop.sensationzperformingarts.com) पर जाएं, "
+                "अपना पैकेज चुनें और चेकआउट पूरा करें। चेकआउट पूरा होते ही आपका एनरोलमेंट एक्टिवेट हो जाता है। "
+                "किसी भी सहायता के लिए आप *agent* टाइप कर सकते हैं! 😊"
+            )
+        elif is_english:
+            sanitized_reply = (
+                "Please note that course enrollment cannot be confirmed directly over chat by the AI. "
+                "To complete your enrollment, please select your package and complete checkout on the official Sensationz App or website (shop.sensationzperformingarts.com). "
+                "Once checkout is completed, your enrollment is activated. For assistance, please type *agent*! 😊"
+            )
+        else:
+            sanitized_reply = (
+                "Dhyan dein ki WhatsApp chat par AI ke dwara enrollment confirm nahi hota hai. "
+                "Course enrollment complete karne ke liye Sensationz App ya official website (shop.sensationzperformingarts.com) par jayein, "
+                "apna package select karein aur checkout complete karein. Checkout ke baad aapka enrollment active ho jata hai. "
+                "Kisi bhi query ke liye aap *agent* type kar sakte hain! 😊"
+            )
+        return sanitized_reply, None
+
+    return reply, followup
 
 
 async def dispatch_media_guide_async(
@@ -669,10 +787,13 @@ async def handle_conversation_turn_async(
     allow_app_links = user_asked_links or sending_video
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
+    clean_reply, clean_followup = _sanitize_confirmation_guardrails(
+        clean_reply, followup_msg, language=new_state.get("language")
+    )
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=user_asked_demo)
 
-    clean_followup = _format_for_whatsapp(followup_msg) if followup_msg else None
     if clean_followup:
+        clean_followup = _format_for_whatsapp(clean_followup)
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=user_asked_demo)
 
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup

@@ -39,6 +39,18 @@ def _get_config() -> Tuple[bool, int, int]:
     return enabled, max_msgs, window_sec
 
 
+# Atomic Lua script: INCR and set EXPIRE if unset, returning {count, ttl} in a single network roundtrip
+_RATE_LIMIT_LUA = """
+local current = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if ttl < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+    ttl = tonumber(ARGV[1])
+end
+return {current, ttl}
+"""
+
+
 async def is_rate_limited(phone: str) -> Tuple[bool, Dict[str, Any]]:
     """
     Evaluates whether the given phone number has exceeded the message rate limit.
@@ -61,22 +73,30 @@ async def is_rate_limited(phone: str) -> Tuple[bool, Dict[str, Any]]:
 
     # Normalize phone key
     clean_phone = phone.strip().replace("+", "").replace(" ", "").replace("-", "")
+    if not clean_phone:
+        return False, {"allowed": True, "count": 0, "limit": 0, "window": 0, "retry_after": 0}
+
     key = f"ratelimit:{clean_phone}"
 
     try:
         r = get_async_redis_connection()
-        pipe = r.pipeline()
-        pipe.incr(key)
-        pipe.ttl(key)
-        results = await pipe.execute()
 
-        count = int(results[0])
-        ttl = int(results[1])
-
-        # If key is brand new or lacks expiration, set the TTL
-        if count == 1 or ttl < 0:
-            await r.expire(key, window_sec)
-            ttl = window_sec
+        # Try atomic Lua script first (1 network roundtrip instead of 2)
+        try:
+            results = await r.eval(_RATE_LIMIT_LUA, 1, key, window_sec)
+            count = int(results[0])
+            ttl = int(results[1])
+        except Exception:
+            # Fallback to pipeline if Lua eval is not supported
+            pipe = r.pipeline()
+            pipe.incr(key)
+            pipe.ttl(key)
+            results = await pipe.execute()
+            count = int(results[0])
+            ttl = int(results[1])
+            if count == 1 or ttl < 0:
+                await r.expire(key, window_sec)
+                ttl = window_sec
 
         if count > max_msgs:
             return True, {
@@ -115,6 +135,8 @@ async def reset_rate_limit(phone: str) -> bool:
     if not phone:
         return False
     clean_phone = phone.strip().replace("+", "").replace(" ", "").replace("-", "")
+    if not clean_phone:
+        return False
     key = f"ratelimit:{clean_phone}"
     try:
         r = get_async_redis_connection()

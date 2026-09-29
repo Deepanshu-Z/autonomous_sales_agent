@@ -53,52 +53,51 @@
         "gst_included_in_listed_price": false,
         "gst_percentage": 5,
         "gst_added_at": "Checkout in app or website",
-        "offer_mechanism": "Ganesh Chaturthi Offer coupon sent after profile creation in app/website",
+        "offer_mechanism": "Welcome Offer coupon sent after profile creation in app/website",
         "beginner_recommendation": "1 Month package",
         "packages": [
             {
                 "duration": "1 Month",
                 "duration_code": "1M",
                 "base_price": 700,
-                "offer_price": 210,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA70",
-                "gst_on_offer": 11,
-                "total_with_gst_offer": 221,
-                "per_day_offer": "Rs.7/day (offer price)"
+                "gst_on_base": 35,
+                "total_with_gst": 735,
+                "per_day": "Rs.23.3/day",
+                "note": "No offer on 1 Month. Price is ₹700 + 5% GST = ₹735 at checkout."
             },
             {
                 "duration": "3 Months",
                 "duration_code": "3M",
                 "base_price": 1750,
-                "offer_price": 525,
+                "offer_price": 600,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA70",
-                "gst_on_offer": 26,
-                "total_with_gst_offer": 551,
-                "per_day_offer": "Rs.5.8/day — less than a cup of tea"
+                "coupon_code": "YOGA600",
+                "gst_on_offer": 30,
+                "total_with_gst_offer": 630,
+                "per_day_offer": "Rs.6.7/day — less than a cup of tea"
             },
             {
                 "duration": "6 Months",
                 "duration_code": "6M",
                 "base_price": 3200,
-                "offer_price": 960,
+                "offer_price": 900,
                 "gst_slab": "5%",
-                "coupon_code": "YOGA70",
-                "gst_on_offer": 48,
-                "total_with_gst_offer": 1008,
-                "per_day_offer": "Rs.5.3/day"
+                "coupon_code": "YOGA900",
+                "gst_on_offer": 45,
+                "total_with_gst_offer": 945,
+                "per_day_offer": "Rs.5/day"
             },
             {
                 "duration": "1 Year",
                 "duration_code": "1Y",
                 "base_price": 5000,
+                "offer_price": 1200,
                 "gst_slab": "5%",
-                "offer_price": 1500,
-                "coupon_code": "YOGA70",
-                "gst_on_offer": 75,
-                "total_with_gst_offer": 1575,
-                "per_day_offer": "Rs.4.1/day"
+                "coupon_code": "YOGA1200",
+                "gst_on_offer": 60,
+                "total_with_gst_offer": 1260,
+                "per_day_offer": "Rs.3.3/day"
             }
         ]
     },

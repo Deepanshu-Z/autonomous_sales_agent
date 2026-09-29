@@ -31,6 +31,7 @@ from src.state.chat_state import (
 from src.workers.batching import add_message_to_batch_async
 from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email
 from src.services.agent_handoff import OWNER_EMAIL, execute_agent_handoff_async
+from src.services.rate_limiter import is_rate_limited
 from src.core.lead_logger import log_lead_action, extract_lead_details
 
 router = APIRouter()
@@ -167,6 +168,18 @@ async def receive_interakt_webhook(request: Request):
         if ad_tag and "ad_tag" not in referral:
             referral["ad_tag"] = ad_tag
 
+    # ── Independent Rate Limiter ──────────────────────────────────────────
+    limited, rl_info = await is_rate_limited(phone)
+    if limited:
+        print(f"[api] ⚠️ Rate limit exceeded for {phone}: {rl_info.get('count')}/{rl_info.get('limit')} msgs in {rl_info.get('window')}s. Dropping message.")
+        log_lead_action(
+            lead_no=phone,
+            lead_details="Rate Limited",
+            action_taken="RATE_LIMITED",
+            reason=f"Exceeded {rl_info.get('limit')} msgs in {rl_info.get('window')}s",
+        )
+        return {"status": "ok", "message": "rate_limited"}
+
     await log_message_async(phone, "user", text)
 
     try:
@@ -204,6 +217,12 @@ async def receive_test_webhook(request: Request):
         )
         if ad_tag and "ad_tag" not in referral:
             referral["ad_tag"] = ad_tag
+
+    # ── Independent Rate Limiter ──────────────────────────────────────────
+    limited, rl_info = await is_rate_limited(phone)
+    if limited:
+        print(f"[api] ⚠️ Rate limit exceeded for {phone} (test-webhook). Dropping message.")
+        return {"status": "ok", "message": "rate_limited"}
 
     await log_message_async(phone, "user", text)
 

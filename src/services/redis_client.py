@@ -71,30 +71,37 @@ def get_redis_connection():
     return StandardRedis.from_url("redis://localhost:6379", decode_responses=True)
 
 
-_async_redis_client = None
+_async_redis_clients = {}
 
 
 def get_async_redis_connection():
     """
     Returns non-blocking Async Redis connection (redis.asyncio) for high-concurrency webhook ingestion.
-    Reuses singleton connection pool across coroutines.
+    Reuses connection pool safely per event loop to prevent 'Event loop is closed' errors.
     """
-    global _async_redis_client
-    if _async_redis_client is not None:
-        return _async_redis_client
-
+    import asyncio
     from redis.asyncio import Redis as AsyncRedis
 
-    if REDIS_URL:
-        _async_redis_client = AsyncRedis.from_url(REDIS_URL, decode_responses=True)
-        return _async_redis_client
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-    if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
+    if loop and loop in _async_redis_clients:
+        if not loop.is_closed():
+            return _async_redis_clients[loop]
+
+    if REDIS_URL:
+        client = AsyncRedis.from_url(REDIS_URL, decode_responses=True)
+    elif UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
         tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
-        _async_redis_client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
-        return _async_redis_client
+        client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
+    else:
+        client = AsyncRedis.from_url("redis://localhost:6379", decode_responses=True)
 
-    _async_redis_client = AsyncRedis.from_url("redis://localhost:6379", decode_responses=True)
-    return _async_redis_client
+    if loop:
+        _async_redis_clients[loop] = client
+
+    return client
 

@@ -780,10 +780,14 @@ async def handle_conversation_turn_async(
     will_send_install_video = is_install_turn and not is_trial_turn and (wants_resend or not new_state.get("app_download_video_sent"))
     sending_video = will_send_trial_video or will_send_install_video
 
-    # STRICT ZERO-LINKS: App/platform links are injected into the text reply ONLY when the customer
-    # explicitly asked for them. Video dispatch is handled separately by dispatch_media_guide_async
-    # and must NOT trigger link injection in the text reply.
-    allow_app_links = user_asked_links
+    # Allow app/platform links on explicit request OR at key action steps (Step 4 install/profile setup, trial booking)
+    is_action_step = bool(
+        is_install_turn
+        or is_trial_turn
+        or new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
+        or re.search(r"\b(download the sensationz app|download.{0,10}app|install.{0,10}app|create.{0,15}profile|profile bana)\b", main_reply, re.IGNORECASE)
+    )
+    allow_app_links = user_asked_links or is_action_step
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(

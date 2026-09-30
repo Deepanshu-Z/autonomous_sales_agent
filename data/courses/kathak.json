@@ -104,8 +104,9 @@
     "batch_timings": {
         "selection_flow": "Student selects a time + day-pair slot. If more than one teacher is assigned to that slot, the student is prompted to select a teacher.",
         "classes_per_week": 2,
-        "slots": [
+        "batches": [
             {
+                "slot": "Tuesday/Thursday",
                 "time_12h": "4:00 PM to 5:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
@@ -113,6 +114,7 @@
                 ]
             },
             {
+                "slot": "Wednesday/Friday",
                 "time_12h": "4:00 PM to 5:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
@@ -120,6 +122,7 @@
                 ]
             },
             {
+                "slot": "Tuesday/Thursday",
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
@@ -129,6 +132,7 @@
                 ]
             },
             {
+                "slot": "Wednesday/Friday",
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
@@ -137,6 +141,7 @@
                 ]
             },
             {
+                "slot": "Saturday/Sunday",
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
@@ -146,6 +151,7 @@
                 ]
             },
             {
+                "slot": "Tuesday/Thursday",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
@@ -153,6 +159,7 @@
                 ]
             },
             {
+                "slot": "Wednesday/Friday",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
@@ -162,6 +169,7 @@
                 ]
             },
             {
+                "slot": "Saturday/Sunday",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
@@ -171,6 +179,7 @@
                 ]
             },
             {
+                "slot": "Tuesday/Thursday",
                 "time_12h": "7:00 PM to 8:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
@@ -179,6 +188,7 @@
                 ]
             },
             {
+                "slot": "Wednesday/Friday",
                 "time_12h": "7:00 PM to 8:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
@@ -187,6 +197,7 @@
                 ]
             },
             {
+                "slot": "Saturday/Sunday",
                 "time_12h": "7:00 PM to 8:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
@@ -196,6 +207,7 @@
                 ]
             },
             {
+                "slot": "Wednesday/Friday",
                 "time_12h": "8:00 PM to 9:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
@@ -204,6 +216,7 @@
                 ]
             },
             {
+                "slot": "Saturday/Sunday",
                 "time_12h": "8:00 PM to 9:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
@@ -212,6 +225,7 @@
                 ]
             },
             {
+                "slot": "Tuesday/Thursday",
                 "time_12h": "8:00 PM to 9:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
@@ -311,6 +325,28 @@
         "Stable Internet Connection",
         "Open Space to Move"
     ],
+    "trial_class": {
+        "available": true,
+        "cost": "Free",
+        "max_trials": 3,
+        "booking_platform": "Sensationz App",
+        "booking_steps": [
+            "Download the Sensationz App",
+            "Login using Continue with Google",
+            "Complete your profile (Name, Gender, Country, etc.)",
+            "Go to Profile then tap Trial Links",
+            "Select the desired Kathak trial class",
+            "Select preferred Timing, Days, and Teacher",
+            "Tap Confirm Trial Enrollment",
+            "Your trial will be confirmed and booked"
+        ],
+        "demo_videos": {
+            "Madhuri": "https://youtu.be/t-XO2enPGwM",
+            "Vibha Mittal": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS",
+            "Kratika Gontiya": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1",
+            "Sneha Maurya": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
+        }
+    },
     "certification_structure": {
         "tiers": [
             {

@@ -282,7 +282,8 @@ def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
         offer = p.get("offer_price")
         coupon = p.get("coupon_code")
         if base is not None and offer is not None:
-            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,})"
+            coupon_str = f" with coupon *{coupon}*" if coupon else ""
+            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,}{coupon_str})"
         elif base is not None and coupon:
             valid_pkgs[duration] = f"₹{base:,} (Coupon: {coupon})"
         elif base is not None:

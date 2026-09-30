@@ -632,6 +632,7 @@ def _sanitize_locked_coupons(reply: str, state: dict) -> str:
     If the user has not completed their profile / unlocked coupon, any accidental
     coupon code mentions are sanitized out of the LLM reply.
     """
+    return reply  # Coupons are now unrestricted
     has_unlocked = bool(
         state.get("profile_created")
         or state.get("coupon_sent")

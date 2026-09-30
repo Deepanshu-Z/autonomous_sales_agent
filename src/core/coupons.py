@@ -207,87 +207,24 @@ def format_coupon_banner(
 
 def build_coupon_context(state: Optional[Dict[str, Any]] = None, course_id: str = "yoga") -> str:
     """
-    Backend Secret Gating Architecture:
-    - If profile is NOT created: Codes are strictly locked and hidden from LLM context.
-      Shows offer prices only. Instructs LLM to guide to profile creation and emit
-      the action tag [UNLOCK_COUPON] if customer indicates profile setup.
-    - If profile IS created: Unlocked codes are injected into context for natural conversation.
+    Builds coupon and discount policy context for the LLM.
+    Unrestricted policy: ALWAYS provide base price, offer price, and corresponding coupon code.
     """
-    s = state or {}
-    profile_created = bool(
-        s.get("profile_created")
-        or s.get("coupon_sent")
-        or s.get("stage") in ("PROFILE_COMPLETED", "COUPON_SENT")
-    )
-
     course_kb = kb_loader.get_course_data(course_id)
     packages = course_kb.get("pricing", {}).get("packages", [])
-    profile_video = course_kb.get("universal_enrollment_flow", {}).get("how_to_create_profile_video_url")
 
-    if not profile_created:
-        lines = [
-            "• GANESH CHATURTHI OFFER — DISCOUNT POLICY (PROFILE REGISTRATION REQUIRED):",
-            "  - Ganesh Chaturthi Offer coupon codes are LOCKED and hidden. Codes unlock ONLY AFTER profile registration.",
-            "  - ZERO FABRICATION RULE: You do NOT have any coupon codes. NEVER invent, fabricate, guess, or output ANY coupon code string (e.g. NEVER make up codes like 'WELCOME100', 'DISCOUNT50', or ANY code string).",
-            "  - If customer asks for a coupon or code for ANY package (e.g. '6 month ka coupon do', 'coupon code kya hai', 'give coupon'):",
-            "    1. Warmly explain that Ganesh Chaturthi Offer coupon codes unlock only AFTER completing profile registration on the Sensationz App or website.",
-            "    2. Quote the official offer price for their package (e.g. 6 Months offer price is \u20b91,000, 1 Month is \u20b9300).",
-            "    3. Guide them to complete their profile on the Sensationz App or website using the official links:",
-        ]
-        if profile_video:
-            lines.append(f"       \u2022 Tutorial Video: {profile_video}")
-        lines.extend([
-            "       \u2022 Android App: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev",
-            "       \u2022 iOS App: https://apps.apple.com/us/app/sensationz/id6761418351",
-            "       \u2022 Website: https://shop.sensationzperformingarts.com/",
-            "  - PROFILE COMPLETION TRIGGER (STRICT PAST TENSE AFFIRMATION ONLY):",
-            "    \u2022 Emit [UNLOCK_COUPON] ONLY IF the customer states they ALREADY finished/created/completed their profile or registered.",
-            "    \u2022 STRICT NEGATIVE RULE (NO [UNLOCK_COUPON] ON QUESTIONS/INQUIRIES): If the customer asks WHERE, HOW, or WHEN to create their profile (e.g. 'kha bnani h', 'kahan banegi', 'kaise banayein', 'where do I make it', 'how to create', 'send link'), they have NOT created it! NEVER output [UNLOCK_COUPON] on questions, inquiries, or instructions. Guide them to download the app or visit the website instead.",
-            "    \u2022 CELEBRATE warmly and include [UNLOCK_COUPON] ONLY when they confirm completion (e.g. 'Congratulations! [UNLOCK_COUPON]').",
-            "\u2022 OFFICIAL OFFER PRICES — GANESH CHATURTHI OFFER (Coupon codes are securely hidden until profile created):"
-        ])
-        for pkg in packages:
-            lines.append(f"  \u2022 {pkg.get('duration')}: Offer Price \u20b9{pkg.get('offer_price')} (Regular: \u20b9{pkg.get('base_price')}) \u2014 [Code locked until profile created]")
-        if not packages:
-            lines.append("  (No course selected yet \u2014 once customer selects a course, offer prices and locked codes will be shown.)")
-        return "\n".join(lines)
-
-    elif profile_created and s.get("wants_trial") and not s.get("package") and not s.get("is_coupon_requested"):
-        return (
-            "• CUSTOMER STATUS — PROFILE CREATED FOR FREE TRIAL:\n"
-            "  - The customer has completed their profile registration specifically to attend a FREE TRIAL class.\n"
-            "  - DO NOT pitch paid packages or output discount coupon codes right now! The customer is here for their free trial class.\n"
-            "  - Congratulate them warmly on creating their profile and instruct them to finalize their free trial in the Sensationz App: "
-            "Profile -> Trial Links -> Select batch timing -> Tap Confirm Trial Enrollment.\n"
-            "  - Ask if they are all set for their trial session or have any questions."
-        )
-
-    else:
-        selected = s.get("package")
-        if not packages:
-            return (
-                "• GANESH CHATURTHI OFFER — PROFILE CONFIRMED (UNLOCKED):\n"
-                "  - Profile is confirmed but no course is selected yet. Coupon codes are course-specific.\n"
-                "  - DO NOT output any coupon code. Once the customer selects their course and package, share the exact code from COURSE_DATA.\n"
-                "  - ZERO FABRICATION RULE: NEVER invent, guess, or make up any coupon code string!"
-            )
-        lines = [
-            "• GANESH CHATURTHI OFFER — PROFILE CONFIRMED (UNLOCKED):",
-            "  - Customer's profile registration is CONFIRMED. Ganesh Chaturthi Offer coupon codes are UNLOCKED.",
-            "  - Below are the exact unlocked coupon codes for each package duration:",
-        ]
-        for p in packages:
-            lines.append(f"  • {p.get('duration')}: *{p.get('coupon_code')}* (Regular: ₹{p.get('base_price')}, Offer Price: ₹{p.get('offer_price')})")
-
-        if selected:
-            canonical_sel = normalize_package_name(selected, course_id=course_id) or selected.strip()
-            pkg = next((p for p in packages if normalize_package_name(p.get("duration"), course_id=course_id) == canonical_sel or str(p.get("duration", "")).lower() == canonical_sel.lower()), None)
-            if pkg:
-                lines.append(f"\n  - Customer's Selected Package: {pkg.get('duration')}. Share their code *{pkg.get('coupon_code')}* and checkout instructions.")
-        else:
-            lines.append("\n  - Share the coupon code corresponding to whichever duration the customer chooses or asks about.")
-        lines.append("  - NEVER invent or modify codes. Use ONLY the exact codes listed above.")
-        return "\n".join(lines)
+    lines = [
+        "• DISCOUNT & COUPON POLICY (UNRESTRICTED — SEND ALONG WITH PRICES):",
+        "  - Coupon codes are completely open and unrestricted.",
+        "  - Whenever quoting, listing, or discussing package fees or prices, ALWAYS provide the base price, the offer price, and the corresponding coupon code for each package.",
+        "  - Instruct customers to apply the coupon code at checkout on the Sensationz App or website.",
+        "  - OFFICIAL PACKAGES & COUPONS (Source of truth — use ONLY exact codes below, NEVER fabricate):"
+    ]
+    for pkg in packages:
+        coupon = pkg.get("coupon_code")
+        coupon_str = f" | Coupon: *{coupon}*" if coupon else ""
+        lines.append(f"  • {pkg.get('duration')}: Regular ₹{pkg.get('base_price')}, Offer Price ₹{pkg.get('offer_price')}{coupon_str}")
+    return "\n".join(lines)
 
 
 def format_coupon_unlock_delivery(

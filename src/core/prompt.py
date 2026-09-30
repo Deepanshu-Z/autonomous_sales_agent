@@ -233,7 +233,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 - WhatsApp Bold: Use single asterisks *bold*, NEVER double asterisks **bold**.
 - Bullets: Use • or - with a space. NEVER use an asterisk as a bullet.
 - URLs: Always output plain raw URLs (e.g. https://example.com). NEVER use markdown link syntax [title](url).
-- Structured Pricing: Whenever quoting packages or fees, present them in clear bullet points with line breaks.
+- Structured Pricing: Whenever quoting packages or fees, present them in clear bullet points with line breaks. Always send the offer price and its corresponding coupon code from COURSE_DATA alongside the price (e.g. Duration: Base ₹X, Offer ₹Y using coupon *CODE*).
 
 ════════════════════════════════════════
 5. ACTIVE CUSTOMER SESSION CONTEXT
@@ -368,12 +368,9 @@ def format_system_prompt(
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
 
-    should_include_coupons = bool(
-        profile_confirmed
-        and (not s.get("wants_trial") or s.get("package") or s.get("is_coupon_requested"))
-    )
+    # Coupons are unrestricted — always include in course data
     course_json_str = kb_loader.get_course_prompt_str(
-        cid, minified=True, include_coupons=should_include_coupons
+        cid, minified=True, include_coupons=True
     )
 
     catalog_names = ", ".join(

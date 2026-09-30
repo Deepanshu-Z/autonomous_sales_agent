@@ -110,12 +110,11 @@
             "Select package duration (1M / 3M / 6M / 1Y)",
             "Download the Sensationz App or visit the website",
             "Create your profile (login via Google)",
-            "Reply Done or Yes on WhatsApp to receive Ganesh Chaturthi Offer coupon",
-            "Apply coupon at checkout for offer price",
+            "Apply coupon received with pricing at checkout for offer price",
             "Complete payment"
         ],
         "payment_platform": "Sensationz App or official website only",
-        "coupon_delivery": "Sent via WhatsApp after profile creation"
+        "coupon_delivery": "Provided upfront with package pricing"
     },
     "support_and_escalation": {
         "human_agent_trigger": "User types *agent*",

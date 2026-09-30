@@ -264,10 +264,6 @@ def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional
     coupons = kb_loader.get_course_coupons(course_id)
     valid_codes = {c.get("code").upper() for c in coupons.values() if c.get("code")}
 
-    if not profile_confirmed:
-        # If profile not confirmed, redact any leaked or fabricated coupon code pattern
-        reply = re.sub(r"\*?\b[A-Z]{3,12}\d{2,5}\b\*?", "welcome discount coupon", reply)
-        return reply
 
     # If profile is confirmed:
     selected_pkg = state.get("package")

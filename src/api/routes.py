@@ -130,7 +130,7 @@ async def receive_interakt_webhook(request: Request):
 
     signature = request.headers.get("Interakt-Signature", "")
     if not verify_webhook_signature(raw_body, signature):
-        print(f"[api] ❌ Signature verification FAILED. Signature header: '{signature[:20]}...'")
+        print(f"[api]  Signature verification FAILED. Signature header: '{signature[:20]}...'")
         log_lead_action(
             lead_no="Unknown",
             lead_details="N/A",
@@ -139,9 +139,8 @@ async def receive_interakt_webhook(request: Request):
         )
         return {"status": "invalid signature"}
 
-    # Special handling for Interakt dashboard "Test Webhook" button
     if event_type == "Webhook Test":
-        print("[api] ✅ Interakt 'Webhook Test' event verified successfully!")
+        print("[api]  Interakt 'Webhook Test' event verified successfully!")
         return {"status": "ok", "message": "Webhook Test received"}
 
     if event_type != "message_received":
@@ -154,7 +153,6 @@ async def receive_interakt_webhook(request: Request):
     text = _extract_message_text(message)
     referral = message.get("referral", {}) or {}
 
-    # Enrich referral with ad_tag from customer traits/tags/headline if missing
     if isinstance(referral, dict):
         traits = customer.get("traits", {}) if isinstance(customer, dict) else {}
         ad_tag = (
@@ -168,7 +166,6 @@ async def receive_interakt_webhook(request: Request):
         if ad_tag and "ad_tag" not in referral:
             referral["ad_tag"] = ad_tag
 
-    # ── Independent Rate Limiter ──────────────────────────────────────────
     limited, rl_info = await is_rate_limited(phone)
     if limited:
         print(f"[api] ⚠️ Rate limit exceeded for {phone}: {rl_info.get('count')}/{rl_info.get('limit')} msgs in {rl_info.get('window')}s. Dropping message.")

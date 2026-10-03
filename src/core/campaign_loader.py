@@ -126,7 +126,7 @@ def get_campaign_buttons(campaign: Optional[Dict[str, Any]], language: Optional[
     Supports both language-keyed button dictionaries and flat button lists.
     """
     if not campaign:
-        return ["Timing", "Fees", "Free Trial"]
+        return ["Fees", "Timings", "Talk to Agent"]
 
     raw_buttons = campaign.get("buttons")
     if isinstance(raw_buttons, list):
@@ -142,5 +142,5 @@ def get_campaign_buttons(campaign: Optional[Dict[str, Any]], language: Optional[
         if isinstance(first_val, list):
             return first_val
 
-    return ["Timing", "Fees", "Free Trial"]
+    return ["Fees", "Timings", "Talk to Agent"]
 

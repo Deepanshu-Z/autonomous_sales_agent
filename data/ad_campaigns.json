@@ -5,12 +5,12 @@
       "120251036038770010"
     ],
     "welcome_messages": {
-      "message_1": "Welcome to Sensationz! 🙏 Join our live Yoga classes, Monday to Friday, with certified instructors. \n\n Sensationz में आपका स्वागत है! हमारे प्रमाणित प्रशिक्षकों के साथ सोमवार से शुक्रवार तक लाइव योग क्लासेस जॉइन करें।",
-      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
+      "message_1": "Hi, Yes! 😊 We currently have a ₹600 / 3-month offer.\n\n🧘 Live Yoga Classes\n📅 Monday–Friday\n👨🏫 Certified instructors\n💰 3 months — ₹600\n💻 Online classes",
+      "message_2": "Would you like me to share the class timings and registration details?"
     },
     "buttons": [
-      "Timing",
       "Fees",
+      "Timings",
       "Talk to Agent"
     ]
   },

@@ -1,0 +1,326 @@
+{
+    "_meta": {
+        "version": "3.1",
+        "course": "ladies_bollywood_dance",
+        "document_status": "draft",
+        "language_support": [
+            "en",
+            "hi"
+        ],
+        "last_updated": "2026",
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here. Fields set to null are pending confirmation from the business owner."
+    },
+    "course_overview": {
+        "name": "Online Live Interactive Ladies Bollywood Dance",
+        "mode": "Online Only",
+        "platform": "Sensationz App",
+        "class_format": "Live and interactive",
+        "class_days": "Monday to Friday (5 days per week)",
+        "weekend_classes": false,
+        "session_duration_minutes": 60,
+        "minimum_age_years": 16,
+        "prior_experience_required": false,
+        "batch_size_range": null,
+        "class_language": [
+            "English",
+            "Hindi"
+        ],
+        "all_teachers_female": false,
+        "suitable_for": [
+            "Beginners",
+            "Intermediate learners",
+            "Advanced learners"
+        ],
+        "duration_options": [
+            "1 Month",
+            "3 Months",
+            "6 Months",
+            "1 Year",
+            "Lifetime Membership"
+        ],
+        "available_from_anywhere": true,
+        "recordings_available": true,
+        "recordings_note": "Recordings of the class are provided daily, after each class.",
+        "certificate_provided": false,
+        "trial_classes_available": null,
+        "max_trial_classes": null,
+        "trial_cost": null,
+        "important_note": null
+    },
+    "pricing": {
+        "currency": "INR",
+        "gst_included_in_listed_price": false,
+        "gst_percentage": 18,
+        "gst_added_at": "Checkout in app or website",
+        "offer_mechanism": null,
+        "beginner_recommendation": null,
+        "packages": [
+            {
+                "duration": "1 Month",
+                "duration_code": "1M",
+                "base_price": 500,
+                "gst_slab": "18%",
+                "gst_on_base": 90,
+                "total_with_gst": 590,
+                "per_day": "Rs.16.7/day",
+                "note": "No offer on 1 Month. Price is ₹500 + 18% GST = ₹590 at checkout."
+            },
+            {
+                "duration": "3 Months",
+                "duration_code": "3M",
+                "base_price": 1200,
+                "offer_price": 600,
+                "gst_slab": "18%",
+                "coupon_code": "DANCE600",
+                "gst_on_offer": 108,
+                "total_with_gst_offer": 708,
+                "per_day_offer": "Rs.6.7/day"
+            },
+            {
+                "duration": "6 Months",
+                "duration_code": "6M",
+                "base_price": 2100,
+                "offer_price": 900,
+                "gst_slab": "18%",
+                "coupon_code": "DANCE900",
+                "gst_on_offer": 162,
+                "total_with_gst_offer": 1062,
+                "per_day_offer": "Rs.5/day"
+            },
+            {
+                "duration": "1 Year",
+                "duration_code": "1Y",
+                "base_price": 3500,
+                "offer_price": 1200,
+                "gst_slab": "18%",
+                "coupon_code": "DANCE1200",
+                "gst_on_offer": 216,
+                "total_with_gst_offer": 1416,
+                "per_day_offer": "Rs.3.3/day"
+            },
+            {
+                "duration": "Lifetime Membership",
+                "duration_code": "LIFETIME",
+                "base_price": null,
+                "offer_price": null,
+                "gst_slab": "18%",
+                "coupon_code": null,
+                "gst_on_offer": null,
+                "total_with_gst_offer": null,
+                "per_day_offer": null
+            }
+        ]
+    },
+    "batch_timings": {
+        "total_batches": 7,
+        "flexibility_at_enrollment": "Slot cannot be changed within the first 1 month after enrollment",
+        "classes_per_day": 1,
+        "batches": [
+            {
+                "slot": "Morning",
+                "time_24h": "11:00-12:00",
+                "time_12h": "11:00 AM to 12:00 PM",
+                "instructors": [
+                    "Aditi Vyas"
+                ]
+            },
+            {
+                "slot": "Afternoon",
+                "time_24h": "12:00-13:00",
+                "time_12h": "12:00 PM to 1:00 PM",
+                "instructors": [
+                    "Aditi Vyas"
+                ]
+            },
+            {
+                "slot": "Afternoon",
+                "time_24h": "13:00-14:00",
+                "time_12h": "1:00 PM to 2:00 PM",
+                "instructors": [
+                    "Lokesh Kumar"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "16:00-17:00",
+                "time_12h": "4:00 PM to 5:00 PM",
+                "instructors": [
+                    "Gresi Gurung"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "17:00-18:00",
+                "time_12h": "5:00 PM to 6:00 PM",
+                "instructors": [
+                    "Mansi Pal"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "18:00-19:00",
+                "time_12h": "6:00 PM to 7:00 PM",
+                "instructors": [
+                    "Aditi Vyas"
+                ]
+            },
+            {
+                "slot": "Evening",
+                "time_24h": "20:00-21:00",
+                "time_12h": "8:00 PM to 9:00 PM",
+                "instructors": [
+                    "Aditi Vyas"
+                ]
+            }
+        ],
+        "unavailable_slots": null,
+        "earliest_batch": "11:00 AM to 12:00 PM",
+        "latest_batch": "8:00 PM to 9:00 PM"
+    },
+    "teachers": [
+        {
+            "name": "Aditi Vyas",
+            "experience_years": "4+",
+            "qualifications": null,
+            "certifications": null,
+            "specialization": [
+                "Bollywood Dance",
+                "Semi-Classical Dance",
+                "Choreography",
+                "Stage show and cultural performance preparation"
+            ],
+            "with_sensationz": "1+ year",
+            "profile_highlights": [
+                "Versatile Bollywood and Semi-Classical dance instructor",
+                "Strong command of dance training and choreography",
+                "Conducts structured, engaging and learner-focused sessions",
+                "Actively involved in dance and cultural events",
+                "Skilled in preparing students for stage shows and cultural performances",
+                "Emphasis on expressions, rhythm, movement and stage presence",
+                "Dedicated to nurturing confidence, creativity and performance skills"
+            ],
+            "assigned_batches": [
+                "11:00 AM to 12:00 PM",
+                "12:00 PM to 1:00 PM",
+                "6:00 PM to 7:00 PM",
+                "8:00 PM to 9:00 PM"
+            ],
+            "demo_video": "https://www.instagram.com/reel/DcgMu1kQDeJ/?stkn=MXVxa3g0cTB0dXF4bw=="
+        },
+        {
+            "name": "Lokesh Kumar",
+            "experience_years": "6+",
+            "qualifications": null,
+            "certifications": null,
+            "specialization": [
+                "Bollywood Dance",
+                "Dance and Fitness",
+                "Choreography and Performance"
+            ],
+            "with_sensationz": "5+ years",
+            "profile_highlights": [
+                "Experienced Bollywood Dance and Fitness instructor",
+                "Energetic and engaging teaching style",
+                "Fun, dynamic and learner-friendly sessions for all levels",
+                "Experience in dance and cultural events",
+                "Passionate about choreography and performance"
+            ],
+            "assigned_batches": [
+                "1:00 PM to 2:00 PM"
+            ],
+            "demo_video": null
+        },
+        {
+            "name": "Gresi Gurung",
+            "experience_years": "4+",
+            "qualifications": null,
+            "certifications": null,
+            "specialization": [
+                "Bollywood Dance",
+                "Beginner-friendly dance training",
+                "Rhythm, expressions and coordination"
+            ],
+            "with_sensationz": "1+ year",
+            "profile_highlights": [
+                "Passionate and energetic Bollywood dance instructor",
+                "Specializes in beginner-friendly dance training",
+                "Experienced in conducting Kids' batches",
+                "Teaches choreography through simple, step-by-step guidance",
+                "Creates a fun, interactive and comfortable learning environment",
+                "Helps beginners build confidence and enjoy their dance journey"
+            ],
+            "assigned_batches": [
+                "4:00 PM to 5:00 PM"
+            ],
+            "demo_video": "https://www.instagram.com/reel/Dca-An0FgIR/?stkn=MXA2eGNlejdzb213Nw=="
+        },
+        {
+            "name": "Mansi Pal",
+            "experience_years": null,
+            "qualifications": null,
+            "certifications": null,
+            "specialization": [
+                "Bollywood Dance"
+            ],
+            "with_sensationz": null,
+            "profile_highlights": null,
+            "assigned_batches": [
+                "5:00 PM to 6:00 PM"
+            ],
+            "demo_video": "https://www.instagram.com/reel/DdL2ZOcjhmQ/?stkn=c2FnczgzMWQ0eno4"
+        }
+    ],
+    "syllabus": {
+        "learning_format": "Weekly song-based choreography",
+        "structure_note": "This course has no fixed level-wise syllabus or module list. Each week is built around one Bollywood song, and students learn its choreography over the week.",
+        "weekly_cycle": [
+            {
+                "day": "Monday",
+                "focus": "Song of the week is chosen and choreography learning begins"
+            },
+            {
+                "day": "Tuesday to Friday",
+                "focus": "Step-by-step learning of the same song's choreography, continuing through the week"
+            }
+        ],
+        "skills_practised": [
+            "Bollywood choreography",
+            "Rhythm and coordination",
+            "Expressions",
+            "Movement and stage presence"
+        ]
+    },
+    "course_benefits": {
+        "focus_areas": null,
+        "disclaimer": "These are course focus areas, not medical guarantees or cure claims."
+    },
+    "what_to_keep_ready": null,
+    "trial_class": {
+        "available": null,
+        "cost": null,
+        "max_trials": null,
+        "booking_platform": "Sensationz App",
+        "booking_steps": null,
+        "note": "Trial class details follow global.json.",
+        "demo_videos": {
+            "Aditi Vyas": "https://www.instagram.com/reel/DcgMu1kQDeJ/?stkn=MXVxa3g0cTB0dXF4bw==",
+            "Gresi Gurung": "https://www.instagram.com/reel/Dca-An0FgIR/?stkn=MXA2eGNlejdzb213Nw==",
+            "Mansi Pal": "https://www.instagram.com/reel/DdL2ZOcjhmQ/?stkn=c2FnczgzMWQ0eno4",
+            "Lokesh Kumar": null
+        }
+    },
+    "enrollment": {
+        "batches_start": "Ongoing — enroll anytime"
+    },
+    "not_offered": {
+        "course_types": null,
+        "other": [
+            "Course completion certificate"
+        ],
+        "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
+    },
+    "health_and_medical": {
+        "covered_topics": null,
+        "medical_disclaimer": null
+    }
+}

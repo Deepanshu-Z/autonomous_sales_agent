@@ -39,5 +39,18 @@
       "Fees",
       "Other questions"
     ]
+  },
+  {
+    "course": "ladies_dance",
+    "ad_ids": [],
+    "welcome_messages": {
+      "message_1": "Welcome to Sensationz! 💃 Learn energetic Bollywood and semi-classical dance with our live interactive online classes for ladies.\n\nSensationz में आपका स्वागत है! महिलाओं के लिए हमारे लाइव इंटरएक्टिव ऑनलाइन बॉलीवुड डांस सेशन से जुड़ें।",
+      "message_2": "How can I help?\n\nमैं आपकी कैसे मदद करूँ?"
+    },
+    "buttons": [
+      "Timing",
+      "Fees",
+      "Talk to Agent"
+    ]
   }
 ]

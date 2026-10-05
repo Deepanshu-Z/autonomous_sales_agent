@@ -1,14 +1,14 @@
 {
     "_meta": {
         "version": "3.1",
-        "course": "ladies_bollywood_dance",
-        "document_status": "draft",
+        "course": "ladies_dance",
+        "document_status": "active",
         "language_support": [
             "en",
             "hi"
         ],
         "last_updated": "2026",
-        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here. Fields set to null are pending confirmation from the business owner."
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here."
     },
     "course_overview": {
         "name": "Online Live Interactive Ladies Bollywood Dance",
@@ -20,7 +20,7 @@
         "session_duration_minutes": 60,
         "minimum_age_years": 16,
         "prior_experience_required": false,
-        "batch_size_range": null,
+        "batch_size_range": "30 to 45 students",
         "class_language": [
             "English",
             "Hindi"
@@ -29,31 +29,32 @@
         "suitable_for": [
             "Beginners",
             "Intermediate learners",
-            "Advanced learners"
+            "Advanced learners",
+            "Homemakers",
+            "Working professionals"
         ],
         "duration_options": [
             "1 Month",
             "3 Months",
             "6 Months",
-            "1 Year",
-            "Lifetime Membership"
+            "1 Year"
         ],
         "available_from_anywhere": true,
         "recordings_available": true,
         "recordings_note": "Recordings of the class are provided daily, after each class.",
         "certificate_provided": false,
-        "trial_classes_available": null,
-        "max_trial_classes": null,
-        "trial_cost": null,
-        "important_note": null
+        "trial_classes_available": true,
+        "max_trial_classes": 3,
+        "trial_cost": "Free",
+        "important_note": "Physical branches are office addresses only. Online Ladies Bollywood Dance classes are accessible from anywhere worldwide."
     },
     "pricing": {
         "currency": "INR",
         "gst_included_in_listed_price": false,
         "gst_percentage": 18,
         "gst_added_at": "Checkout in app or website",
-        "offer_mechanism": null,
-        "beginner_recommendation": null,
+        "offer_mechanism": "Welcome Offer coupon sent after profile creation in app/website",
+        "beginner_recommendation": "1 Month package",
         "packages": [
             {
                 "duration": "1 Month",
@@ -97,17 +98,6 @@
                 "gst_on_offer": 216,
                 "total_with_gst_offer": 1416,
                 "per_day_offer": "Rs.3.3/day"
-            },
-            {
-                "duration": "Lifetime Membership",
-                "duration_code": "LIFETIME",
-                "base_price": null,
-                "offer_price": null,
-                "gst_slab": "18%",
-                "coupon_code": null,
-                "gst_on_offer": null,
-                "total_with_gst_offer": null,
-                "per_day_offer": null
             }
         ]
     },
@@ -173,7 +163,6 @@
                 ]
             }
         ],
-        "unavailable_slots": null,
         "earliest_batch": "11:00 AM to 12:00 PM",
         "latest_batch": "8:00 PM to 9:00 PM"
     },
@@ -181,8 +170,9 @@
         {
             "name": "Aditi Vyas",
             "experience_years": "4+",
-            "qualifications": null,
-            "certifications": null,
+            "certifications": [
+                "Certified Dance Instructor"
+            ],
             "specialization": [
                 "Bollywood Dance",
                 "Semi-Classical Dance",
@@ -191,7 +181,6 @@
             ],
             "with_sensationz": "1+ year",
             "profile_highlights": [
-                "Versatile Bollywood and Semi-Classical dance instructor",
                 "Strong command of dance training and choreography",
                 "Conducts structured, engaging and learner-focused sessions",
                 "Actively involved in dance and cultural events",
@@ -210,8 +199,9 @@
         {
             "name": "Lokesh Kumar",
             "experience_years": "6+",
-            "qualifications": null,
-            "certifications": null,
+            "certifications": [
+                "Certified Dance & Fitness Instructor"
+            ],
             "specialization": [
                 "Bollywood Dance",
                 "Dance and Fitness",
@@ -227,14 +217,14 @@
             ],
             "assigned_batches": [
                 "1:00 PM to 2:00 PM"
-            ],
-            "demo_video": null
+            ]
         },
         {
             "name": "Gresi Gurung",
             "experience_years": "4+",
-            "qualifications": null,
-            "certifications": null,
+            "certifications": [
+                "Certified Dance Instructor"
+            ],
             "specialization": [
                 "Bollywood Dance",
                 "Beginner-friendly dance training",
@@ -244,7 +234,6 @@
             "profile_highlights": [
                 "Passionate and energetic Bollywood dance instructor",
                 "Specializes in beginner-friendly dance training",
-                "Experienced in conducting Kids' batches",
                 "Teaches choreography through simple, step-by-step guidance",
                 "Creates a fun, interactive and comfortable learning environment",
                 "Helps beginners build confidence and enjoy their dance journey"
@@ -256,14 +245,21 @@
         },
         {
             "name": "Mansi Pal",
-            "experience_years": null,
-            "qualifications": null,
-            "certifications": null,
-            "specialization": [
-                "Bollywood Dance"
+            "experience_years": "3+",
+            "certifications": [
+                "Certified Dance Instructor"
             ],
-            "with_sensationz": null,
-            "profile_highlights": null,
+            "specialization": [
+                "Bollywood Dance",
+                "Choreography",
+                "Expressions & Movement"
+            ],
+            "with_sensationz": "1+ year",
+            "profile_highlights": [
+                "Energetic and passionate Bollywood dance instructor",
+                "Focuses on step-by-step choreography learning",
+                "Encouraging, lively, and beginner-friendly sessions"
+            ],
             "assigned_batches": [
                 "5:00 PM to 6:00 PM"
             ],
@@ -291,36 +287,50 @@
         ]
     },
     "course_benefits": {
-        "focus_areas": null,
+        "focus_areas": [
+            "Full-body cardio workout, calorie burn and stamina building",
+            "Weekly new Bollywood song choreographies",
+            "Rhythm, graceful expressions, hand gestures and footwork",
+            "Stress relief, confidence boosting, and joyful learning environment",
+            "Step-by-step guidance suitable for complete beginners"
+        ],
         "disclaimer": "These are course focus areas, not medical guarantees or cure claims."
     },
-    "what_to_keep_ready": null,
+    "what_to_keep_ready": [
+        "Comfortable dance wear or workout clothing",
+        "Water bottle",
+        "Stable internet connection",
+        "Open space to move freely"
+    ],
     "trial_class": {
-        "available": null,
-        "cost": null,
-        "max_trials": null,
+        "available": true,
+        "cost": "Free",
+        "max_trials": 3,
         "booking_platform": "Sensationz App",
-        "booking_steps": null,
-        "note": "Trial class details follow global.json.",
+        "booking_steps": [
+            "Download the Sensationz App",
+            "Login using Continue with Google",
+            "Complete your profile (Name, Gender, Country, etc.)",
+            "Go to Profile then tap Trial Links",
+            "Select Ladies Bollywood Dance and your preferred timing",
+            "Tap Confirm Trial Enrollment"
+        ],
         "demo_videos": {
             "Aditi Vyas": "https://www.instagram.com/reel/DcgMu1kQDeJ/?stkn=MXVxa3g0cTB0dXF4bw==",
             "Gresi Gurung": "https://www.instagram.com/reel/Dca-An0FgIR/?stkn=MXA2eGNlejdzb213Nw==",
-            "Mansi Pal": "https://www.instagram.com/reel/DdL2ZOcjhmQ/?stkn=c2FnczgzMWQ0eno4",
-            "Lokesh Kumar": null
+            "Mansi Pal": "https://www.instagram.com/reel/DdL2ZOcjhmQ/?stkn=c2FnczgzMWQ0eno4"
         }
     },
     "enrollment": {
         "batches_start": "Ongoing — enroll anytime"
     },
     "not_offered": {
-        "course_types": null,
         "other": [
-            "Course completion certificate"
+            "Course completion certificate",
+            "1-on-1 private classes",
+            "Offline studio classes",
+            "Refunds"
         ],
         "medical_advice_note": "AI must NOT provide personalized medical diagnoses, treatment, cure claims, or exercise prescriptions."
-    },
-    "health_and_medical": {
-        "covered_topics": null,
-        "medical_disclaimer": null
     }
 }

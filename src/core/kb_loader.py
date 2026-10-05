@@ -264,7 +264,14 @@ def get_valid_timings(course_id: Optional[str] = None) -> List[str]:
             valid_timings.append(canonical)
         elif t:
             valid_timings.append(t)
-    return valid_timings
+    # Deduplicate while preserving order across multi-teacher/day-pair batches
+    seen = set()
+    deduped = []
+    for vt in valid_timings:
+        if vt not in seen:
+            seen.add(vt)
+            deduped.append(vt)
+    return deduped
 
 
 def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:

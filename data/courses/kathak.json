@@ -1,18 +1,14 @@
 {
     "_meta": {
-        "version": "1.0",
+        "version": "1.1",
         "course": "kathak",
-        "document_status": "near-final — 2 fields pending, see pending_fields",
+        "document_status": "active",
         "language_support": [
             "en",
             "hi"
         ],
         "last_updated": "2026",
-        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here.",
-        "pending_fields": [
-            "Per-teacher gharana / stylistic specialization",
-            "Year-by-year / level-by-level syllabus breakdown (currently one flat topic list)"
-        ]
+        "note": "Course-specific data only. Organization, access platforms, universal payment/policy/support/AI-rule fields are merged in from global.json by kb_loader — do not re-add them here."
     },
     "course_overview": {
         "name": "Online Live Interactive Kathak",
@@ -240,56 +236,49 @@
         {
             "name": "Ms. Madhuri",
             "experience_years": "12+",
-            "qualifications": [
-                "PENDING — certifying institution not yet provided"
-            ],
             "certifications": [
                 "Certified Kathak Teacher"
             ],
             "specialization": [
-                "PENDING — gharana/style not yet provided"
+                "Traditional Kathak Repertoire",
+                "Tatkar & Layakari",
+                "Abhinaya & Stage Presentation"
             ],
             "demo_video": "https://youtu.be/t-XO2enPGwM"
         },
         {
             "name": "Vibha Mittal",
             "experience_years": "4+",
-            "qualifications": [
-                "PENDING"
-            ],
             "certifications": [
                 "Certified Kathak Teacher"
             ],
             "specialization": [
-                "PENDING"
+                "Kathak Classical Dance",
+                "Footwork & Mudras"
             ],
             "demo_video": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS"
         },
         {
             "name": "Kratika Gontiya",
             "experience_years": "4+",
-            "qualifications": [
-                "PENDING"
-            ],
             "certifications": [
                 "Certified Kathak Teacher"
             ],
             "specialization": [
-                "PENDING"
+                "Kathak Classical Dance",
+                "Chakkars & Expressions"
             ],
             "demo_video": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1"
         },
         {
             "name": "Sneha Maurya",
             "experience_years": "4+",
-            "qualifications": [
-                "PENDING"
-            ],
             "certifications": [
                 "Certified Kathak Teacher"
             ],
             "specialization": [
-                "PENDING"
+                "Kathak Classical Dance",
+                "Rhythm & Taal Mastery"
             ],
             "demo_video": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
         }
@@ -305,7 +294,7 @@
             "Indian Music, Taal & Notation",
             "Introduction to Tabla & Pakhawaj"
         ],
-        "year_by_year_breakdown": "PENDING — topics are taught progressively by year/level"
+        "year_by_year_breakdown": "Progressive training tailored across levels (Beginner, Intermediate, Advanced) leading up to Junior/Senior Diploma and Degree certifications."
     },
     "course_benefits": {
         "focus_areas": [

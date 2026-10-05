@@ -28,17 +28,32 @@
         "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
     },
     {
+        "id": "ladies_dance",
+        "name": "Online Live Interactive Ladies Bollywood Dance",
+        "aliases": [
+            "ladies dance",
+            "ladies bollywood dance",
+            "bollywood dance",
+            "women dance",
+            "ladies dance classes",
+            "dance for ladies"
+        ],
+        "has_full_kb": true,
+        "kb_file": "data/courses/ladies_dance.json",
+        "gst_percentage": 18,
+        "description": "Live interactive Bollywood and semi-classical dance sessions for ladies with weekly song-based choreographies."
+    },
+    {
         "id": "dance",
         "name": "Western Dance & Choreography",
         "aliases": [
             "dance",
             "western dance",
             "hip hop",
-            "contemporary",
-            "bollywood dance"
+            "contemporary"
         ],
         "has_full_kb": false,
-        "description": "High-energy Western, Bollywood, and Contemporary dance styles for all age groups."
+        "description": "High-energy Western, Hip-Hop, and Contemporary dance styles for all age groups."
     },
     {
         "id": "fitness",

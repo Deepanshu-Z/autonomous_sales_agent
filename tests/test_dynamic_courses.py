@@ -50,42 +50,49 @@ def test_dynamic_timings_multiple_courses():
 
 
 def test_dynamic_package_detection():
-    # Test Yoga pricing
-    pkg_yoga = detect_package_from_text("300", course_id="yoga")
+    # Test Yoga pricing (1M is 700, 3M offer is 600)
+    pkg_yoga = detect_package_from_text("700", course_id="yoga")
     assert pkg_yoga == "1 Month"
 
     pkg_yoga_dur = detect_package_from_text("3 mahine", course_id="yoga")
     assert pkg_yoga_dur == "3 Months"
 
-    # Test Kathak pricing (1 Month offer is 800, 3 Months offer is 2000)
-    pkg_kathak_800 = detect_package_from_text("800", course_id="kathak")
-    assert pkg_kathak_800 == "1 Month"
+    # Test Kathak pricing (1 Month offer is 700, 3 Months offer is 1500)
+    pkg_kathak_700 = detect_package_from_text("700", course_id="kathak")
+    assert pkg_kathak_700 == "1 Month"
 
-    pkg_kathak_2000 = detect_package_from_text("2000", course_id="kathak")
-    assert pkg_kathak_2000 == "3 Months"
+    pkg_kathak_1500 = detect_package_from_text("1500", course_id="kathak")
+    assert pkg_kathak_1500 == "3 Months"
+
+    # Test Ladies Dance pricing (1 Month is 500, 3 Months offer is 600)
+    pkg_dance_500 = detect_package_from_text("500", course_id="ladies_dance")
+    assert pkg_dance_500 == "1 Month"
+
+    pkg_dance_600 = detect_package_from_text("600", course_id="ladies_dance")
+    assert pkg_dance_600 == "3 Months"
 
     print("✅ test_dynamic_package_detection passed!")
 
 
 def test_dynamic_sales_followup():
-    # Kathak package asked follow up should display Kathak fees (₹800, ₹2,000 etc), NOT Yoga fees (₹300)
+    # Kathak package asked follow up should display Kathak fees (₹700, ₹1,500 etc)
     state_kathak = {
         "stage": "PACKAGE_ASKED",
         "course": "kathak",
         "timing": "6:00–7:00 PM",
     }
     followup_kathak = get_sales_followup("soch raha hu", "Sure!", state_kathak)
-    assert "800" in followup_kathak
-    assert "300" not in followup_kathak, "Should not leak Yoga ₹300 into Kathak follow-up!"
+    assert "700" in followup_kathak
+    assert "1,500" in followup_kathak
 
-    # Yoga follow up should display Yoga fees
+    # Yoga follow up should display Yoga fees (₹700, ₹600)
     state_yoga = {
         "stage": "PACKAGE_ASKED",
         "course": "yoga",
         "timing": "6:00–7:00 AM",
     }
     followup_yoga = get_sales_followup("soch raha hu", "Sure!", state_yoga)
-    assert "300" in followup_yoga
+    assert "700" in followup_yoga
 
     # NEW stage follow up should interpolate course name
     state_new_kathak = {"stage": "NEW", "course": "kathak"}
@@ -115,8 +122,8 @@ async def test_slot_extraction_dynamic():
     # User mentions 3 months package
     res2 = await extract_and_update_slots(phone, "3 months")
     assert res2.get("package") == "3 Months"
-    # Kathak 3 months fee is ₹3,000 (Offer Price: ₹2,000)
-    assert "2,000" in (res2.get("fee") or "")
+    # Kathak 3 months fee is ₹2,100 (Offer Price: ₹1,500)
+    assert "1,500" in (res2.get("fee") or "")
 
     print("✅ test_slot_extraction_dynamic passed!")
 

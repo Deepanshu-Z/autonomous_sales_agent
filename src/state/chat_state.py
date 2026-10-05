@@ -497,7 +497,7 @@ def detect_timing_from_text(text: str, course_id: str = "yoga") -> tuple:
     for hr, aliases in hour_checks:
         for alias in aliases:
             if re_has(rf"(?<![0-9\-])\s*{alias}(?:\s*baje|\s*bje|\b)"):
-                cands = [vt for vt in valid_timings if re.search(rf"\b{hr}(?::00)?\s*(?:to|-|–)", vt)]
+                cands = list(dict.fromkeys([vt for vt in valid_timings if re.search(rf"\b{hr}(?::00)?\s*(?:to|-|–)", vt)]))
                 if len(cands) == 1:
                     return cands[0], False, ""
                 elif len(cands) > 1:
@@ -606,7 +606,7 @@ def resolve_llm_reply_tags(reply: str, state: dict, course_id: str = "yoga", use
     # If session is NOT verified and was NOT unlocked, ensure NO coupon codes (real or fabricated) are leaked.
     if not did_unlock and not state.get("profile_created"):
         resolved_reply = re.sub(
-            r"\*?\b(?:welcome|yoga|kathak|coupon|code|flat|save|off)\d{2,5}\b\*?",
+            r"\*?\b(?:welcome|yoga|kathak|dance|coupon|code|flat|save|off)\d{2,5}\b\*?",
             "welcome coupon",
             resolved_reply,
             flags=re.IGNORECASE

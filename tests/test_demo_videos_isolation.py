@@ -10,9 +10,12 @@ from src.state.chat_state import get_default_state
 class TestDemoVideosIsolation(unittest.TestCase):
 
     def test_face_yoga_demo_videos_display(self):
-        """Face Yoga must report no recorded demo videos and never leak Yoga teachers."""
+        """Face Yoga must list Parul mam and Sonali mam and never leak Yoga teachers."""
         display = kb_loader.format_demo_videos_display("face_yoga")
-        self.assertIn("not available for Face Yoga", display)
+        self.assertIn("Parul mam", display)
+        self.assertIn("https://youtu.be/PzwrL2P8mYQ", display)
+        self.assertIn("Sonali mam", display)
+        self.assertIn("https://www.instagram.com/reel/Dc-2YCFCFn7", display)
         self.assertNotIn("Suman Lata", display)
         self.assertNotIn("Mradula", display)
         self.assertNotIn("Priya Mathur", display)
@@ -44,7 +47,8 @@ class TestDemoVideosIsolation(unittest.TestCase):
         sp = prompt.format_system_prompt(state, course_id="face_yoga")
         
         self.assertIn("ACTIVE COURSE INSTRUCTOR DEMO VIDEOS", sp)
-        self.assertIn("Recorded demo videos are currently not available for Face Yoga instructors", sp)
+        self.assertIn("Parul mam: https://youtu.be/PzwrL2P8mYQ", sp)
+        self.assertIn("Sonali mam: https://www.instagram.com/reel/Dc-2YCFCFn7", sp)
         # Verify global_rules did not leak (Suman Lata, Mradula, Priya Mathur) into Face Yoga trial class
         course_data = kb_loader.get_course_data("face_yoga")
         demo_rule = course_data.get("trial_class", {}).get("demo_videos_rule", "")

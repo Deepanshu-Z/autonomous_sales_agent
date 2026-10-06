@@ -155,7 +155,7 @@
                 "7:00 AM to 8:00 AM",
                 "6:00 PM to 7:00 PM"
             ],
-            "demo_video": null
+            "demo_video": "https://youtu.be/PzwrL2P8mYQ?si=6yi_xF-Gj5Z3gSa8"
         },
         {
             "name": "Sonali mam",
@@ -167,7 +167,7 @@
                 "12:00 PM to 1:00 PM",
                 "4:00 PM to 5:00 PM"
             ],
-            "demo_video": null
+            "demo_video": "https://www.instagram.com/reel/Dc-2YCFCFn7/?stkn=Z3NlZ2s0dmE5cWxm"
         }
     ],
     "syllabus": {
@@ -195,8 +195,10 @@
             "Tap the + icon in the top right corner",
             "Select the desired trial"
         ],
-        "demo_videos": {},
-        "demo_videos_note": "Recorded demo videos are currently not available for Face Yoga instructors (Parul mam, Sonali mam). Customers can experience their teaching style directly through up to 3 free live interactive trial classes on the Sensationz App."
+        "demo_videos": {
+            "Parul mam": "https://youtu.be/PzwrL2P8mYQ?si=6yi_xF-Gj5Z3gSa8",
+            "Sonali mam": "https://www.instagram.com/reel/Dc-2YCFCFn7/?stkn=Z3NlZ2s0dmE5cWxm"
+        }
     },
     "enrollment": {
         "batches_start": "Not provided"

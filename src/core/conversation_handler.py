@@ -120,6 +120,8 @@ async def handle_incoming_message(
     course_in_msg = kb_loader.detect_course_from_text(user_message, default_course=None) if user_message else None
 
     old_course = session_state.get("course") or course_id or ""
+    if course_in_msg in ("dance", "western_dance") and old_course in ("ladies_dance", "kathak"):
+        course_in_msg = old_course
 
     # If no course is active in state or message, inspect recent user turns in conversation history
     if not course_in_msg and not old_course and not new_state.get("course") and conversation_history:

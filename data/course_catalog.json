@@ -44,13 +44,14 @@
         "description": "Live interactive Bollywood and semi-classical dance sessions for ladies with weekly song-based choreographies."
     },
     {
-        "id": "dance",
+        "id": "western_dance",
         "name": "Western Dance & Choreography",
         "aliases": [
-            "dance",
             "western dance",
             "hip hop",
-            "contemporary"
+            "contemporary",
+            "western",
+            "dance"
         ],
         "has_full_kb": false,
         "description": "High-energy Western, Hip-Hop, and Contemporary dance styles for all age groups."

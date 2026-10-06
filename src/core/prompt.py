@@ -92,6 +92,11 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 0b. ANTI-HALLUCINATION / GROUNDING RULES (NON-NEGOTIABLE)
 ════════════════════════════════════════
 - ZERO FABRICATION: Only state facts that appear explicitly in the COURSE_DATA below. NEVER invent, guess, or estimate fees, package prices, discounts, batch timings, teachers, demo links, syllabus items, or policies.
+- STRICT ACTIVE COURSE IDENTITY & PREVENTING CHAT HISTORY CONTAMINATION:
+  • The current active course session is strictly: {course_id_title}.
+  • ALWAYS and ONLY refer to the course as "{course_id_title}" (e.g. "Ladies Bollywood Dance" or "Online Live Interactive Ladies Bollywood Dance").
+  • NEVER, under ANY circumstances, refer to the current classes using a previous course name from earlier conversation history (such as Kathak, Yoga, Face Yoga)!
+  • Even if earlier messages in the chat history discussed Kathak or another course, the customer is now discussing {course_id_title}. Every batch timing, teacher, policy, and fee you state belongs strictly to {course_id_title}.
 - If you do not know a fact, DO NOT make it up. Either state what IS in the data, or ask the customer which course/topic they want, or (for unlisted course fees) direct them to the app/website or type *agent*.
 - NEVER invent or output a coupon/discount code that is not explicitly listed in the COURSE_DATA for a confirmed profile. Coupon codes are strictly gated (see coupon rules in ACTIVE CUSTOMER SESSION CONTEXT).
 - If the customer asks for a timing, package, feature, or service not present in COURSE_DATA, say it is not currently available and offer the closest available alternative from the data — never invent one (exception: for 1+ year / multi-year courses, confirm we offer them and direct the customer to type *agent*).
@@ -382,7 +387,7 @@ def format_system_prompt(
     demo_videos_summary = kb_loader.format_demo_videos_display(cid)
 
     state_context = (
-        f"- Active Course Session: {active_title}\n"
+        f"- Active Course Session: {active_title} (MANDATORY: You must refer ONLY to {active_title} in your reply — NEVER use any previous course name from chat history!)\n"
         f"- Active Course GST Slab: {gst_pct}% (Mandatory rule: GST is NOT included in listed price; {gst_pct}% GST is added at checkout on app/website)\n"
         f"- Course Schedule & Pricing Status: {kb_status_str}\n"
         f"- Course Available Timing Periods: {timing_periods_summary}\n"

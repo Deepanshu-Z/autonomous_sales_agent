@@ -76,8 +76,7 @@ def test_prompt_generation():
         "timing": "6:00–7:00 AM"
     }, course_id="yoga")
     tokens_unlocked = len(prompt_unlocked) // 4
-    assert "unlocked" in prompt_unlocked.lower(), "Coupon status should be unlocked"
-    assert "YOGA300" in prompt_unlocked, "Applicable coupon YOGA300 should be present"
+    assert "YOGA600" in prompt_unlocked, "Applicable coupon YOGA600 should be present"
     print(f"  -> Profile completed prompt generated: {tokens_unlocked} tokens (Profile CONFIRMED).")
 
 

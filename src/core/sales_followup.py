@@ -243,6 +243,38 @@ def _should_suppress(user_text: str, full_reply: str) -> bool:
     return False
 
 
+def _get_timing_preference_question(state: dict, use_hindi: bool) -> str:
+    """Dynamically generates a timing preference question matching the course's available periods."""
+    from src.core import kb_loader
+    cid = state.get("course") or ""
+    periods_info = kb_loader.get_course_time_periods(cid)
+    avail = periods_info.get("available_periods", [])
+    if avail == ["Evening"]:
+        return (
+            "Kaun sa evening time slot aapke routine mein fit hoga (4 PM se 8 PM ke beech)? 😊"
+            if use_hindi else
+            "Which evening time slot fits your routine best (between 4 PM and 8 PM)? 😊"
+        )
+    elif avail == ["Morning"]:
+        return (
+            "Kaun sa morning time slot aapke routine mein fit hoga? 😊"
+            if use_hindi else
+            "Which morning time slot fits your routine best? 😊"
+        )
+    elif "Morning" in avail and "Evening" in avail and "Afternoon" not in avail:
+        return (
+            "Subah ya shaam — kaun sa time aapke daily routine mein fit hoga? 😊"
+            if use_hindi else
+            "Which time slot suits you better, morning or evening? 😊"
+        )
+    else:
+        return (
+            "Subah ya shaam — kaun sa time aapke daily routine mein fit hoga? 😊"
+            if use_hindi else
+            "Morning, afternoon or evening — which time fits your daily routine better? 😊"
+        )
+
+
 # -- Public API ---------------------------------------------------------------
 
 def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional[str]:
@@ -266,10 +298,11 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
                 "Do you have any questions about attending the online live classes? 😊"
             )
         else:
+            timing_q = _get_timing_preference_question(state, use_hindi)
             return (
-                "Classes 100% online hain Sensationz App par — ghar se hi attend kar sakte hain. Kya aap morning ya evening prefer karenge? 😊"
+                f"Classes 100% online hain Sensationz App par — ghar se hi attend kar sakte hain. {timing_q}"
                 if use_hindi else
-                "Classes are 100% online via the Sensationz App — attend from anywhere. Do you prefer morning or evening? 😊"
+                f"Classes are 100% online via the Sensationz App — attend from anywhere. {timing_q}"
             )
 
     # 2. Fee / Pricing / Discount Inquiry (Context-aware: if timing is already selected, ask for package duration)
@@ -292,11 +325,7 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
                 "Need any help downloading the app and creating your profile? 😊"
             )
         else:
-            return (
-                "Kaunsa time slot aapke liye best rahega, subah ya shaam? 😊"
-                if use_hindi else
-                "Which time slot suits you better, morning or evening? 😊"
-            )
+            return _get_timing_preference_question(state, use_hindi)
 
     # 3. Timing / Schedule Inquiry (Context-aware: if timing is already selected, don't ask again)
     timing_kws = [
@@ -319,11 +348,7 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
                 "Need any help downloading the app and creating your profile? 😊"
             )
         else:
-            return (
-                "Subah ya shaam — kaun sa time aapke daily routine mein fit hoga? 😊"
-                if use_hindi else
-                "Morning, Afternoon or evening — which time fits your daily routine better? 😊"
-            )
+            return _get_timing_preference_question(state, use_hindi)
 
     # 3b. Conversational Acknowledgments / Confirmations ("ok", "okay", "theek hai", "got it", "fine", etc.)
     ack_words = ["ok", "okay", "theek", "theek hai", "thik", "thik hai", "accha", "acha", "got it", "understood", "fine", "k", "sahi", "sahi hai"]
@@ -337,11 +362,7 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
                 "Which package duration would you like to start with — 1 month or 3 months? 😊"
             )
         elif not state.get("timing"):
-            return (
-                "Subah ya shaam — kaun sa time aapke daily routine mein fit hoga? 😊"
-                if use_hindi else
-                "Morning, afternoon or evening — which time fits your daily routine better? 😊"
-            )
+            return _get_timing_preference_question(state, use_hindi)
         elif state.get("timing") and state.get("package") and not state.get("profile_created"):
             return (
                 "App download karke profile banane mein koi help chahiye? 😊"

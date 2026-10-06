@@ -274,6 +274,105 @@ def get_valid_timings(course_id: Optional[str] = None) -> List[str]:
     return deduped
 
 
+def classify_time_period(time_str: str) -> Optional[str]:
+    """Dynamically categorizes any timing string into 'Morning', 'Afternoon', or 'Evening'.
+    - Morning (AM): 4:00 AM – 11:59 AM
+    - Afternoon (PM): 12:00 PM – 3:59 PM
+    - Evening (PM): 4:00 PM – 11:59 PM
+    """
+    if not time_str:
+        return None
+    m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM)", time_str, re.IGNORECASE)
+    if not m:
+        m24 = re.search(r"(\d{1,2}):(\d{2})", time_str)
+        if m24:
+            hr = int(m24.group(1))
+            if 4 <= hr < 12:
+                return "Morning"
+            elif 12 <= hr < 16:
+                return "Afternoon"
+            elif 16 <= hr <= 23:
+                return "Evening"
+        return None
+    hr = int(m.group(1))
+    merid = m.group(3).upper()
+    if merid == "AM":
+        return "Morning"
+    else:
+        if hr == 12 or 1 <= hr < 4:
+            return "Afternoon"
+        return "Evening"
+
+
+def get_course_time_periods(course_id: Optional[str] = None) -> Dict[str, Any]:
+    """Dynamically parses and categorizes all batches for a course into time periods:
+    'Morning', 'Afternoon', and 'Evening'. Zero hardcoding.
+    Returns:
+    {
+        "has_timings": bool,
+        "available_periods": List[str], # e.g. ["Evening"] or ["Morning", "Afternoon", "Evening"]
+        "missing_periods": List[str],   # e.g. ["Morning", "Afternoon"]
+        "batches_by_period": Dict[str, List[str]],
+        "summary": str
+    }
+    """
+    if not course_id:
+        return {
+            "has_timings": False,
+            "available_periods": [],
+            "missing_periods": ["Morning", "Afternoon", "Evening"],
+            "batches_by_period": {},
+            "summary": "Check official app/website for schedule.",
+        }
+    data = get_course_data(course_id)
+    batches = data.get("batch_timings", {}).get("batches", [])
+    if not batches:
+        return {
+            "has_timings": False,
+            "available_periods": [],
+            "missing_periods": ["Morning", "Afternoon", "Evening"],
+            "batches_by_period": {},
+            "summary": "Live batch schedules are available on the Sensationz App and website.",
+        }
+
+    batches_by_period: Dict[str, List[str]] = {"Morning": [], "Afternoon": [], "Evening": []}
+    for b in batches:
+        t = b.get("time_12h", "") or b.get("time_24h", "")
+        period = classify_time_period(t)
+        if not period and b.get("slot") in ("Morning", "Afternoon", "Evening"):
+            period = b.get("slot")
+        if period and period in batches_by_period:
+            if t and t not in batches_by_period[period]:
+                batches_by_period[period].append(t)
+
+    available = [p for p in ["Morning", "Afternoon", "Evening"] if batches_by_period[p]]
+    missing = [p for p in ["Morning", "Afternoon", "Evening"] if not batches_by_period[p]]
+
+    course_name = data.get("course_overview", {}).get("name", course_id.title())
+    if len(available) == 1:
+        only_p = available[0]
+        missing_str = " or ".join(missing)
+        summary = (
+            f"Batches are held in the {only_p} only ({', '.join(batches_by_period[only_p])}). "
+            f"CRITICAL: {course_name} has NO {missing_str} batches!"
+        )
+    elif available:
+        descs = [f"{p} ({', '.join(batches_by_period[p])})" for p in available]
+        missing_str = f" (NO {' or '.join(missing)} batches)" if missing else ""
+        summary = f"Batches available: {'; '.join(descs)}{missing_str}."
+    else:
+        summary = "Check the Sensationz App or website for live batch schedules."
+
+    return {
+        "has_timings": True,
+        "available_periods": available,
+        "missing_periods": missing,
+        "batches_by_period": batches_by_period,
+        "summary": summary,
+    }
+
+
+
 def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
     """Dynamically extracts package names + formatted fee strings from the course JSON."""
     if not course_id:

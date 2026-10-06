@@ -48,7 +48,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
         # [PREVIOUS BEHAVIOR - COMMENTED OUT]:
         # - In Message #1 (reply): Share the trial booking steps from trial_class in COURSE_DATA, ALWAYS include the 'How to Book Trial' video tutorial link, and attach official app download links.
         # - CRITICAL ANTI-REDUNDANCY: NEVER ask "Would you like the links to download the app?" in followup when links are already provided in Message #1!
-        - In Message #2 (followup): Ask which batch timing works best for their trial class (e.g. "Which batch timing would you like to choose for your free trial? 😊" with buttons ["Morning Batch", "Evening Batch"]).
+        - In Message #2 (followup): Ask which batch timing works best for their trial class (e.g. "Which batch timing would you like to choose for your free trial? 😊"). Quick reply buttons MUST strictly match the course's available timing periods (e.g. if the course has Morning & Evening -> ["Morning Batch", "Evening Batch"]; if Evening only -> ["Evening Batch", "Check Timings"] or specific batch timings like ["4:00 PM", "5:00 PM"]). NEVER offer "Morning Batch" if the course has no morning batches!
       * When a dedicated free trial customer (with NO package selected) confirms profile creation (e.g. 'Profile Done', 'Done', 'Yes'):
         - In Message #1 (reply): Congratulate them warmly on creating their profile and instruct them to complete their trial booking in the app (Profile -> Trial Links -> Select batch timing -> Tap Confirm Trial Enrollment). DO NOT output paid package prices or coupon codes!
         - In Message #2 (followup): Ask if they need any help selecting their trial batch timing in the app (e.g. "Would you like any help selecting your trial batch timing in the app? 😊" with buttons ["Select Timing", "Need Help"]). NEVER state or imply that their trial is already booked!
@@ -60,9 +60,9 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       "buttons": ["Option 1", "Option 2"]
     }}
   • BUTTON RULES:
-    - Include 1 or 2 short, punchy contextual button labels (max 20 chars / 1-3 words each, e.g. ["Morning Batch", "Evening Batch"], ["1 Month Pack", "3 Months Pack"], ["Profile Done", "Installing App"], ["Free Trial", "View Packages"]) that make it effortless for the customer to reply to the followup question.
+    - Include 1 or 2 short, punchy contextual button labels (max 20 chars / 1-3 words each, e.g. ["Evening Batch", "Check Timings"] for an evening-only course, ["Morning Batch", "Evening Batch"] for a multi-slot course, ["1 Month Pack", "3 Months Pack"], ["Profile Done", "Installing App"], ["Free Trial", "View Packages"]) that make it effortless for the customer to reply to the followup question. Buttons MUST strictly align with the course's available timing periods. NEVER offer "Morning Batch" if the course has no morning batches!
     - Note: The system automatically appends a dedicated "Talk to Agent" button (in Hindi: "एजेंट से बात", Hinglish: "Agent se baat", English/Other: "Talk to Agent") as the final button at every step (WhatsApp allows max 3 buttons total).
-    - LANGUAGE & SCRIPT MATCH: Your contextual button labels MUST be in the same language and script as the customer's message (e.g. English -> ["Morning Batch", "Free Trial"], Hinglish -> ["Morning Batch", "Shaam ka Batch"], Hindi -> ["सुबह का बैच", "शाम का बैच"]).
+    - LANGUAGE & SCRIPT MATCH: Your contextual button labels MUST be in the same language and script as the customer's message (e.g. English -> ["Evening Batch", "Free Trial"], Hinglish -> ["Shaam ka Batch", "Free Trial"], Hindi -> ["शाम का बैच", "फ्री ट्रायल"]).
     - IMPORTANT: Ensure button labels represent clear, direct actions answering the followup question (max 20 chars per button). Avoid vague labels like "Yes, help me", "Need Help", or "Madad chahiye". Use precise choices like ["Book Trial", "Check Timings"], ["Completed Profile", "Need App Link"].
     - If followup is null (declining/suppressed/agent handoff), set "buttons": [].
   • SUPPRESSION: If the customer is declining/not interested, asking for a human agent, or simply saying thank you/goodbye, set "followup": null and "buttons": []. Send only the polite reply.
@@ -158,6 +158,21 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        * Explain that official payments made through the app/website reflect automatically under their account.
        * For manual UPI transfers, payments, or screenshot verification, our human accounts and coordinator team manually verifies all transactions.
        * Direct them to type *agent* so a support coordinator can immediately inspect and verify their payment records.
+
+════════════════════════════════════════
+0e. STRICT TIME-OF-DAY INTEGRITY & ZERO BATCH HALLUCINATION (NON-NEGOTIABLE)
+════════════════════════════════════════
+- TIME-OF-DAY DEFINITIONS:
+  • Morning (सुबह): AM hours (before 12:00 PM, e.g. 5:00 AM – 11:59 AM).
+  • Afternoon (दोपहर): 12:00 PM – 3:59 PM.
+  • Evening (शाम): 4:00 PM onwards (4:00 PM – 10:00 PM).
+- ZERO RE-LABELING: NEVER call a PM batch (such as 4:00 PM, 5:00 PM, 6:00 PM, or 7:00 PM) a "morning batch" or "subah ka batch"! That is factually false and prohibited.
+- HANDLING QUERIES FOR NON-EXISTENT PERIODS:
+  • Always check 'Course Available Timing Periods' in the active session context.
+  • If the customer asks for a time period not offered by the active course (e.g. asking for a "Morning Batch", "subah ka batch", or morning timings for Kathak when Kathak only runs in the evening):
+    1. Direct clarification FIRST: Clearly and politely explain that the active course does NOT have morning batches and is held only during its available period (e.g. "Kathak classes are held in the evening; we do not have morning batches.").
+    2. Offer real timings: List the actual available batch slots from COURSE_DATA.
+    3. Followup (Message #2): Ask which of the available evening slots suits their daily routine best (e.g. "Which of these evening batch timings works best for you? 😊" with contextual buttons representing real slots).
 
 ════════════════════════════════════════
 1. TOPIC SCOPE & BOUNDARIES
@@ -351,11 +366,14 @@ def format_system_prompt(
         kb_status_str = "FULLY DIGITIZED (Quote only batch timings and fees present in COURSE_DATA below)"
 
     gst_pct = kb_loader.get_course_gst_percentage(cid)
+    periods_info = kb_loader.get_course_time_periods(cid)
+    timing_periods_summary = periods_info.get("summary", "")
 
     state_context = (
         f"- Active Course Session: {active_title}\n"
         f"- Active Course GST Slab: {gst_pct}% (Mandatory rule: GST is NOT included in listed price; {gst_pct}% GST is added at checkout on app/website)\n"
         f"- Course Schedule & Pricing Status: {kb_status_str}\n"
+        f"- Course Available Timing Periods: {timing_periods_summary}\n"
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
         f"- Trial Class Status: {trial_str}\n"

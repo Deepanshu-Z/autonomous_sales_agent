@@ -219,6 +219,9 @@ async def handle_incoming_message(
     # Enforce exact coupons directly from the active course's JSON (zero hallucination, zero hardcode)
     main_reply = _enforce_json_coupons(main_reply, new_state, effective_course_id)
 
+    # Sanitize any hallucinated time-of-day period claims (e.g. calling PM batches 'morning timings')
+    main_reply = _sanitize_timing_period_hallucinations(main_reply, effective_course_id)
+
     # Strictly intercept and sanitize any hallucinated confirmation of enrollment, trial, or payment
     main_reply, followup_msg = _sanitize_confirmation_guardrails(
         main_reply, followup_msg, language=detected_lang
@@ -236,7 +239,35 @@ async def handle_incoming_message(
         from src.core import language_loader
         agent_btn = language_loader.get_agent_button(new_state.get("language") or session_state.get("language"))
         all_agent_labels = language_loader.get_all_agent_buttons()
-        filtered_b = [str(b).strip() for b in buttons if str(b).strip() and str(b).strip().lower() not in all_agent_labels]
+
+        # Dynamic timing period button filtering — never present buttons for non-existent time periods
+        periods_info = kb_loader.get_course_time_periods(effective_course_id)
+        missing_periods = periods_info.get("missing_periods", [])
+        avail_periods = periods_info.get("available_periods", [])
+
+        cleaned_b = []
+        for b in buttons:
+            b_str = str(b).strip()
+            if not b_str:
+                continue
+            if "Morning" in missing_periods and re.search(r"\b(morning|subah|sawere|mrng)\b", b_str, re.IGNORECASE):
+                continue
+            if "Evening" in missing_periods and re.search(r"\b(evening|shaam|sham|night|raat|evng)\b", b_str, re.IGNORECASE):
+                continue
+            if "Afternoon" in missing_periods and re.search(r"\b(afternoon|dopahar|dophar)\b", b_str, re.IGNORECASE):
+                continue
+            cleaned_b.append(b_str)
+
+        # If timing buttons were completely stripped due to non-existent period, supply actual available period buttons
+        if not cleaned_b and avail_periods:
+            if avail_periods == ["Evening"]:
+                cleaned_b = ["Evening Batch", "Check Timings"]
+            elif "Morning" in avail_periods and "Evening" in avail_periods:
+                cleaned_b = ["Morning Batch", "Evening Batch"]
+            else:
+                cleaned_b = [f"{p} Batch" for p in avail_periods[:2]]
+
+        filtered_b = [str(b).strip() for b in cleaned_b if str(b).strip() and str(b).strip().lower() not in all_agent_labels]
         buttons = filtered_b[:2] + [agent_btn]
 
     return {"reply": main_reply, "followup": followup_msg, "buttons": buttons, "new_state": new_state}
@@ -276,6 +307,47 @@ def _enforce_json_coupons(reply: str, state: Dict[str, Any], course_id: Optional
         if token.upper() not in valid_codes:
             replacement = f"*{official_code}*" if official_code else "welcome discount coupon"
             reply = re.sub(rf"\b{re.escape(token)}\b", replacement, reply)
+
+    return reply
+
+
+def _sanitize_timing_period_hallucinations(reply: str, course_id: Optional[str]) -> str:
+    """
+    100% dynamic, zero-hardcode sanity shield for time-of-day slots.
+    If a course does NOT offer Morning batches (or Evening/Afternoon), but the LLM
+    falsely presents PM batches as 'morning batch timings', this intercepts and corrects it.
+    """
+    if not reply or not course_id:
+        return reply
+
+    from src.core import kb_loader
+    periods_info = kb_loader.get_course_time_periods(course_id)
+    missing_periods = periods_info.get("missing_periods", [])
+    if not missing_periods:
+        return reply
+
+    course_data = kb_loader.get_course_data(course_id)
+    course_name = course_data.get("course_overview", {}).get("name", course_id.title())
+
+    # Case 1: Course has NO Morning batches, but reply claims "morning batch timings are: ... PM"
+    if "Morning" in missing_periods:
+        has_pm_times = bool(re.search(r"\b\d{1,2}(?::\d{2})?\s*PM\b", reply, re.IGNORECASE))
+        morning_claim = re.search(
+            r"(?:the\s+available\s+morning\s+batch\s+timings?(?:\s+for\s+[^:\n]+)?\s*are:?|available\s+morning\s+batch\s+timings?|morning\s+batch\s+timings?\s+are:?|subah\s+k[aei]\s+batch\s+timings?\s*hain:?)",
+            reply,
+            re.IGNORECASE,
+        )
+        if morning_claim and has_pm_times:
+            avail_p = " and ".join(periods_info.get("available_periods", ["Evening"]))
+            replacement = (
+                f"Please note that {course_name} does not offer morning batches; "
+                f"classes are held in the {avail_p.lower()} only. The available {avail_p.lower()} batch timings are:"
+            )
+            reply = re.sub(
+                r"(?i)(?:the\s+available\s+morning\s+batch\s+timings?(?:\s+for\s+[^:\n]+)?\s*are:?|available\s+morning\s+batch\s+timings?|morning\s+batch\s+timings?\s+are:?)",
+                replacement,
+                reply,
+            )
 
     return reply
 
@@ -767,12 +839,11 @@ async def handle_conversation_turn_async(
 
     is_trial_turn = bool(
         last_turn.get("wants_trial")
-        or new_state.get("wants_trial")
-        or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
-        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book|trial class|free trial)\b", main_reply, re.IGNORECASE)
+        or (new_state.get("stage") == "TRIAL_REQUESTED" and not new_state.get("trial_video_sent"))
+        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book\s+trial|book\s+a\s+trial)\b", main_reply, re.IGNORECASE)
     )
     is_install_turn = bool(
-        new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
+        (new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"] and not new_state.get("profile_created"))
         or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", main_reply, re.IGNORECASE)
     )
 
@@ -784,7 +855,7 @@ async def handle_conversation_turn_async(
     is_action_step = bool(
         is_install_turn
         or is_trial_turn
-        or new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"]
+        or (new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"] and not new_state.get("profile_created"))
         or re.search(r"\b(download the sensationz app|download.{0,10}app|install.{0,10}app|create.{0,15}profile|profile bana)\b", main_reply, re.IGNORECASE)
     )
     allow_app_links = user_asked_links or is_action_step

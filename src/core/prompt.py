@@ -368,12 +368,19 @@ def format_system_prompt(
     gst_pct = kb_loader.get_course_gst_percentage(cid)
     periods_info = kb_loader.get_course_time_periods(cid)
     timing_periods_summary = periods_info.get("summary", "")
+    teacher_schedule = kb_loader.format_teacher_batch_schedule(cid)
 
     state_context = (
         f"- Active Course Session: {active_title}\n"
         f"- Active Course GST Slab: {gst_pct}% (Mandatory rule: GST is NOT included in listed price; {gst_pct}% GST is added at checkout on app/website)\n"
         f"- Course Schedule & Pricing Status: {kb_status_str}\n"
         f"- Course Available Timing Periods: {timing_periods_summary}\n"
+    )
+    if teacher_schedule:
+        state_context += (
+            f"- TEACHER ↔ BATCH TIMINGS MAP (Use this EXACT mapping when answering teacher-specific queries — do NOT infer from raw JSON):\n{teacher_schedule}\n"
+        )
+    state_context += (
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
         f"- Trial Class Status: {trial_str}\n"
@@ -384,6 +391,7 @@ def format_system_prompt(
         f"- Official App & Platform Links (Share ONLY if customer explicitly asked for links):\n{app_platforms_str}\n"
         f"- Coupon & Profile Status:\n{coupon_instruction}"
     )
+
 
     # Coupons are unrestricted — always include in course data
     course_json_str = kb_loader.get_course_prompt_str(

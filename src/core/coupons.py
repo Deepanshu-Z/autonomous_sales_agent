@@ -56,13 +56,19 @@ def detect_package_from_text(text: Optional[str], course_id: str = "yoga") -> Op
             if re.search(rf"\b{re.escape(alias.lower())}\b", t):
                 return canonical_name
 
-    # 4. Check prices (base_price or offer_price in short text)
+    # 4. Check prices (offer_price prioritized over base_price in short text)
     if not re.search(r"\b(?:am|pm)\b", t):
+        # Check offer price first (what customers actually buy/quote)
+        for canonical_name, data in registry.items():
+            offer = str(data.get("offer_price", ""))
+            if offer and (re.search(rf"\b{offer}\b", t) or re.search(rf"₹\s*{offer}\b", t)):
+                if len(t) <= 30 or re.search(rf"₹\s*{offer}\b", t):
+                    return canonical_name
+        # Fallback to base price
         for canonical_name, data in registry.items():
             base = str(data.get("base_price", ""))
-            offer = str(data.get("offer_price", ""))
-            if (base and base in t) or (offer and offer in t):
-                if len(t) <= 30 or re.search(rf"₹\s*(?:{base}|{offer})", t):
+            if base and (re.search(rf"\b{base}\b", t) or re.search(rf"₹\s*{base}\b", t)):
+                if len(t) <= 30 or re.search(rf"₹\s*{base}\b", t):
                     return canonical_name
 
     # 5. Dynamic numeric + duration unit match

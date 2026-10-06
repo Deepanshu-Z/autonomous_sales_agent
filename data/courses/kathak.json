@@ -106,7 +106,7 @@
                 "time_12h": "4:00 PM to 5:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Madhuri"
+                    "Ms. Madhuri"
                 ]
             },
             {
@@ -114,7 +114,7 @@
                 "time_12h": "4:00 PM to 5:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
-                    "Madhuri"
+                    "Ms. Madhuri"
                 ]
             },
             {
@@ -122,7 +122,7 @@
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Madhuri",
+                    "Ms. Madhuri",
                     "Vibha Mittal",
                     "Sneha Maurya"
                 ]
@@ -132,7 +132,7 @@
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
-                    "Madhuri",
+                    "Ms. Madhuri",
                     "Kratika Gontiya"
                 ]
             },
@@ -151,7 +151,7 @@
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Madhuri"
+                    "Ms. Madhuri"
                 ]
             },
             {
@@ -159,7 +159,7 @@
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
-                    "Madhuri",
+                    "Ms. Madhuri",
                     "Vibha Mittal",
                     "Kratika Gontiya"
                 ]
@@ -244,6 +244,11 @@
                 "Tatkar & Layakari",
                 "Abhinaya & Stage Presentation"
             ],
+            "assigned_batches": [
+                "4:00 PM to 5:00 PM",
+                "5:00 PM to 6:00 PM",
+                "6:00 PM to 7:00 PM"
+            ],
             "demo_video": "https://youtu.be/t-XO2enPGwM"
         },
         {
@@ -255,6 +260,11 @@
             "specialization": [
                 "Kathak Classical Dance",
                 "Footwork & Mudras"
+            ],
+            "assigned_batches": [
+                "5:00 PM to 6:00 PM",
+                "6:00 PM to 7:00 PM",
+                "7:00 PM to 8:00 PM"
             ],
             "demo_video": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS"
         },
@@ -268,6 +278,12 @@
                 "Kathak Classical Dance",
                 "Chakkars & Expressions"
             ],
+            "assigned_batches": [
+                "5:00 PM to 6:00 PM",
+                "6:00 PM to 7:00 PM",
+                "7:00 PM to 8:00 PM",
+                "8:00 PM to 9:00 PM"
+            ],
             "demo_video": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1"
         },
         {
@@ -279,6 +295,12 @@
             "specialization": [
                 "Kathak Classical Dance",
                 "Rhythm & Taal Mastery"
+            ],
+            "assigned_batches": [
+                "5:00 PM to 6:00 PM",
+                "6:00 PM to 7:00 PM",
+                "7:00 PM to 8:00 PM",
+                "8:00 PM to 9:00 PM"
             ],
             "demo_video": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
         }
@@ -330,6 +352,7 @@
             "Your trial will be confirmed and booked"
         ],
         "demo_videos": {
+            "Ms. Madhuri": "https://youtu.be/t-XO2enPGwM",
             "Madhuri": "https://youtu.be/t-XO2enPGwM",
             "Vibha Mittal": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS",
             "Kratika Gontiya": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1",

@@ -320,6 +320,24 @@
                 "5:00 AM to 6:00 AM"
             ],
             "demo_video": null
+        },
+        {
+            "name": "Prachi",
+            "experience_years": "4+",
+            "qualifications": [
+                "Certified Yoga Instructor"
+            ],
+            "certifications": [
+                "Certified Yoga Teacher"
+            ],
+            "specialization": [
+                "Yoga Wellness",
+                "Asana & Pranayama"
+            ],
+            "assigned_batches": [
+                "8:00 AM to 9:00 AM"
+            ],
+            "demo_video": null
         }
     ],
     "syllabus": {

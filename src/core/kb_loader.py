@@ -448,6 +448,43 @@ def format_batch_timings_display(course_id: Optional[str] = None) -> str:
     return "\n".join(f"• {slot}: " + ", ".join(t for t in times if t) for slot, times in slots.items())
 
 
+def format_teacher_batch_schedule(course_id: Optional[str] = None) -> str:
+    """Pre-computes a human-readable teacher → batch timings mapping from course JSON.
+    Injected into the system prompt so the LLM doesn't need to traverse minified JSON
+    to answer teacher-specific timing queries — eliminates teacher-timing hallucinations."""
+    if not course_id:
+        return ""
+    data = get_course_data(course_id)
+    batches = data.get("batch_timings", {}).get("batches", [])
+    if not batches:
+        return ""
+
+    # Build teacher -> list of (days, time) tuples
+    teacher_map: Dict[str, List[str]] = {}
+    for b in batches:
+        days = b.get("days") or b.get("slot") or ""
+        time_str = b.get("time_12h", "")
+        if not days or not time_str:
+            continue
+        for instructor in b.get("instructors", []):
+            teacher_map.setdefault(instructor, []).append(f"{days} {time_str}")
+
+    if not teacher_map:
+        return ""
+
+    lines = []
+    for teacher, slots in teacher_map.items():
+        # Deduplicate while preserving order
+        seen = set()
+        unique_slots = []
+        for s in slots:
+            if s not in seen:
+                seen.add(s)
+                unique_slots.append(s)
+        lines.append(f"• {teacher}: {' | '.join(unique_slots)}")
+    return "\n".join(lines)
+
+
 def get_course_gst_percentage(course_id: Optional[str] = None) -> int:
     """Dynamically retrieves the official GST percentage for the course (e.g. 18 for Kathak, 5 for Yoga/Face Yoga)."""
     if not course_id:

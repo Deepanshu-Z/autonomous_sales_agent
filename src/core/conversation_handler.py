@@ -422,16 +422,17 @@ def _ensure_app_website_links(
             "shop.sensationzperformingarts.com",
             "sensationzperformingarts.com",
         )
-        youtube_domains = (
+        demo_domains = (
             "youtube.com",
             "youtu.be",
+            "instagram.com",
         )
         lines = []
         for line in text.splitlines():
             line_lower = line.lower()
             if any(d in line_lower for d in platform_domains):
                 continue
-            if any(d in line_lower for d in youtube_domains):
+            if any(d in line_lower for d in demo_domains):
                 if allow_demo_links:
                     lines.append(line)
                 continue
@@ -826,10 +827,21 @@ async def handle_conversation_turn_async(
         or re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link)\b", text_clean, re.IGNORECASE)
         or (re.search(r"\b(link|links)\b", text_clean, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", text_clean, re.IGNORECASE))
     )
+    prev_ai_demo = False
+    if history:
+        for h_turn in reversed(history):
+            if h_turn.get("role") == "assistant":
+                p_text = (h_turn.get("content") or "").lower()
+                if any(w in p_text for w in ["demo video", "demo", "sample video", "instructor's demo"]):
+                    prev_ai_demo = True
+                break
+
     user_asked_demo = bool(
         re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", text_clean, re.IGNORECASE)
         or "demo" in (last_turn.get("question_summary") or "").lower()
         or last_turn.get("wants_resend_video")
+        or prev_ai_demo
+        or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
         or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
     )
     # Dynamic Media Configuration for Trial and App Download/Install
@@ -837,8 +849,11 @@ async def handle_conversation_turn_async(
     course_data_active = kb_loader.get_course_data(active_cid)
     wants_resend = bool(last_turn.get("wants_resend_video", False))
 
+    is_trial_booking_guide = bool(
+        re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", main_reply, re.IGNORECASE)
+    )
     is_trial_turn = bool(
-        last_turn.get("wants_trial")
+        (last_turn.get("wants_trial") and (is_trial_booking_guide or not user_asked_demo) and not new_state.get("package"))
         or (new_state.get("stage") == "TRIAL_REQUESTED" and not new_state.get("trial_video_sent"))
         or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book\s+trial|book\s+a\s+trial)\b", main_reply, re.IGNORECASE)
     )
@@ -847,14 +862,14 @@ async def handle_conversation_turn_async(
         or re.search(r"\b(download the sensationz app|install.{0,10}app|create.{0,15}profile|profile bana|complete.{0,15}profile)\b", main_reply, re.IGNORECASE)
     )
 
-    will_send_trial_video = is_trial_turn and (re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", main_reply, re.IGNORECASE) or wants_resend) and (wants_resend or not new_state.get("trial_video_sent"))
+    will_send_trial_video = is_trial_turn and (is_trial_booking_guide or wants_resend) and (wants_resend or not new_state.get("trial_video_sent"))
     will_send_install_video = is_install_turn and not is_trial_turn and (wants_resend or not new_state.get("app_download_video_sent"))
     sending_video = will_send_trial_video or will_send_install_video
 
     # Allow app/platform links on explicit request OR at key action steps (Step 4 install/profile setup, trial booking)
     is_action_step = bool(
         is_install_turn
-        or is_trial_turn
+        or (is_trial_turn and is_trial_booking_guide)
         or (new_state.get("stage") in ["READY_FOR_APP_LINK", "PACKAGE_SELECTED"] and not new_state.get("profile_created"))
         or re.search(r"\b(download the sensationz app|download.{0,10}app|install.{0,10}app|create.{0,15}profile|profile bana)\b", main_reply, re.IGNORECASE)
     )

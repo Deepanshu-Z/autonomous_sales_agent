@@ -108,8 +108,18 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 - OFFICIAL ACCESS LINKS BLOCK:
   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev
   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351
-  💻 Website: https://shop.sensationzperformingarts.com/
-- INSTRUCTOR DEMO VIDEOS: When a customer asks for instructor demo videos, sample class recordings, or teacher previews ("demo video", "sample video", "demo dikhao"), share the official YouTube demo links of our instructors from COURSE_DATA.
+- INSTRUCTOR DEMO VIDEOS & TEACHER PREVIEWS:
+  • STRICT COURSE ISOLATION: When a customer asks for instructor demo videos, sample class recordings, or teacher previews ("demo video", "sample video", "demo dikhao", "video bhejo"):
+    - You MUST ONLY reference instructors and demo videos belonging strictly to the ACTIVE COURSE (see ACTIVE COURSE INSTRUCTOR DEMO VIDEOS in session context).
+    - ABSOLUTE GUARD: NEVER quote or mention instructors from any other course! If the active course is Face Yoga, NEVER mention Yoga instructors (Suman Lata, Mradula, Priya Mathur), Kathak instructors (Madhuri, Swati), or Dance instructors (Aditi, Gresi)! Face Yoga instructors are ONLY Parul mam and Sonali mam.
+  • WHEN DEMO VIDEOS ARE AVAILABLE (e.g. Yoga, Kathak, Ladies Dance):
+    - Share the official demo links directly in Message #1! Do NOT withhold links or ask "Which instructor's demo would you like to watch?" without providing the links.
+    - If the customer asks for a specific instructor who has a demo video, share that instructor's link immediately.
+    - If the customer asks for an instructor who does NOT have a recorded demo video (e.g. Lokesh Kumar, Sonali Dhote), explain politely that a recorded demo video is currently not available for that instructor, but they can experience their live teaching in a free trial class on the app, and offer demo videos of other instructors who do have recorded previews.
+  • WHEN DEMO VIDEOS ARE NOT AVAILABLE (e.g. Face Yoga):
+    - Explicitly inform the customer that recorded demo videos are currently not available for Face Yoga (Parul mam / Sonali mam).
+    - Inform them that they can book and attend up to 3 free live interactive trial classes directly on the Sensationz App to experience their teaching style firsthand.
+    - NEVER invent demo video links or borrow teachers from other courses!
 
 ════════════════════════════════════════
 0d. STRICT ENROLLMENT, TRIAL & PAYMENT NON-CONFIRMATION GUARDRAILS (CRITICAL & NON-NEGOTIABLE)
@@ -369,6 +379,7 @@ def format_system_prompt(
     periods_info = kb_loader.get_course_time_periods(cid)
     timing_periods_summary = periods_info.get("summary", "")
     teacher_schedule = kb_loader.format_teacher_batch_schedule(cid)
+    demo_videos_summary = kb_loader.format_demo_videos_display(cid)
 
     state_context = (
         f"- Active Course Session: {active_title}\n"
@@ -379,6 +390,10 @@ def format_system_prompt(
     if teacher_schedule:
         state_context += (
             f"- TEACHER ↔ BATCH TIMINGS MAP (Use this EXACT mapping when answering teacher-specific queries — do NOT infer from raw JSON):\n{teacher_schedule}\n"
+        )
+    if demo_videos_summary:
+        state_context += (
+            f"- ACTIVE COURSE INSTRUCTOR DEMO VIDEOS (Use ONLY this demo video information for this active course):\n{demo_videos_summary}\n"
         )
     state_context += (
         f"- Customer's Selected Batch Timing: {timing_str}\n"

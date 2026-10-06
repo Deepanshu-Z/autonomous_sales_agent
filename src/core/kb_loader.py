@@ -515,8 +515,34 @@ def format_demo_videos_display(course_id: Optional[str] = None) -> str:
     if not course_id:
         return ""
     data = get_course_data(course_id)
-    demos = data.get("trial_class", {}).get("demo_videos", {})
-    return "\n".join(f"• Trainer {name}: {url}" for name, url in demos.items() if url)
+    demos = dict(data.get("trial_class", {}).get("demo_videos") or {})
+    # Check teachers list if not in trial_class.demo_videos
+    if not demos:
+        for t in data.get("teachers", []):
+            name = t.get("name")
+            v = t.get("demo_video")
+            if name and v:
+                demos[name] = v
+
+    if demos:
+        lines = [f"• {name}: {url}" for name, url in demos.items() if url]
+        teachers = [t.get("name") for t in data.get("teachers", []) if t.get("name")]
+        no_demo = [t for t in teachers if t not in demos]
+        if no_demo:
+            lines.append(f"(Note: Recorded demo videos are not available for: {', '.join(no_demo)}; clients can attend live interactive trial classes with them).")
+        return "\n".join(lines)
+
+    note = data.get("trial_class", {}).get("demo_videos_note")
+    if note:
+        return note
+
+    teachers = [t.get("name") for t in data.get("teachers", []) if t.get("name")]
+    if teachers:
+        return (
+            f"Recorded demo videos are currently not available for {', '.join(teachers)}. "
+            "Clients can book and attend up to 3 free live interactive trial classes on the Sensationz App to experience their teaching style firsthand."
+        )
+    return "Recorded demo videos are currently not available for this course. Clients can attend up to 3 free live interactive trial classes on the Sensationz App."
 
 
 def format_app_links_display() -> str:

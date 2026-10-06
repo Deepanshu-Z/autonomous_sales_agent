@@ -80,7 +80,7 @@ class TestNoLinksSpam(unittest.IsolatedAsyncioTestCase):
         )
 
         mock_step5_json = (
-            '{"reply": "Congratulations! Aapka profile registration confirm ho gaya hai. Aapka coupon code YOGA70 hai.", '
+            '{"reply": "Congratulations! Aapka profile registration confirm ho gaya hai. Aapka coupon code YOGA600 hai.", '
             '"followup": "Kya aapko checkout par coupon apply karne mein madad chahiye?", '
             '"buttons": ["Apply Coupon 👍"]}'
         )
@@ -102,7 +102,7 @@ class TestNoLinksSpam(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("play.google.com", reply)
             self.assertNotIn("apps.apple.com", reply)
             self.assertNotIn("shop.sensationzperformingarts.com", reply)
-            self.assertIn("YOGA70", reply)
+            self.assertIn("YOGA600", reply)
 
             # Zero platform links in Message #2 (follow-up)
             self.assertIsNotNone(followup)

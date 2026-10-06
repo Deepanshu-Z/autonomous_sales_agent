@@ -194,7 +194,9 @@
             "Select the Trial Links option",
             "Tap the + icon in the top right corner",
             "Select the desired trial"
-        ]
+        ],
+        "demo_videos": {},
+        "demo_videos_note": "Recorded demo videos are currently not available for Face Yoga instructors (Parul mam, Sonali mam). Customers can experience their teaching style directly through up to 3 free live interactive trial classes on the Sensationz App."
     },
     "enrollment": {
         "batches_start": "Not provided"

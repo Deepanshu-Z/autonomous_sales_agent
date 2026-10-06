@@ -11,14 +11,14 @@
       "id": "english",
       "name": "English",
       "button_label": "English",
-      "aliases": ["english", "eng", "en", "1"],
+      "aliases": ["english", "eng", "1"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "hindi",
       "name": "Hindi",
       "button_label": "हिन्दी (Hindi)",
-      "aliases": ["hindi", "हिन्दी", "हिंदी", "hi", "2"],
+      "aliases": ["hindi", "हिन्दी", "हिंदी", "2"],
       "agent_button": "एजेंट से बात"
     },
     {
@@ -32,56 +32,56 @@
       "id": "malayalam",
       "name": "Malayalam",
       "button_label": "മലയാളം (Malayalam)",
-      "aliases": ["malayalam", "മലയാളം", "ml", "mal", "manglish"],
+      "aliases": ["malayalam", "മലയാളം", "manglish"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "tamil",
       "name": "Tamil",
       "button_label": "தமிழ் (Tamil)",
-      "aliases": ["tamil", "தமிழ்", "ta", "tanglish"],
+      "aliases": ["tamil", "தமிழ்", "tanglish"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "telugu",
       "name": "Telugu",
       "button_label": "తెలుగు (Telugu)",
-      "aliases": ["telugu", "తెలుగు", "te"],
+      "aliases": ["telugu", "తెలుగు"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "kannada",
       "name": "Kannada",
       "button_label": "ಕನ್ನಡ (Kannada)",
-      "aliases": ["kannada", "ಕನ್ನಡ", "kn"],
+      "aliases": ["kannada", "ಕನ್ನಡ"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "bengali",
       "name": "Bengali",
       "button_label": "বাংলা (Bengali)",
-      "aliases": ["bengali", "বাংলা", "bn", "bangla"],
+      "aliases": ["bengali", "বাংলা", "bangla"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "marathi",
       "name": "Marathi",
       "button_label": "मराठी (Marathi)",
-      "aliases": ["marathi", "मराठी", "mr"],
+      "aliases": ["marathi", "मराठी"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "gujarati",
       "name": "Gujarati",
       "button_label": "ગુજરાતી (Gujarati)",
-      "aliases": ["gujarati", "ગુજરાતી", "gu"],
+      "aliases": ["gujarati", "ગુજરાતી"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "punjabi",
       "name": "Punjabi",
       "button_label": "ਪੰਜਾਬੀ (Punjabi)",
-      "aliases": ["punjabi", "ਪੰਜਾਬੀ", "pa"],
+      "aliases": ["punjabi", "ਪੰਜਾਬੀ"],
       "agent_button": "Talk to Agent"
     }
   ]

@@ -88,6 +88,10 @@ def match_language(text: str) -> Optional[str]:
         return None
 
     cleaned = text.strip().lower()
+    # Guard against common conversational greetings being mistaken for language selections
+    if cleaned in {"hi", "hello", "hey", "hii", "hiii", "helo", "hola", "namaste", "namaskar", "pranam"}:
+        return None
+
     cfg = get_language_config()
 
     for lang in cfg.get("languages", []):

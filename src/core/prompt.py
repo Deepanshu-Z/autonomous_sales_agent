@@ -262,7 +262,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 - WhatsApp Bold: Use single asterisks *bold*, NEVER double asterisks **bold**.
 - Bullets: Use • or - with a space. NEVER use an asterisk as a bullet.
 - URLs: Always output plain raw URLs (e.g. https://example.com). NEVER use markdown link syntax [title](url).
-- Structured Pricing: Whenever quoting packages or fees, present them in clear bullet points with line breaks. Always send the offer price and its corresponding coupon code from COURSE_DATA alongside the price (e.g. Duration: Base ₹X, Offer ₹Y using coupon *CODE*).
+- Structured Pricing & Fees (MANDATORY FORMAT): Whenever quoting packages or fees, present them in clear bullet points with line breaks, bold durations, regular price, offer price, and coupon code:
+  • *1 Month:* Regular ₹1,000, Offer Price ₹700 (Coupon: *KATHAK700*)
+  • *3 Months:* Regular ₹2,100, Offer Price ₹1,500 (Coupon: *KATHAK1500*)
+  • *6 Months:* Regular ₹3,800, Offer Price ₹2,500 (Coupon: *KATHAK2500*)
+  • *1 Year:* Regular ₹7,000, Offer Price ₹4,000 (Coupon: *KATHAK4000*)
+  
+  *Note:* {gst_pct}% GST will be applicable at checkout on the app/website.
+- Concise Batch Timings (MANDATORY FORMAT): Whenever sharing batch schedules, group them cleanly (e.g. by Day-Pair or Morning/Evening) so the customer can read them in 3-4 clean lines. NEVER output repetitive single lines (e.g. NEVER output 10+ lines listing every day/hour combination individually)! Follow the CLEAN GROUPED BATCH TIMINGS format in session context.
 
 ════════════════════════════════════════
 5. ACTIVE CUSTOMER SESSION CONTEXT
@@ -385,6 +392,7 @@ def format_system_prompt(
     timing_periods_summary = periods_info.get("summary", "")
     teacher_schedule = kb_loader.format_teacher_batch_schedule(cid)
     demo_videos_summary = kb_loader.format_demo_videos_display(cid)
+    batch_timings_summary = kb_loader.format_batch_timings_display(cid)
 
     state_context = (
         f"- Active Course Session: {active_title} (MANDATORY: You must refer ONLY to {active_title} in your reply — NEVER use any previous course name from chat history!)\n"
@@ -392,6 +400,10 @@ def format_system_prompt(
         f"- Course Schedule & Pricing Status: {kb_status_str}\n"
         f"- Course Available Timing Periods: {timing_periods_summary}\n"
     )
+    if batch_timings_summary:
+        state_context += (
+            f"- CLEAN GROUPED BATCH TIMINGS (Use this clean grouped format whenever sharing available batch timings — NEVER output raw repetitive single-slot lines):\n{batch_timings_summary}\n"
+        )
     if teacher_schedule:
         state_context += (
             f"- TEACHER ↔ BATCH TIMINGS MAP (Use this EXACT mapping when answering teacher-specific queries — do NOT infer from raw JSON):\n{teacher_schedule}\n"

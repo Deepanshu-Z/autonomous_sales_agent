@@ -442,10 +442,18 @@ def format_batch_timings_display(course_id: Optional[str] = None) -> str:
     batches = data.get("batch_timings", {}).get("batches", [])
     slots: Dict[str, List[str]] = {}
     for b in batches:
-        slots.setdefault(b.get("slot", "Available").strip().title(), []).append(b.get("time_12h", ""))
+        slot_name = b.get("slot") or b.get("days") or "Available"
+        slot_name = slot_name.strip()
+        t = b.get("time_12h", "")
+        if t and t not in slots.setdefault(slot_name, []):
+            slots[slot_name].append(t)
     if not slots:
         return "• Flexible batch timings available — check the app/website for the current schedule."
-    return "\n".join(f"• {slot}: " + ", ".join(t for t in times if t) for slot, times in slots.items())
+    lines = []
+    for slot, times in slots.items():
+        formatted_slot = slot.replace("/", " & ")
+        lines.append(f"• *{formatted_slot}:* " + ", ".join(times))
+    return "\n".join(lines)
 
 
 def format_teacher_batch_schedule(course_id: Optional[str] = None) -> str:
@@ -506,7 +514,7 @@ def format_package_fees_display(course_id: Optional[str] = None) -> str:
     if not pkgs:
         return ""
     gst_pct = get_course_gst_percentage(course_id)
-    lines = [f"• {pkg}: {fee}" for pkg, fee in pkgs.items()]
+    lines = [f"• *{pkg}:* {fee}" for pkg, fee in pkgs.items()]
     lines.append(f"\n*Note:* {gst_pct}% GST will be applicable at checkout on the app/website.")
     return "\n".join(lines)
 

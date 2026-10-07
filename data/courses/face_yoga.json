@@ -51,7 +51,7 @@
         "gst_percentage": 5,
         "gst_added_at": "Checkout in app or website",
         "offer_mechanism": "Coupon code applied at checkout",
-        "beginner_recommendation": "Not specified",
+        "beginner_recommendation": "1 Month package",
         "packages": [
             {
                 "duration": "1 Month",
@@ -147,10 +147,16 @@
     "teachers": [
         {
             "name": "Parul mam",
-            "experience_years": "Not provided",
-            "qualifications": "Not provided",
-            "certifications": "Not provided",
-            "specialization": "Not provided",
+            "experience_years": "Experienced (teaching and practicing Face Yoga for a long time)",
+            "qualifications": "Experienced Face Yoga Trainer",
+            "certifications": [
+                "Natural Face Beautification & Face Yoga Trainer"
+            ],
+            "specialization": [
+                "Natural Face Beautification",
+                "Facial Muscle Toning & Face Stretching",
+                "Lymphatic Drainage & Anti-Aging Massages"
+            ],
             "assigned_batches": [
                 "7:00 AM to 8:00 AM",
                 "6:00 PM to 7:00 PM"
@@ -159,10 +165,16 @@
         },
         {
             "name": "Sonali mam",
-            "experience_years": "Not provided",
-            "qualifications": "Not provided",
-            "certifications": "Not provided",
-            "specialization": "Not provided",
+            "experience_years": "Experienced (teaching and practicing Face Yoga for a long time)",
+            "qualifications": "Experienced Face Yoga Trainer",
+            "certifications": [
+                "Natural Face Beautification & Face Yoga Trainer"
+            ],
+            "specialization": [
+                "Natural Face Beautification",
+                "Facial Massage Techniques (Guasha, Jade Roller, Ice Cube)",
+                "Double Chin & Collagen Boosting"
+            ],
             "assigned_batches": [
                 "12:00 PM to 1:00 PM",
                 "4:00 PM to 5:00 PM"
@@ -171,11 +183,30 @@
         }
     ],
     "syllabus": {
-        "note": "Not provided in source data — stages and topics need to be filled in once curriculum details are available."
+        "title": "Natural Face Beautification",
+        "topics_covered": [
+            "Breathing Exercises",
+            "Face Stretching",
+            "Lymphatic Massage",
+            "Water Poses",
+            "Collagen Boosting Massage",
+            "Ice Cube Massage",
+            "Guasha Massage",
+            "Jade Roller Massage",
+            "Eye Exercises",
+            "Double Chin Massage",
+            "Deep Cleaning Massage",
+            "Hot Spoon Massage",
+            "Head Massage"
+        ]
     },
     "course_benefits": {
         "focus_areas": [
-            "Not provided"
+            "Natural Face Beautification and facial muscle toning",
+            "Double chin reduction, jawline sculpting, and face stretching",
+            "Collagen boosting and lymphatic drainage massage",
+            "Relaxing eye exercises, breathing techniques, and head massage",
+            "Specialized massage techniques (Guasha, Jade Roller, Ice Cube, Hot Spoon, Deep Cleaning)"
         ],
         "disclaimer": "These are course focus areas only, not guaranteed results — individual outcomes vary based on consistency of practice."
     },
@@ -201,7 +232,7 @@
         }
     },
     "enrollment": {
-        "batches_start": "Not provided"
+        "batches_start": "Ongoing — enroll anytime"
     },
     "not_offered": {
         "course_types": [

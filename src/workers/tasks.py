@@ -100,6 +100,9 @@ def _format_for_whatsapp(text: str) -> str:
     # Convert Markdown **bold** to WhatsApp *bold*
     text = re.sub(r"\*\*(.*?)\*\*", r"*\1*", text)
 
+    # Convert markdown links [title](url) to plain url for WhatsApp
+    text = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\2", text)
+
     # Convert lines starting with loose asterisk bullets to clean bullet '• '
     text = re.sub(r"^\s*\*\s+", "• ", text, flags=re.MULTILINE)
 

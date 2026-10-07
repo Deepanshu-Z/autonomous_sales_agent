@@ -391,6 +391,7 @@ def _format_for_whatsapp(text: str) -> str:
         return text
     text = re.sub(r"^(?:#{1,6})\s+(.+)$", r"*\1*", text, flags=re.MULTILINE)
     text = re.sub(r"\*\*(.*?)\*\*", r"*\1*", text)
+    text = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\2", text)
     text = re.sub(r"^\s*\*\s+", "• ", text, flags=re.MULTILINE)
     text = re.sub(r"^•\s*-\s*", "• ", text, flags=re.MULTILINE)
     return text.strip()

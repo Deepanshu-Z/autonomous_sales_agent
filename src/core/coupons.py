@@ -251,13 +251,13 @@ def format_coupon_unlock_delivery(
         offer = details["offer_price"]
         if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
-                f"\n\nYe raha aapka Ganesh Chaturthi Offer coupon code 🎁🪔\n"
+                f"\n\nYe raha aapka Welcome Offer coupon code 🎁🪔\n"
                 f"✨ Coupon Code: *{code}* ({canonical} package ke liye — Offer Price: ₹{offer})\n\n"
                 "Isko Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
             )
         else:
             return (
-                f"\n\nHere is your Ganesh Chaturthi Offer coupon code 🎁🪔\n"
+                f"\n\nHere is your Welcome Offer coupon code 🎁🪔\n"
                 f"✨ Coupon Code: *{code}* (for {canonical} package — Offer Price: ₹{offer})\n\n"
                 "Please enter this code during checkout in the Sensationz App or website to activate your discount. See you in class! ✨"
             )
@@ -266,13 +266,13 @@ def format_coupon_unlock_delivery(
         codes_block = "\n".join(lines)
         if any(k in str(language).lower() for k in ["hindi", "hinglish"]):
             return (
-                f"\n\nYe rahe aapke Ganesh Chaturthi Offer coupon codes 🎁🪔\n"
+                f"\n\nYe rahe aapke Welcome Offer coupon codes 🎁🪔\n"
                 f"{codes_block}\n\n"
                 "Apne selected package ke liye coupon code Sensationz App ya website checkout par enter karke apply karein. Class mein milte hain! ✨"
             )
         else:
             return (
-                f"\n\nHere are your Ganesh Chaturthi Offer coupon codes 🎁🪔\n"
+                f"\n\nHere are your Welcome Offer coupon codes 🎁🪔\n"
                 f"{codes_block}\n\n"
                 "Please enter the coupon code for your selected package during checkout in the Sensationz App or website. See you in class! ✨"
             )

@@ -390,13 +390,13 @@ def get_sales_followup(user_text: str, full_reply: str, state: dict) -> Optional
             return (
                 "Kaunsa package aapke liye best rahega? 😊\n\n"
                 f"Fees:\n{fees_block}\n\n"
-                "Offer price app aur Ganesh Chaturthi Offer coupon ke through applicable hoga ✨"
+                "Offer price app aur Welcome Offer coupon ke through applicable hoga ✨"
             )
         else:
             return (
                 "Which package works best for you? 😊\n\n"
                 f"Fees:\n{fees_block}\n\n"
-                "Offer price is applicable through the app and Ganesh Chaturthi Offer coupon ✨"
+                "Offer price is applicable through the app and Welcome Offer coupon ✨"
             )
 
     if stage == "NEW":

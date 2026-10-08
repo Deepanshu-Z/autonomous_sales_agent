@@ -18,12 +18,12 @@
     "course": "kathak",
     "ad_ids": [],
     "welcome_messages": {
-      "message_1": "Welcome to Sensationz! 🙏 Explore traditional Kathak Classical Dance with live interactive online classes for all skill levels. \n\n Sensationz में आपका स्वागत है! सभी स्तरों के लिए लाइव इंटरएक्टिव ऑनलाइन क्लासेस के साथ पारंपरिक कथक नृत्य सीखें।",
-      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
+      "message_1": "Hi, Yes! 😊 We currently have a special ₹700 / month offer.\n\n💃 Live Kathak Classes\n📅 2 days a week (Flexible slots)\n👨🏫 Certified instructors\n💰 1 month — ₹700 (3 months — ₹1,500)\n💻 Online classes",
+      "message_2": "Would you like me to share the class timings and registration details?"
     },
     "buttons": [
-      "Timing",
       "Fees",
+      "Timings",
       "Talk to Agent"
     ]
   },
@@ -31,25 +31,25 @@
     "course": "face_yoga",
     "ad_ids": [],
     "welcome_messages": {
-      "message_1": "Welcome to Sensationz! 🙏 Discover our Online Live Interactive Face Yoga sessions for facial toning, jawline sculpting, and anti-aging wellness. \n\n Sensationz में आपका स्वागत है! फेशियल टोनिंग, जॉलाइन स्कल्प्टिंग और एंटी-एजिंग वेलनेस के लिए हमारे ऑनलाइन लाइव फेस योग सत्र खोजें।",
-      "message_2": "How can I help? \n\n मैं आपकी कैसे मदद करूँ?"
+      "message_1": "Hi, Yes! 😊 We currently have a ₹600 / 3-month offer.\n\n💆 Live Face Yoga Classes\n📅 Monday–Friday\n👩🏫 Certified instructors\n💰 3 months — ₹600 (1 month — ₹300)\n💻 Online classes",
+      "message_2": "Would you like me to share the class timings and registration details?"
     },
     "buttons": [
-      "Timing",
       "Fees",
-      "Other questions"
+      "Timings",
+      "Talk to Agent"
     ]
   },
   {
     "course": "ladies_dance",
     "ad_ids": [],
     "welcome_messages": {
-      "message_1": "Welcome to Sensationz! 💃 Learn energetic Bollywood and semi-classical dance with our live interactive online classes for ladies.\n\nSensationz में आपका स्वागत है! महिलाओं के लिए हमारे लाइव इंटरएक्टिव ऑनलाइन बॉलीवुड डांस सेशन से जुड़ें।",
-      "message_2": "How can I help?\n\nमैं आपकी कैसे मदद करूँ?"
+      "message_1": "Hi, Yes! 😊 We currently have a ₹600 / 3-month offer.\n\n💃 Live Ladies Bollywood Dance\n📅 Monday–Friday\n👩🏫 Expert choreographers\n💰 3 months — ₹600\n💻 Online classes",
+      "message_2": "Would you like me to share the class timings and registration details?"
     },
     "buttons": [
-      "Timing",
       "Fees",
+      "Timings",
       "Talk to Agent"
     ]
   }

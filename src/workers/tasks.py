@@ -525,7 +525,7 @@ def get_flow_followup(state: dict) -> str:
         return (
             "Which package duration would you like to start with? 😊\n\n"
             f"Fees:\n{fees_block}\n\n"
-            "*Note:* Offer price will be only applicable through app and Ganesh Chaturthi Offer coupon. Once the app is downloaded and the profile is created, the Ganesh Chaturthi Offer coupon will be sent here."
+            "*Note:* Offer price will be only applicable through app and Welcome Offer coupon. Once the app is downloaded and the profile is created, the Welcome Offer coupon will be sent here."
         )
 
     # 3. If ready for app download & profile setup (first time only)
@@ -665,12 +665,12 @@ def _sanitize_locked_coupons(reply: str, state: dict) -> str:
             # Remove entire lines/bullets containing the code
             cleaned = re.sub(r"^[ \t]*[\*\-•]?[ \t]*.*?" + pat + r".*?$", "", cleaned, flags=re.MULTILINE | re.IGNORECASE)
             # Remove inline mentions
-            cleaned = re.sub(pat, "Ganesh Chaturthi Offer coupon", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(pat, "Welcome Offer coupon", cleaned, flags=re.IGNORECASE)
 
     if leaked:
         cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
         if "profile" not in cleaned.lower() and "done" not in cleaned.lower():
-            cleaned += "\n\n🎁🪔 *(Ganesh Chaturthi Offer coupon code app ya website par profile complete karne ke baad yahan receive hoga!)*"
+            cleaned += "\n\n🎁🪔 *(Welcome Offer coupon code app ya website par profile complete karne ke baad yahan receive hoga!)*"
     return cleaned
 
 async def handle_ai_reply_async(phone: str, text: str, history: list, start_time: float = None, referral: dict = None):

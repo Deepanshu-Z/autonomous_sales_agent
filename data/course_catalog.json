@@ -106,31 +106,6 @@
         "description": "Keyboard notation, finger exercises, scale training, and popular compositions."
     },
     {
-        "id": "drawing",
-        "name": "Drawing & Fine Arts",
-        "aliases": [
-            "drawing",
-            "painting",
-            "sketching",
-            "art",
-            "fine arts"
-        ],
-        "has_full_kb": false,
-        "description": "Creative drawing, sketching, watercolors, acrylics, and canvas painting."
-    },
-    {
-        "id": "acting",
-        "name": "Acting & Theatre Arts",
-        "aliases": [
-            "acting",
-            "theatre",
-            "drama",
-            "monologue"
-        ],
-        "has_full_kb": false,
-        "description": "Dramatic performance, voice projection, expression exercises, and camera acting."
-    },
-    {
         "id": "spoken_english",
         "name": "Spoken English & Communication",
         "aliases": [

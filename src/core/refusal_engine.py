@@ -71,9 +71,12 @@ ANALYSIS CRITERIA:
    - Note: If `Refusal Stage` is 1, the customer is now responding with their reason for earlier refusal — treat their reply as the reason even if it doesn't sound like a new refusal.
 
 2. REASON PRESENCE:
-   - Did the customer specify WHY they are refusing?
-   - If they only said "not interested", "nahi chahiye", "no" -> `has_reason` = false.
-   - If they explained (e.g., "fees are too high", "timing conflict", "busy schedule", "want offline classes", "scam company", "had surgery") -> `has_reason` = true.
+   - Did the customer specify WHY they are refusing, hesitating, or postponing?
+   - If they only said "not interested", "nahi chahiye", "no" without context -> `has_reason` = false.
+   - If they gave ANY explanation or current situation:
+     • Course objections: "fees are too high", "timing conflict", "busy schedule", "want offline classes", "scam company", "had surgery"
+     • Situational / temporal unavailability: "office mein hu", "at work", "in office", "driving", "in meeting", "busy right now", "traveling", "exams chal rahe hain", "bimar hu"
+     -> ALWAYS set `has_reason` = true and extract the situation as `extracted_reason`.
 
 3. RISK & LEGAL EVALUATION — MANDATORY CHECK (read every sub-point):
    - Does the message involve ANY of the following?
@@ -88,6 +91,7 @@ ANALYSIS CRITERIA:
 4. SOLUTION VIABILITY:
    - Can our system/knowledge base legitimately solve the customer's reason?
      • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch switch allowed after 1 month, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
+     • Temporary / Situational Unavailability: Customer is currently at office/work, in a meeting, driving, traveling, or temporarily occupied. This is SOLVABLE by respecting their time, acknowledging their schedule politely with zero pressure, and letting them know they can connect whenever free (or we can check in later). Set `solution_viable` = true.
      • NOT Solvable: Customer insists on physical offline in-person studio classes, demands 1-on-1 private home tutors, demands cash payment at physical office, refund demand, or has unserviceable demands.
    - If the request cannot be fulfilled by our offerings -> `solution_viable` = false.
 
@@ -119,18 +123,26 @@ DECISION OUTCOMES:
        -> `resolution_type` = "ESCALATE_TO_AGENT"
        -> GENERATE a `reply_message` that: politely explains the offering boundary (e.g. 100% online classes), and lets them know our human coordinator can assist them further.
        -> `escalation_reason`: English summary of the unresolvable request.
-     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, flexible timings, beginner hesitation, fear of pace, doubt about teachers):
+     • If reason is SOLVABLE (e.g. budget/fees, schedule/timing, flexible timings, beginner hesitation, fear of pace, doubt about teachers, situational unavailability):
        -> `resolution_type` = "PROVIDE_SOLUTION"
-       -> GENERATE a `reply_message` that: warmly and empathetically offers our low-pressure solution:
+       -> GENERATE a `reply_message` that: warmly and empathetically addresses their specific situation:
+          - If temporary situational unavailability (e.g. at office, working, driving, busy right now, in meeting):
+            Warmly acknowledge their situation with zero pressure. Let them know they can finish their work and check out the trial or details whenever they are free.
+            Example tone (Hinglish): "Bilkul koi baat nahi! 😊 Aap apna office ka kaam complete kar lijiye. Jab bhi aap free hon, tab batayega — hum tab connect kar lenge. Have a productive day at work! 👍"
+            Example tone (English): "No problem at all! 😊 Please focus on your work. Feel free to message whenever you are free and we can connect then. Have a great day! 👍"
           - If doubt about schedule, timing flexibility, or missing classes: Warmly explain that live interactive classes run Mon-Fri (1 session/day) across 10 batch slots (5 AM to 8 PM). While day-to-day switching isn't available, they can switch their batch after 1 month, and full recordings are available in the app if they ever miss a session.
           - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
           - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
           - Keep it inviting, empathetic, and friendly.
 
-4. REFUSAL WITHOUT REASON (FIRST-TIME REFUSAL, REFUSAL STAGE == 0):
-   - If the customer refuses/declines without providing any explanation (e.g. "not interested", "leave it", "nahi chahiye", "no thanks"):
+4. REFUSAL WITHOUT REASON (FIRST-TIME REFUSAL ONLY, REFUSAL STAGE == 0):
+   - ONLY applicable when `Refusal Stage` is 0 AND the customer refused without providing any explanation (e.g. "not interested", "leave it", "nahi chahiye", "no thanks"):
      -> `resolution_type` = "ASK_REASON"
      -> GENERATE a `reply_message` that: warmly and empathetically asks what is holding them back (timing, fees, hesitation, or something else) so we can see if we can help. Never pressure.
+   - CRITICAL GUARDRAIL: If `Refusal Stage` >= 1:
+     • NEVER output `resolution_type` = "ASK_REASON" under any circumstances. We already asked once.
+     • If the customer is answering why (including "office mein hu", "busy hu", etc.), treat it as REFUSAL WITH REASON (`resolution_type` = "PROVIDE_SOLUTION" or "ESCALATE_TO_AGENT").
+     • If they repeat pure disinterest or say nothing useful, treat as PERSISTENT REFUSAL (`resolution_type` = "ESCALATE_TO_AGENT").
 
 STRICT GROUNDING ON ACTIVE COURSE DATA (NON-NEGOTIABLE):
 - When generating `reply_message` for PROVIDE_SOLUTION:

@@ -42,7 +42,9 @@
   },
   {
     "course": "ladies_dance",
-    "ad_ids": [],
+    "ad_ids": [
+      "120251036740780010"
+    ],
     "welcome_messages": {
       "message_1": "Hi, Yes! 😊 We currently have a ₹600 / 3-month offer.\n\n💃 Live Ladies Bollywood Dance\n📅 Monday–Friday\n👩🏫 Expert choreographers\n💰 3 months — ₹600\n💻 Online classes",
       "message_2": "Would you like me to share the class timings and registration details?"

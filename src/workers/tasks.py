@@ -375,10 +375,25 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
         received_id = source_id or ad_id
 
         from src.core import campaign_loader
-        if received_id and campaign_loader.is_registered_ad_id(received_id):
-            return True, f"Campaign Ad ID matched: '{received_id}'"
+        from src.core.meta_loader import get_post_config
+        if received_id:
+            if campaign_loader.is_registered_ad_id(received_id):
+                return True, f"Campaign Ad ID matched: '{received_id}'"
+            if get_post_config(received_id):
+                return True, f"Meta Post ID matched: '{received_id}'"
 
-        return False, f"Ad ID '{received_id}' is not registered in ad_campaigns.json"
+        return False, f"ID '{received_id}' is not registered in campaigns or target posts"
+
+    # For Meta users (Instagram/Facebook DMs)
+    if phone and (phone.startswith("ig_") or phone.startswith("fb_")):
+        from src.core.meta_loader import get_meta_settings, is_course_intent_dm
+        meta_settings = get_meta_settings()
+        if meta_settings.get("allow_all_dms", True):
+            return True, "Meta DM allowed by settings (allow_all_dms=True)"
+        elif is_course_intent_dm(text):
+            return True, "Organic Meta DM qualified: course inquiry intent detected"
+        else:
+            return False, "Organic Meta DM ignored: no course inquiry intent (allow_all_dms=False)"
 
     return False, "No referral data (organic / non-ad message)"
 
@@ -695,8 +710,17 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     if not state.get("welcome_sent") and not has_prior_ai_reply:
         campaign = campaign_loader.match_campaign(referral=referral, text=text)
         if not campaign:
-            print(f"[tasks] {phone}: No registered campaign matches referral ad_id — ignoring 1st message.")
-            return
+            if phone.startswith("ig_") or phone.startswith("fb_"):
+                # Meta DM: route directly into conversational AI handler instead of dropping
+                print(f"[tasks] {phone}: Meta DM with no campaign match — routing directly to conversational AI.")
+                state["is_target_ad"] = True
+                state["welcome_sent"] = True
+                await save_user_state_async(phone, state)
+                await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
+                return
+            else:
+                print(f"[tasks] {phone}: No registered campaign matches referral ad_id — ignoring 1st message.")
+                return
 
         matched_course = campaign.get("course")
         if matched_course:

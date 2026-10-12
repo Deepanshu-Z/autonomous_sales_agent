@@ -49,7 +49,13 @@ def _split_phone(phone_with_country_code: str):
 
 
 async def send_text_message_async(phone: str, message: str):
-    country_code, number = _split_phone(phone)
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        from src.services.meta_client import send_direct_message_async
+        from src.core.meta_loader import format_for_meta
+        return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message))
+
+    country_code, number = _split_phone(clean_phone)
     payload = {
         "countryCode": country_code,
         "phoneNumber": number,
@@ -103,6 +109,11 @@ def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
 
 
 async def assign_chat_to_agent_async(phone: str, agent_email: str) -> bool:
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        print(f"[interakt] Meta user {clean_phone} handoff to {agent_email} noted (managed via Meta Inbox).")
+        return True
+
     payload = {"user_phone_number": phone, "agent_email": agent_email}
     t0 = time.perf_counter()
     try:
@@ -180,12 +191,24 @@ def send_text_message(phone: str, message: str):
 
 async def send_video_message_async(phone: str, video_url: str, caption: str = "") -> bool:
     """
-    Sends a native playable video file (MP4) to WhatsApp via Interakt.
+    Sends a native playable video file (MP4) to WhatsApp via Interakt or to Meta DMs via Graph API.
     Returns True if successfully delivered, False on timeout or failure.
     """
     if not video_url:
         return False
-    country_code, number = _split_phone(phone)
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        from src.services.meta_client import send_media_message_async
+        recipient_id = clean_phone.split("_", 1)[1]
+        try:
+            res = await send_media_message_async(recipient_id, "video", video_url)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[interakt] send_video_message_async Meta error for {clean_phone}: {e}")
+        return False
+
+    country_code, number = _split_phone(clean_phone)
     payload = {
         "countryCode": country_code,
         "phoneNumber": number,

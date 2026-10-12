@@ -1,0 +1,26 @@
+{
+  "settings": {
+    "graph_api_base": "https://graph.facebook.com",
+    "graph_api_version": "v21.0",
+    "comment_reply_delay_min_seconds": 3,
+    "comment_reply_delay_max_seconds": 12,
+    "default_channel": "instagram",
+    "use_ai_comment_replies": true,
+    "use_ai_private_dms": true,
+    "allow_all_dms": true
+  },
+  "posts": [
+    {
+      "post_id": "*",
+      "course": "face_yoga",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Face Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special offer available!\n\nWould you like me to share the class timings?"
+    }
+  ]
+}

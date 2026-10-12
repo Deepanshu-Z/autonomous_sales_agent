@@ -29,6 +29,21 @@ async def send_followup_with_buttons_async(
     """
     valid_buttons = [str(b).strip()[:20] for b in (buttons or []) if str(b).strip()][:3]
 
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        from src.services.meta_client import send_quick_replies_async
+        from src.core.meta_loader import format_for_meta
+        clean_text = format_for_meta(followup_text)
+        recipient_id = clean_phone.split("_", 1)[1]
+        try:
+            res = await send_quick_replies_async(recipient_id, clean_text, valid_buttons)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[quick_reply_service] Meta quick replies error for {clean_phone}: {e}")
+        await send_text_message_async(clean_phone, clean_text)
+        return False
+
     if not valid_buttons:
         # No buttons requested — send as plain text
         await send_text_message_async(phone, followup_text)

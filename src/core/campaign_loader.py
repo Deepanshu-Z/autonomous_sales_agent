@@ -77,6 +77,14 @@ def match_campaign(referral: Optional[dict] = None, text: str = "") -> Optional[
                     reg_str = str(registered_id).strip()
                     if reg_str and (ad_id == reg_str or (source_url and reg_str in source_url)):
                         return camp
+
+            from src.core.meta_loader import get_post_config
+            post_cfg = get_post_config(ad_id)
+            if post_cfg:
+                for camp in campaigns:
+                    if camp.get("course") == post_cfg.get("course"):
+                        return camp
+
             return None  # Ad ID provided but not registered -> strictly ignore
 
     # 2. Direct Testing / Whitelisted Fallback (no ad referral attached)

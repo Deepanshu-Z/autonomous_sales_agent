@@ -35,8 +35,9 @@ async def send_followup_with_buttons_async(
         from src.core.meta_loader import format_for_meta
         clean_text = format_for_meta(followup_text)
         recipient_id = clean_phone.split("_", 1)[1]
+        channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
         try:
-            res = await send_quick_replies_async(recipient_id, clean_text, valid_buttons)
+            res = await send_quick_replies_async(recipient_id, clean_text, valid_buttons, channel=channel)
             if isinstance(res, dict) and "error" not in res:
                 return True
         except Exception as e:

@@ -5,6 +5,7 @@ Zero hardcoding: dynamically reads token, base url, and API version.
 
 import os
 import httpx
+from typing import Optional
 from dotenv import load_dotenv
 from src.core.meta_loader import get_meta_settings
 
@@ -24,21 +25,28 @@ def _get_client() -> httpx.AsyncClient:
     return _async_client
 
 
-async def _meta_post(endpoint: str, payload: dict) -> dict:
-    """Unified POST caller for all Meta Graph API endpoints."""
-    token = os.getenv("META_PAGE_ACCESS_TOKEN", "").strip()
-    if not token:
-        print("[meta_client] ⚠️ META_PAGE_ACCESS_TOKEN is not configured.")
-        return {"error": "Missing META_PAGE_ACCESS_TOKEN"}
+async def _meta_post(endpoint: str, payload: dict, channel: Optional[str] = None) -> dict:
+    """Unified POST caller for all Meta Graph API endpoints with dual token support."""
+    fb_token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "").strip()
+    ig_token = os.getenv("META_PAGE_ACCESS_TOKEN", "").strip()
 
-    settings = get_meta_settings()
-    base_url = settings["graph_api_base"]
-    # Auto-route between Instagram API (IGAA... tokens) and Facebook Graph API (EAAG... tokens)
-    if not os.getenv("META_GRAPH_API_BASE"):
+    if channel == "facebook":
+        token = fb_token or ig_token
+        base_url = "https://graph.facebook.com"
+    else:
+        token = ig_token or fb_token
         if token.startswith("IG"):
             base_url = "https://graph.instagram.com"
         else:
             base_url = "https://graph.facebook.com"
+
+    if not token:
+        print("[meta_client] ⚠️ Neither META_PAGE_ACCESS_TOKEN nor FACEBOOK_PAGE_ACCESS_TOKEN is configured.")
+        return {"error": "Missing Meta access token"}
+
+    settings = get_meta_settings()
+    if os.getenv("META_GRAPH_API_BASE"):
+        base_url = settings["graph_api_base"]
 
     version = settings["graph_api_version"]
     url = f"{base_url}/{version}/{endpoint.lstrip('/')}"
@@ -60,28 +68,29 @@ async def _meta_post(endpoint: str, payload: dict) -> dict:
         return {"error": str(e)}
 
 
-async def reply_to_comment_async(comment_id: str, message: str) -> dict:
+async def reply_to_comment_async(comment_id: str, message: str, channel: Optional[str] = None) -> dict:
     """Posts a public direct reply to an Instagram or Facebook comment."""
-    return await _meta_post(f"{comment_id}/replies", {"message": message})
+    endpoint = f"{comment_id}/comments" if channel == "facebook" else f"{comment_id}/replies"
+    return await _meta_post(endpoint, {"message": message}, channel=channel)
 
 
-async def send_private_reply_async(comment_id: str, message: str) -> dict:
+async def send_private_reply_async(comment_id: str, message: str, channel: Optional[str] = None) -> dict:
     """Sends a private DM to a user from their comment (Private Reply API)."""
-    return await _meta_post("me/messages", {"recipient": {"comment_id": comment_id}, "message": {"text": message}})
+    return await _meta_post("me/messages", {"recipient": {"comment_id": comment_id}, "message": {"text": message}}, channel=channel)
 
 
-async def send_direct_message_async(recipient_id: str, message: str) -> dict:
+async def send_direct_message_async(recipient_id: str, message: str, channel: Optional[str] = None) -> dict:
     """Sends a direct message (DM) to an Instagram/Facebook user."""
-    return await _meta_post("me/messages", {"recipient": {"id": recipient_id}, "message": {"text": message}})
+    return await _meta_post("me/messages", {"recipient": {"id": recipient_id}, "message": {"text": message}}, channel=channel)
 
 
-async def send_quick_replies_async(recipient_id: str, message: str, buttons: list) -> dict:
+async def send_quick_replies_async(recipient_id: str, message: str, buttons: list, channel: Optional[str] = None) -> dict:
     """
     Sends interactive quick-reply buttons (up to 10 buttons) to Instagram or Facebook Messenger.
     """
     clean_buttons = [str(b).strip()[:20] for b in (buttons or []) if str(b).strip()][:10]
     if not clean_buttons:
-        return await send_direct_message_async(recipient_id, message)
+        return await send_direct_message_async(recipient_id, message, channel=channel)
 
     quick_replies = [
         {
@@ -98,10 +107,10 @@ async def send_quick_replies_async(recipient_id: str, message: str, buttons: lis
             "quick_replies": quick_replies,
         },
     }
-    return await _meta_post("me/messages", payload)
+    return await _meta_post("me/messages", payload, channel=channel)
 
 
-async def send_media_message_async(recipient_id: str, media_type: str, media_url: str) -> dict:
+async def send_media_message_async(recipient_id: str, media_type: str, media_url: str, channel: Optional[str] = None) -> dict:
     """Sends a media attachment (video, image, audio) to an Instagram/Facebook user."""
     payload = {
         "recipient": {"id": recipient_id},
@@ -112,4 +121,4 @@ async def send_media_message_async(recipient_id: str, media_type: str, media_url
             }
         },
     }
-    return await _meta_post("me/messages", payload)
+    return await _meta_post("me/messages", payload, channel=channel)

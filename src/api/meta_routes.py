@@ -80,7 +80,7 @@ async def _handle_comment_async(
     # 2. Public comment reply (1 sentence answering query + DM CTA)
     if public_msg:
         try:
-            res_pub = await reply_to_comment_async(comment_id, public_msg)
+            res_pub = await reply_to_comment_async(comment_id, public_msg, channel=channel)
             if isinstance(res_pub, dict) and "error" in res_pub:
                 print(f"[meta_routes] ⚠️ Public reply API error on {comment_id}: {res_pub['error']}")
             else:
@@ -92,7 +92,7 @@ async def _handle_comment_async(
     if private_dm:
         clean_dm = format_for_meta(private_dm)
         try:
-            res_dm = await send_private_reply_async(comment_id, clean_dm)
+            res_dm = await send_private_reply_async(comment_id, clean_dm, channel=channel)
             if isinstance(res_dm, dict) and "error" in res_dm:
                 print(f"[meta_routes] ⚠️ Private DM API error on {comment_id}: {res_dm['error']}")
             else:

@@ -53,7 +53,8 @@ async def send_text_message_async(phone: str, message: str):
     if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
         from src.services.meta_client import send_direct_message_async
         from src.core.meta_loader import format_for_meta
-        return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message))
+        channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
+        return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message), channel=channel)
 
     country_code, number = _split_phone(clean_phone)
     payload = {
@@ -200,8 +201,9 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
     if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
         from src.services.meta_client import send_media_message_async
         recipient_id = clean_phone.split("_", 1)[1]
+        channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
         try:
-            res = await send_media_message_async(recipient_id, "video", video_url)
+            res = await send_media_message_async(recipient_id, "video", video_url, channel=channel)
             if isinstance(res, dict) and "error" not in res:
                 return True
         except Exception as e:

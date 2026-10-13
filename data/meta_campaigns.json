@@ -11,7 +11,31 @@
   },
   "posts": [
     {
-      "post_id": "*",
+      "post_id": "TARGET_POST_ID_HERE",
+      "course": "face_yoga",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Face Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special offer available!\n\nWould you like me to share the class timings?"
+    },
+    {
+      "post_id": "18476212513115388",
+      "course": "kathak",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Kathak post. 😊 Here are the details:\n\n💃 Live Online Classes\n📅 Monday–Friday\n💰 Special offer available!\n\nWould you like me to share the batch timings?"
+    },
+    {
+      "post_id": "18107014196111345",
       "course": "face_yoga",
       "is_active": true,
       "trigger_keywords": [],

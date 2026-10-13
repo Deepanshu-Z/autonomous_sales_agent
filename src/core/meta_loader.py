@@ -73,6 +73,7 @@ def get_post_config(post_id: str) -> Optional[Dict[str, Any]]:
             or reg_id.endswith(f"_{clean_id}")
         ):
             return post
+
     return None
 
 

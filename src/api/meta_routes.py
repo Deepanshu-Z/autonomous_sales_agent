@@ -80,8 +80,11 @@ async def _handle_comment_async(
     # 2. Public comment reply (1 sentence answering query + DM CTA)
     if public_msg:
         try:
-            await reply_to_comment_async(comment_id, public_msg)
-            print(f"[meta_routes] 💬 Replied publicly to {channel} comment {comment_id} (@{username}) after {delay:.1f}s: '{public_msg}'")
+            res_pub = await reply_to_comment_async(comment_id, public_msg)
+            if isinstance(res_pub, dict) and "error" in res_pub:
+                print(f"[meta_routes] ⚠️ Public reply API error on {comment_id}: {res_pub['error']}")
+            else:
+                print(f"[meta_routes] 💬 Replied publicly to {channel} comment {comment_id} (@{username}) after {delay:.1f}s: '{public_msg}'")
         except Exception as e:
             print(f"[meta_routes] Error posting public comment reply for {comment_id}: {e}")
 
@@ -89,8 +92,11 @@ async def _handle_comment_async(
     if private_dm:
         clean_dm = format_for_meta(private_dm)
         try:
-            await send_private_reply_async(comment_id, clean_dm)
-            print(f"[meta_routes] 📩 Sent AI private DM for comment {comment_id} to {user_key}")
+            res_dm = await send_private_reply_async(comment_id, clean_dm)
+            if isinstance(res_dm, dict) and "error" in res_dm:
+                print(f"[meta_routes] ⚠️ Private DM API error on {comment_id}: {res_dm['error']}")
+            else:
+                print(f"[meta_routes] 📩 Sent AI private DM for comment {comment_id} to {user_key}")
         except Exception as e:
             print(f"[meta_routes] Error sending private DM for comment {comment_id}: {e}")
 
@@ -153,8 +159,11 @@ async def receive_meta_webhook(request: Request, background_tasks: BackgroundTas
                 username = str(val.get("from", {}).get("username") or val.get("from", {}).get("name") or "")
                 text = str(val.get("text") or val.get("message") or "").strip()
 
+                print(f"[meta_routes] 💬 Incoming comment from @{username} (ID: {sender_id}) on post {post_id}: '{text}'")
+
                 # Anti-loop guard: ignore comments from our own page/account
                 if (page_id and sender_id == page_id) or (entry_id and sender_id == entry_id):
+                    print(f"[meta_routes] ℹ️ Ignored comment from our own account ({sender_id})")
                     continue
 
                 if not comment_id:
@@ -163,6 +172,7 @@ async def receive_meta_webhook(request: Request, background_tasks: BackgroundTas
                 # Match against registered target posts (or wildcard)
                 post_cfg = get_post_config(post_id)
                 if not post_cfg:
+                    print(f"[meta_routes] ⚠️ Post {post_id} not registered in meta_campaigns.json — comment ignored")
                     continue
 
                 # Sentiment guard: do not auto-reply to complaints or refunds
@@ -173,6 +183,7 @@ async def receive_meta_webhook(request: Request, background_tasks: BackgroundTas
                 # Optional keyword filter (if list is non-empty)
                 keywords = post_cfg.get("trigger_keywords", [])
                 if keywords and not any(k.lower() in text.lower() for k in keywords):
+                    print(f"[meta_routes] ℹ️ Comment did not match trigger keywords: '{keywords}'")
                     continue
 
                 # Run background task so webhook responds immediately with 200
@@ -206,6 +217,8 @@ async def receive_meta_webhook(request: Request, background_tasks: BackgroundTas
             channel = "facebook" if obj_type == "page" else "instagram"
             user_key = f"fb_{sender_id}" if channel == "facebook" else f"ig_{sender_id}"
             referral = msg_event.get("referral") or msg.get("referral") or {}
+
+            print(f"[meta_routes] 📩 Incoming DM from {user_key}: '{text}'")
 
             # Enqueue into the debouncing & AI processing pipeline (same flow as WhatsApp)
             await add_message_to_batch_async(phone=user_key, text=text, referral=referral)

@@ -33,6 +33,13 @@ async def _meta_post(endpoint: str, payload: dict) -> dict:
 
     settings = get_meta_settings()
     base_url = settings["graph_api_base"]
+    # Auto-route between Instagram API (IGAA... tokens) and Facebook Graph API (EAAG... tokens)
+    if not os.getenv("META_GRAPH_API_BASE"):
+        if token.startswith("IG"):
+            base_url = "https://graph.instagram.com"
+        else:
+            base_url = "https://graph.facebook.com"
+
     version = settings["graph_api_version"]
     url = f"{base_url}/{version}/{endpoint.lstrip('/')}"
 

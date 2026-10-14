@@ -7,12 +7,12 @@
     "default_channel": "instagram",
     "use_ai_comment_replies": true,
     "use_ai_private_dms": true,
-    "allow_all_dms": true
+    "allow_all_dms": false
   },
   "posts": [
     {
-      "post_id": "1284488828075432_122111588151453144",
-      "course": "face_yoga",
+      "post_id": "100064032123660_1507226361421754",
+      "course": "yoga",
       "is_active": true,
       "trigger_keywords": [],
       "public_replies": [
@@ -23,8 +23,8 @@
       "private_dm_intro": "Hi! Thanks for checking out our Face Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special offer available!\n\nWould you like me to share the class timings?"
     },
     {
-      "post_id": "18476212513115388",
-      "course": "kathak",
+      "post_id": "3962024291830227585",
+      "course": "yoga",
       "is_active": true,
       "trigger_keywords": [],
       "public_replies": [

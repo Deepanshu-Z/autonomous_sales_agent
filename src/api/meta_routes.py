@@ -115,6 +115,7 @@ async def _handle_comment_async(
         state.update({
             "is_target_ad": True,
             "welcome_sent": True,
+            "ad_id": post_cfg.get("ad_id") or post_cfg.get("master_ad_id"),
             "source_post_id": post_id,
             "course": post_cfg.get("course"),
             "channel": channel,

@@ -11,6 +11,66 @@
   },
   "posts": [
     {
+      "campaign_name": "Ladies Dance - Facebook",
+      "course": "ladies_dance",
+      "post_id": "1001432206614811_1551233887021001",
+      "post_link": "https://www.facebook.com/1001432206614811_1551233887021001",
+      "ad_id": "120251036740780010",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Ladies Dance post. 😊 Here are the details:\n\n💃 Live Online Ladies Dance Classes\n📅 Monday–Friday\n👩‍🏫 Expert choreographers\n💰 Special ₹600 / 3-month offer!\n\nWould you like me to share the class timings?"
+    },
+    {
+      "campaign_name": "Ladies Dance - Instagram",
+      "course": "ladies_dance",
+      "post_id": "18423193069149005",
+      "post_link": "https://www.instagram.com/p/Dd30-dmgaAj/",
+      "ad_id": "120251036740780010",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Ladies Dance post. 😊 Here are the details:\n\n💃 Live Online Ladies Dance Classes\n📅 Monday–Friday\n👩‍🏫 Expert choreographers\n💰 Special ₹600 / 3-month offer!\n\nWould you like me to share the class timings?"
+    },
+    {
+      "campaign_name": "Yoga - Facebook",
+      "course": "yoga",
+      "post_id": "1001432206614811_1559865116157878",
+      "post_link": "https://www.facebook.com/1001432206614811_1559865116157878",
+      "ad_id": "120251036038770010",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special ₹600 / 3-month offer available!\n\nWould you like me to share the class timings?"
+    },
+    {
+      "campaign_name": "Yoga - Instagram",
+      "course": "yoga",
+      "post_id": "18634005799034651",
+      "post_link": "https://www.instagram.com/p/DeOPbItAavO",
+      "ad_id": "120251036038770010",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special ₹600 / 3-month offer available!\n\nWould you like me to share the class timings?"
+    },
+    {
       "post_id": "100064032123660_1507226361421754",
       "course": "yoga",
       "is_active": true,

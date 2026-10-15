@@ -199,8 +199,20 @@ async def receive_meta_webhook(request: Request, background_tasks: BackgroundTas
                     channel,
                 )
 
-        # ── 2. Process Direct Messages (DMs & Standby) ───────────────────────
-        messaging_events = entry.get("messaging", []) + entry.get("standby", [])
+        # ── 2. Process Direct Messages (DMs) ─────────────────────────────────
+        messaging_events = entry.get("messaging", [])
+        for s_event in entry.get("standby", []):
+            s_sender = str(s_event.get("sender", {}).get("id") or "")
+            s_recipient = str(s_event.get("recipient", {}).get("id") or "")
+            target_user = s_sender if (s_sender and s_sender != page_id and s_sender != entry_id) else s_recipient
+            if target_user and target_user not in (page_id, entry_id):
+                channel = "facebook" if obj_type == "page" else "instagram"
+                user_key = f"fb_{target_user}" if channel == "facebook" else f"ig_{target_user}"
+                try:
+                    from src.state.chat_state import mark_escalated_async
+                    await mark_escalated_async(user_key)
+                except Exception:
+                    pass
         for msg_event in messaging_events:
             sender_id = str(msg_event.get("sender", {}).get("id") or "")
             if (page_id and sender_id == page_id) or (entry_id and sender_id == entry_id):

@@ -52,7 +52,7 @@ def get_meta_settings() -> Dict[str, Any]:
         "default_channel": settings.get("default_channel", "instagram"),
         "use_ai_comment_replies": bool(settings.get("use_ai_comment_replies", True)),
         "use_ai_private_dms": bool(settings.get("use_ai_private_dms", True)),
-        "allow_all_dms": bool(settings.get("allow_all_dms", True)),
+        "allow_all_dms": bool(settings.get("allow_all_dms", False)),
     }
 
 

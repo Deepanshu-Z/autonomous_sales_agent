@@ -384,16 +384,13 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
 
         return False, f"ID '{received_id}' is not registered in campaigns or target posts"
 
-    # For Meta users (Instagram/Facebook DMs)
+    # For Meta users (Instagram/Facebook DMs): ONLY allow if verified target post commenter (is_target_ad=True) or has registered ad_id
     if phone and (phone.startswith("ig_") or phone.startswith("fb_")):
-        from src.core.meta_loader import get_meta_settings, is_course_intent_dm
+        from src.core.meta_loader import get_meta_settings
         meta_settings = get_meta_settings()
-        if meta_settings.get("allow_all_dms", True):
+        if meta_settings.get("allow_all_dms") is True:
             return True, "Meta DM allowed by settings (allow_all_dms=True)"
-        elif is_course_intent_dm(text):
-            return True, "Organic Meta DM qualified: course inquiry intent detected"
-        else:
-            return False, "Organic Meta DM ignored: no course inquiry intent (allow_all_dms=False)"
+        return False, "Organic Meta DM ignored (no ad referral or target post comment interaction)"
 
     return False, "No referral data (organic / non-ad message)"
 

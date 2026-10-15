@@ -95,8 +95,11 @@ def match_campaign(referral: Optional[dict] = None, text: str = "") -> Optional[
             if camp.get("course") == detected_course:
                 return camp
 
-    # Default to first campaign (e.g. yoga) for testing
-    return campaigns[0]
+    # Fall back to first campaign only when explicitly in TEST_MODE
+    if os.getenv("TEST_MODE", "").strip().lower() in ("true", "1", "yes"):
+        return campaigns[0]
+
+    return None
 
 
 def get_welcome_messages(campaign: Optional[Dict[str, Any]], language: Optional[str] = None) -> Dict[str, str]:

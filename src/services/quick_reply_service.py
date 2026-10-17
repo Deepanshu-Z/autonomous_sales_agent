@@ -45,6 +45,18 @@ async def send_followup_with_buttons_async(
         await send_text_message_async(clean_phone, clean_text)
         return False
 
+    if clean_phone.startswith("wa_"):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_buttons_async
+        recipient_id = clean_phone.split("_", 1)[1]
+        try:
+            res = await send_whatsapp_cloud_buttons_async(recipient_id, followup_text, valid_buttons)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[quick_reply_service] WhatsApp Cloud buttons error for {clean_phone}: {e}")
+        await send_text_message_async(clean_phone, followup_text)
+        return False
+
     if not valid_buttons:
         # No buttons requested — send as plain text
         await send_text_message_async(phone, followup_text)

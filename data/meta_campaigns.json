@@ -7,7 +7,7 @@
     "default_channel": "instagram",
     "use_ai_comment_replies": true,
     "use_ai_private_dms": true,
-    "allow_all_dms": false
+    "allow_all_dms": true
   },
   "posts": [
     {
@@ -105,6 +105,19 @@
         "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
       ],
       "private_dm_intro": "Hi! Thanks for checking out our Yoga post. 😊 Here are the details:\n\n🧘 Live Online Classes\n📅 Monday–Friday\n💰 Special offer available!\n\nWould you like me to share the class timings?"
+    },
+    {
+      "campaign_name": "Global Social Media Fallback",
+      "post_id": "*",
+      "course": "all",
+      "is_active": true,
+      "trigger_keywords": [],
+      "public_replies": [
+        "Hey @{username}, sent you the complete details and schedule in your DMs! Please check your Message Requests 📩",
+        "Hi @{username}! Just DM'd you all the course info and trial class details. Check your inbox/requests! ✨",
+        "Hello @{username}, check your DMs! All the info has been sent right to your inbox 📩"
+      ],
+      "private_dm_intro": "Hi! Thanks for checking out our page! 😊 We offer live interactive classes in Dance, Yoga, Music, and Fitness with 3 Free Trial Classes. Which course are you interested in exploring?"
     }
   ]
 }

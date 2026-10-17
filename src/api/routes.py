@@ -2,10 +2,11 @@
 routes.py — FastAPI route definitions for WhatsApp Webhook and Admin endpoints.
 """
 
+import os
 import time
 import json
 import asyncio
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 
 from src.api.deps import extract_phone
 from src.services.interakt import (
@@ -229,6 +230,156 @@ async def receive_test_webhook(request: Request):
     except Exception as e:
         print(f"[api] Failed to enqueue test message, running fallback: {e}")
         return await _process_fallback(phone, text, referral, time.time())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Meta WhatsApp Cloud API — Test Webhook Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_whatsapp_cloud_messages(data: dict) -> list[dict]:
+    """Extracts phone, text, and referral from Meta WhatsApp Cloud API or raw JSON."""
+    items = []
+    if not isinstance(data, dict):
+        return items
+
+    # 1. Official Meta Cloud API payload (object: 'whatsapp_business_account')
+    if "entry" in data:
+        for entry in data.get("entry", []):
+            for change in entry.get("changes", []):
+                val = change.get("value", {})
+                if not isinstance(val, dict):
+                    continue
+                contacts = {
+                    c.get("wa_id"): c.get("profile", {}).get("name", "")
+                    for c in val.get("contacts", [])
+                    if isinstance(c, dict)
+                }
+                for msg in val.get("messages", []):
+                    if not isinstance(msg, dict):
+                        continue
+                    sender = msg.get("from")
+                    if not sender:
+                        continue
+                    mtype = msg.get("type", "text")
+                    text = ""
+                    if mtype == "text":
+                        text = msg.get("text", {}).get("body", "")
+                    elif mtype == "interactive":
+                        interactive = msg.get("interactive", {})
+                        text = (
+                            interactive.get("button_reply", {}).get("title")
+                            or interactive.get("list_reply", {}).get("title")
+                            or interactive.get("button_reply", {}).get("id")
+                            or ""
+                        )
+                    elif mtype == "button":
+                        text = msg.get("button", {}).get("text", "")
+
+                    if text:
+                        referral = msg.get("referral", {}) or {}
+                        items.append({
+                            "phone": str(sender),
+                            "text": text.strip(),
+                            "referral": referral,
+                            "name": contacts.get(sender, ""),
+                        })
+        return items
+
+    # 2. Simplified raw JSON for developer testing (curl / Postman)
+    phone = data.get("phone") or data.get("from") or data.get("wa_id") or data.get("sender")
+    text = data.get("text") or data.get("message") or data.get("body")
+    if phone and text:
+        items.append({
+            "phone": str(phone),
+            "text": str(text).strip(),
+            "referral": data.get("referral") or {},
+            "name": data.get("name") or "Tester",
+        })
+
+    return items
+
+
+def _is_whatsapp_cloud_status_event(data: dict) -> bool:
+    """Checks if payload is a delivery/read receipt from WhatsApp."""
+    if isinstance(data, dict) and "entry" in data:
+        for entry in data.get("entry", []):
+            for change in entry.get("changes", []):
+                val = change.get("value", {})
+                if isinstance(val, dict) and "statuses" in val and not val.get("messages"):
+                    return True
+    return False
+
+
+@router.get("/test-whatsapp-webhook")
+async def verify_whatsapp_test_webhook(request: Request):
+    """Handles Meta WhatsApp Cloud API webhook verification challenge."""
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+
+    expected_tokens = [
+        os.getenv("META_VERIFY_TOKEN", "").strip(),
+        os.getenv("VERIFY_TOKEN", "").strip(),
+    ]
+    expected_tokens = [t for t in expected_tokens if t]
+
+    if mode == "subscribe" and token and (token in expected_tokens or not expected_tokens):
+        print(f"[whatsapp_cloud] ✅ Webhook verified successfully by Meta!")
+        return Response(content=challenge, media_type="text/plain")
+
+    print(f"[whatsapp_cloud] ❌ Verification failed. Token received: '{token}'")
+    return Response(content="Forbidden", status_code=403)
+
+
+@router.post("/test-whatsapp-webhook")
+async def receive_whatsapp_test_webhook(request: Request):
+    """
+    Receives and processes incoming WhatsApp Cloud API webhooks.
+    Supports:
+    1. Official Meta Cloud API webhook payloads (object: 'whatsapp_business_account')
+    2. Status updates (sent/delivered/read) acknowledged with 200 OK
+    3. Simplified raw JSON for direct API / Postman / cURL testing
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "invalid_json"}
+
+    extracted_items = _extract_whatsapp_cloud_messages(data)
+    if not extracted_items:
+        if _is_whatsapp_cloud_status_event(data):
+            return {"status": "ok", "message": "status_acknowledged"}
+        print("[whatsapp_cloud] ℹ️ Webhook event ignored (no message text found)")
+        return {"status": "ignored", "message": "no_messages_found"}
+
+    results = []
+    for item in extracted_items:
+        raw_phone = item["phone"]
+        text = item["text"]
+        referral = item.get("referral") or {}
+        name = item.get("name") or ""
+
+        clean_num = str(raw_phone).replace("+", "").strip()
+        user_key = f"wa_{clean_num}"
+
+        limited, rl_info = await is_rate_limited(user_key)
+        if limited:
+            print(f"[whatsapp_cloud] ⚠️ Rate limit exceeded for {user_key}. Dropping.")
+            results.append({"phone": user_key, "status": "rate_limited"})
+            continue
+
+        await log_message_async(user_key, "user", text)
+
+        try:
+            await add_message_to_batch_async(phone=user_key, text=text, referral=referral)
+            results.append({"phone": user_key, "status": "enqueued"})
+        except Exception as e:
+            print(f"[whatsapp_cloud] Failed to enqueue message, running fallback: {e}")
+            fb_res = await _process_fallback(user_key, text, referral, time.time())
+            results.append({"phone": user_key, "status": "fallback", "result": fb_res})
+
+    return {"status": "ok", "processed": results}
 
 
 async def _process_fallback(phone: str, text: str, referral: dict, start_time: float):

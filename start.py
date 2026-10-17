@@ -71,8 +71,9 @@ if __name__ == "__main__":
     host = sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0"
 
     print(f"\n🌐 Starting uvicorn on {host}:{port}")
-    print(f"   Webhook URL: http://{host}:{port}/webhook")
-    print(f"   Test URL:    http://{host}:{port}/test-webhook\n")
+    print(f"   Webhook URL:         http://{host}:{port}/webhook")
+    print(f"   Interakt Test URL:   http://{host}:{port}/test-webhook")
+    print(f"   WhatsApp Cloud URL:  http://{host}:{port}/test-whatsapp-webhook\n")
 
     uvicorn.run(
         "main:app",

@@ -112,12 +112,18 @@ async def _handle_comment_async(
     # 4. Mark user session as active target lead with welcome_sent=True
     try:
         state = await get_user_state_async(user_key)
+        from src.core import kb_loader
+        detected_course = kb_loader.detect_course_from_text(comment_text) if comment_text else None
+        resolved_course = detected_course or post_cfg.get("course")
+        if resolved_course in ("all", "any", "*"):
+            resolved_course = None
+
         state.update({
             "is_target_ad": True,
             "welcome_sent": True,
             "ad_id": post_cfg.get("ad_id") or post_cfg.get("master_ad_id"),
             "source_post_id": post_id,
-            "course": post_cfg.get("course"),
+            "course": resolved_course,
             "channel": channel,
             "username": username,
         })

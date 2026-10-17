@@ -56,6 +56,10 @@ async def send_text_message_async(phone: str, message: str):
         channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
         return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message), channel=channel)
 
+    if clean_phone.startswith("wa_"):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_text_async
+        return await send_whatsapp_cloud_text_async(clean_phone.split("_", 1)[1], message)
+
     country_code, number = _split_phone(clean_phone)
     payload = {
         "countryCode": country_code,

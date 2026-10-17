@@ -392,6 +392,10 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
             return True, "Meta DM allowed by settings (allow_all_dms=True)"
         return False, "Organic Meta DM ignored (no ad referral or target post comment interaction)"
 
+    # For WhatsApp Cloud API test webhook users:
+    if phone and phone.startswith("wa_"):
+        return True, "WhatsApp Cloud API test webhook message"
+
     return False, "No referral data (organic / non-ad message)"
 
 
@@ -707,9 +711,9 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     if not state.get("welcome_sent") and not has_prior_ai_reply:
         campaign = campaign_loader.match_campaign(referral=referral, text=text)
         if not campaign:
-            if phone.startswith("ig_") or phone.startswith("fb_"):
-                # Meta DM: route directly into conversational AI handler instead of dropping
-                print(f"[tasks] {phone}: Meta DM with no campaign match — routing directly to conversational AI.")
+            if phone.startswith("ig_") or phone.startswith("fb_") or phone.startswith("wa_"):
+                # Meta DM or WhatsApp Cloud: route directly into conversational AI handler instead of dropping
+                print(f"[tasks] {phone}: Direct message with no campaign match — routing directly to conversational AI.")
                 state["is_target_ad"] = True
                 state["welcome_sent"] = True
                 await save_user_state_async(phone, state)

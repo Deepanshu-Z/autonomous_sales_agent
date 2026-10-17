@@ -120,8 +120,13 @@ def format_for_meta(text: str, max_length: int = 1000) -> str:
 
 def _get_course_summary_str(course_id: str) -> str:
     """Extracts concise course facts from KB for comment & DM answering."""
-    if not course_id:
-        return ""
+    clean_cid = str(course_id or "").strip().lower()
+    if not clean_cid or clean_cid in ("all", "any", "*", "none"):
+        return (
+            "Sensationz offers live interactive online courses in: Bollywood Dance, Kathak, Yoga, Face Yoga, "
+            "Fitness & Zumba, Singing / Vocal Music, Guitar, and Piano. Certified instructors, daily batches, "
+            "and up to 3 Free Trial Classes available on the Sensationz App."
+        )
     try:
         from src.core import kb_loader
         data = kb_loader.get_course_data(course_id)
@@ -336,6 +341,10 @@ async def evaluate_and_generate_comment_actions_async(
         }
 
     course_id = post_cfg.get("course", "")
+    from src.core import kb_loader
+    comment_detected = kb_loader.detect_course_from_text(clean_text)
+    if comment_detected:
+        course_id = comment_detected
     course_facts = _get_course_summary_str(course_id)
     user_handle = f"@{username}" if username else "there"
 

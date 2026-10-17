@@ -60,6 +60,7 @@ from src.state.chat_state import (
     reset_user_state_async,
     clear_escalation_async,
     arm_followup_timer,
+    reset_follow_up_timer,
 )
 
 _reply_llm = None
@@ -235,6 +236,16 @@ async def handle_incoming_message(
     if new_state.get("profile_created") and new_state.get("stage") == "PROFILE_COMPLETED":
         new_state["stage"] = "COUPON_SENT"
         new_state["coupon_sent"] = True
+
+    # Strict Zero Follow-up Rule: When a user claims they paid, there must be NO follow up and NO buttons
+    if (
+        new_state.get("payment_claimed")
+        or flags.get("claims_payment_or_enrollment")
+        or flags.get("customer_intent") == "PAYMENT_CLAIM"
+    ):
+        new_state["payment_claimed"] = True
+        followup_msg = None
+        buttons = []
 
     # Guarantee dedicated "Talk to Agent" button in user's language (max 3 buttons total on WhatsApp)
     if followup_msg and buttons is not None:
@@ -888,6 +899,11 @@ async def handle_conversation_turn_async(
         clean_followup = _format_for_whatsapp(clean_followup)
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=user_asked_demo)
 
+    # Strict Zero Follow-up on Payment Claim
+    if new_state.get("payment_claimed") or last_turn.get("claims_payment_or_enrollment") or last_turn.get("intent") == "PAYMENT_CLAIM":
+        clean_followup = None
+        result["buttons"] = []
+
     # Anti-redundancy guarantee: If links were already delivered in Message #1, do not redundantly ask if they want links in followup
     if clean_followup and ("play.google.com" in clean_reply or "sensationzperformingarts.com" in clean_reply):
         REDUNDANT_LINK_QUESTIONS = (
@@ -957,7 +973,7 @@ async def handle_conversation_turn_async(
     #                 clean_reply = f"{clean_reply.rstrip()}\n\n{video_line}"
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause
-    if clean_followup and clean_followup.strip():
+    if clean_followup and clean_followup.strip() and not new_state.get("payment_claimed"):
         await asyncio.sleep(2.5)
         raw_buttons = result.get("buttons") or []
         from src.core import language_loader
@@ -974,7 +990,15 @@ async def handle_conversation_turn_async(
         asyncio.create_task(log_message_async(phone, "ai", clean_followup))
 
     # Persist updated session state
-    arm_followup_timer(new_state, topic=text_clean)
+    if (
+        not new_state.get("payment_claimed")
+        and not new_state.get("is_escalated")
+        and not new_state.get("_last_turn", {}).get("is_disinterested")
+    ):
+        arm_followup_timer(new_state, topic=text_clean)
+    else:
+        reset_follow_up_timer(new_state)
     await save_user_state_async(phone, new_state)
 
-    return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": result.get("buttons", [])}
+    final_buttons = [] if new_state.get("payment_claimed") else result.get("buttons", [])
+    return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": final_buttons}

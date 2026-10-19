@@ -375,14 +375,11 @@ def check_target_ad(text: str, referral_data: dict = None, phone: str = None) ->
         received_id = source_id or ad_id
 
         from src.core import campaign_loader
-        from src.core.meta_loader import get_post_config
-        if received_id:
-            if campaign_loader.is_registered_ad_id(received_id):
+        if received_id or source_url:
+            if campaign_loader.is_registered_ad_id(received_id, source_url):
                 return True, f"Campaign Ad ID matched: '{received_id}'"
-            if get_post_config(received_id):
-                return True, f"Meta Post ID matched: '{received_id}'"
 
-        return False, f"ID '{received_id}' is not registered in campaigns or target posts"
+        return False, f"ID '{received_id}' is not registered in campaigns"
 
     # For Meta users (Instagram/Facebook DMs): ONLY allow if verified target post commenter (is_target_ad=True) or has registered ad_id
     if phone and (phone.startswith("ig_") or phone.startswith("fb_")):

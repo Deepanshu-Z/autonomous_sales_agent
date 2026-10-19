@@ -41,17 +41,17 @@ def get_all_campaigns() -> List[Dict[str, Any]]:
     return _CAMPAIGNS_CACHE
 
 
-def is_registered_ad_id(ad_id: str) -> bool:
-    """Checks if an Ad ID matches any registered campaign."""
-    if not ad_id:
-        return False
-    clean_id = str(ad_id).strip()
-    if not clean_id:
+def is_registered_ad_id(ad_id: str, source_url: str = "") -> bool:
+    """Checks if an Ad ID or source URL matches any registered campaign."""
+    clean_id = str(ad_id).strip() if ad_id else ""
+    clean_url = str(source_url).strip() if source_url else ""
+    if not clean_id and not clean_url:
         return False
 
     for camp in get_all_campaigns():
         for registered_id in camp.get("ad_ids", []):
-            if clean_id == str(registered_id).strip():
+            reg_str = str(registered_id).strip()
+            if reg_str and (clean_id == reg_str or (clean_url and reg_str in clean_url)):
                 return True
     return False
 

@@ -34,6 +34,10 @@ from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next
 from src.services.agent_handoff import OWNER_EMAIL, execute_agent_handoff_async
 from src.services.rate_limiter import is_rate_limited
 from src.core.lead_logger import log_lead_action, extract_lead_details
+from src.services.razorpay_service import (
+    verify_webhook_signature as verify_razorpay_signature,
+    fulfill_razorpay_payment_async,
+)
 
 router = APIRouter()
 
@@ -233,6 +237,93 @@ async def receive_test_webhook(request: Request):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Razorpay Webhook & Payment Reconciliation Endpoints (Module 6)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/api/razorpay/webhook")
+@router.post("/razorpay/webhook")
+async def receive_razorpay_webhook(request: Request):
+    """
+    Subtask 6.1: Real-time Razorpay Webhook listener.
+    Verifies X-Razorpay-Signature header against the raw body bytes.
+    Listens for 'payment.captured' and 'qr_code.credited' events.
+    Fulfills payment, updates state to PAID/ENROLLED, and sends WhatsApp confirmation.
+    """
+    raw_body_bytes = await request.body()
+    try:
+        raw_body_str = raw_body_bytes.decode("utf-8")
+    except Exception:
+        raw_body_str = ""
+
+    signature = (
+        request.headers.get("X-Razorpay-Signature")
+        or request.headers.get("x-razorpay-signature")
+        or ""
+    )
+
+    if not signature or not verify_razorpay_signature(raw_body_str, signature):
+        print(f"[razorpay_webhook] ❌ Razorpay webhook signature verification FAILED. Signature: '{signature[:20]}...'")
+        log_lead_action(
+            lead_no="Unknown",
+            lead_details="Razorpay Webhook",
+            action_taken="IGNORED",
+            reason="Invalid X-Razorpay-Signature header",
+        )
+        return Response(
+            content=json.dumps({"status": "invalid_signature", "message": "Signature verification failed"}),
+            status_code=400,
+            media_type="application/json",
+        )
+
+    try:
+        event_payload = json.loads(raw_body_str)
+    except Exception as exc:
+        print(f"[razorpay_webhook] ❌ Failed to parse JSON body: {exc}")
+        return Response(
+            content=json.dumps({"status": "invalid_json"}),
+            status_code=400,
+            media_type="application/json",
+        )
+
+    event_type = event_payload.get("event", "unknown")
+    if event_type not in ["payment.captured", "qr_code.credited"]:
+        print(f"[razorpay_webhook] ℹ️ Event '{event_type}' ignored (not payment.captured or qr_code.credited)")
+        return {"status": "ignored", "event": event_type}
+
+    print(f"[razorpay_webhook] ✅ Verified payment event received: '{event_type}'")
+    try:
+        result = await fulfill_razorpay_payment_async(event_payload)
+        return {"status": "ok", "event": event_type, "result": result}
+    except Exception as exc:
+        print(f"[razorpay_webhook] ❌ Payment fulfillment failed for '{event_type}': {exc}")
+        return Response(
+            content=json.dumps({"status": "error", "message": str(exc)}),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
+@router.post("/test-razorpay-webhook")
+async def receive_test_razorpay_webhook(request: Request):
+    """Developer test endpoint for Razorpay payment simulation without signature verification."""
+    try:
+        event_payload = await request.json()
+    except Exception:
+        return Response(
+            content=json.dumps({"status": "invalid_json"}),
+            status_code=400,
+            media_type="application/json",
+        )
+
+    event_type = event_payload.get("event", "unknown")
+    if event_type not in ["payment.captured", "qr_code.credited"]:
+        return {"status": "ignored", "event": event_type}
+
+    result = await fulfill_razorpay_payment_async(event_payload)
+    return {"status": "ok", "event": event_type, "result": result}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Meta WhatsApp Cloud API — Test Webhook Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -418,6 +509,19 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
     except Exception:
         pass
 
+    cmd = (text or "").strip().lower()
+    if cmd in ["#summary", "/summary", "#info", "#client", "summary"]:
+        from src.core.helpers.client_summary import get_client_summary_async
+        summary_text = await get_client_summary_async(phone)
+        await send_text_message_async(phone, summary_text)
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="Summary command executed",
+        )
+        return {"status": "summary", "reply": summary_text}
+
     if await is_escalated_async(phone):
         log_lead_action(
             lead_no=phone,
@@ -428,12 +532,16 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
         return {"status": "escalated"}
 
     if not state.get("already_assigned"):
-        if OWNER_EMAIL:
+        is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
+        if OWNER_EMAIL and is_interakt:
             success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)
             if success:
                 state["already_assigned"] = True
                 state["assigned_agent_email"] = OWNER_EMAIL
                 await save_user_state_async(phone, state)
+        else:
+            state["already_assigned"] = True
+            await save_user_state_async(phone, state)
 
     text_lower = text.lower()
     if matches_any(text_lower, AGENT_TRIGGER_WORDS):

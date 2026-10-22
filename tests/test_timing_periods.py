@@ -89,17 +89,43 @@ async def test_kathak_morning_batch_llm_response():
     # The AI must NOT claim that 4:00 PM or 5:00 PM are "morning batch timings"
     assert "available morning batch timings for kathak are" not in reply.lower(), "AI must not claim morning batch timings exist for Kathak!"
     # The AI must clarify that morning batches are not available / batches are evening
-    assert any(w in reply.lower() for w in ["evening", "shaam", "not offer", "not available", "no morning"]), "AI must clarify Kathak batches are evening or morning is not available!"
+    assert any(w in reply.lower() for w in ["evening", "shaam", "not offer", "not available", "no morning", "not held"]), "AI must clarify Kathak batches are evening or morning is not available!"
     # Buttons must NOT offer "Morning Batch"
     assert not any("morning" in b.lower() for b in buttons), f"Buttons must not include 'Morning Batch'! Got: {buttons}"
 
     print("  -> Kathak 'Morning Batch' query correctly handled without hallucination and with valid buttons!")
 
 
+async def test_unoffered_timing_rejected():
+    print("\n[TEST 4] Testing rejection of unoffered timing '11-12' for Yoga...")
+    session_state = {"stage": "NEW", "course": "yoga", "timing": None, "package": None}
+    history = [
+        {
+            "role": "assistant",
+            "content": "Available batch timings for the Online Live Interactive Yoga course are as follows:\n\n* Morning: 5:00 AM to 6:00 AM, 6:00 AM to 7:00 AM, 7:00 AM to 8:00 AM, 8:00 AM to 9:00 AM, 10:00 AM to 11:00 AM\n* Afternoon: 12:00 PM to 1:00 PM\n* Evening: 4:00 PM to 5:00 PM, 5:00 PM to 6:00 PM, 6:00 PM to 7:00 PM, 7:00 PM to 8:00 PM\nWhich batch timing suits your daily routine best? 😊",
+        }
+    ]
+    res = await conversation_handler.handle_incoming_message(
+        user_message="11-12",
+        session_state=session_state,
+        conversation_history=history,
+        course_id="yoga",
+    )
+    new_state = res.get("new_state", {})
+    reply = res.get("reply", "")
+
+    # State must NOT have timing set to 12:00 PM to 1:00 PM or anything else
+    assert new_state.get("timing") is None, f"Timing in state must remain None! Got: {new_state.get('timing')}"
+    # Must NOT claim that 12-1 PM or instructor Nidhi was selected
+    assert "selected the 12:00 pm to 1:00 pm" not in reply.lower()
+    print("  -> Unoffered timing '11-12' correctly rejected without setting timing in state.")
+
+
 async def main():
     test_timing_periods_derivation()
     test_prompt_injection()
     await test_kathak_morning_batch_llm_response()
+    await test_unoffered_timing_rejected()
     print("\n✅ ALL TIMING PERIOD TESTS PASSED SUCCESSFULLY!")
 
 

@@ -6,6 +6,7 @@ and extracts pure semantic state changes and customer intent WITHOUT fragile har
 """
 
 import os
+import re
 import json
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
@@ -57,6 +58,7 @@ def _empty_flags() -> Dict[str, Any]:
         "app_installed_stated": "unmentioned",
         "profile_created_stated": "unmentioned",
         "selected_timing": None,
+        "selected_teacher": None,
         "selected_package": None,
         "selected_course": None,
         "wants_trial": False,
@@ -69,6 +71,11 @@ def _empty_flags() -> Dict[str, Any]:
         "detected_language": "English",
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
+        "wants_app_guide": False,
+        "wants_app_video_guide": False,
+        "wants_trial_guide": False,
+        "wants_trial_video_guide": False,
+        "unoffered_timing_mentioned": None,
     }
 
 
@@ -98,8 +105,14 @@ If customer says "app to ho gaya but profile abhi nahi" -> app_installed_stated:
 If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", profile_created_stated: "denied".
 
 3. "selected_timing":
-   - Batch timing explicitly and definitively selected by the user (e.g. "7:00–8:00 AM", "morning 7 am", "evening 6 pm", "shaam 6 baje"), else null.
-   - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a question, expressing doubt, or asking about schedule flexibility or switching batches (e.g. "1 week morning and 1 week evening", "can I switch timing?", "subah aur shaam dono chalega?", "timing change ho sakti hai kya?", "is this ok?"). In these cases, customer_intent is "QUESTION" and selected_timing MUST BE null!
+   - Batch timing explicitly and definitively chosen by the user from the Allowed Canonical Batch Timings in context.
+   - You MUST translate and map colloquial or informal timing references (e.g. "morning 7 am", "shaam 6 baje", "7-8", "6 to 7 evening", "12-1", "10-11") directly to the exact matching canonical batch timing string from the Allowed Canonical Batch Timings in context (e.g. "7:00 AM to 8:00 AM", "6:00 PM to 7:00 PM", "12:00 PM to 1:00 PM", "10:00 AM to 11:00 AM").
+   - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
+   - CRITICAL UNAVAILABLE / UNOFFERED TIMING GUARD:
+     • If the customer asks for, selects, or mentions a timing that is NOT in the Allowed Canonical Batch Timings (for example, "11-12", "11 to 12", "3 pm", "2 to 3", "9 pm", or any unlisted hour), set selected_timing to null!
+     • NEVER guess, invent, snap, or substitute an unoffered timing to an adjacent or nearby slot (e.g. NEVER convert "11-12" to "12:00 PM to 1:00 PM")!
+     • When the customer gives an unoffered timing, set selected_timing to null, set customer_intent to "QUESTION", and set unoffered_timing_mentioned to the requested timing (e.g. "11-12").
+   - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a general question, expressing doubt, or asking about schedule flexibility or switching batches (e.g. "1 week morning and 1 week evening", "can I switch timing?", "subah aur shaam dono chalega?", "timing change ho sakti hai kya?", "is this ok?"). In these cases, customer_intent is "QUESTION" and selected_timing MUST BE null!
 
 4. "selected_package":
    - Package duration definitively chosen by the user in ANY language, script, or dialect worldwide (e.g. English "1 month", Hindi "1 महीना", Tamil "1 மாதம்", Malayalam "1 മാസം", Telugu "1 నెల", Spanish "1 mes", etc.).
@@ -107,20 +120,26 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - Output ONLY the exact canonical English string from the allowed list, or null. NEVER output foreign language text or unlisted intervals.
    - CRITICAL NEGATIVE GUARD: NEVER extract "1 week", "2 days", or arbitrary intervals as a package! Sensationz only offers packages listed in the course catalog. Set to null if the customer is asking a question or expressing doubt.
 
-5. "selected_course":
+5. "selected_teacher":
+   - Specific instructor or teacher definitively chosen, preferred, or requested by the user (e.g. "madhuri mam", "madhuri ji", "madhuri", "sneha", "mradula", "sonali mam", "parul mam", "aditi").
+   - You MUST translate and map colloquial or informal teacher references directly to the exact matching canonical teacher name from the Allowed Canonical Instructors in context (e.g. "madhuri mam" -> "Ms. Madhuri", "kratika" -> "Kratika Gontiya", "sneha" -> "Sneha Maurya", "vibha" -> "Vibha Mittal").
+   - Output ONLY the exact canonical string from the allowed list, or null. NEVER invent unlisted names.
+   - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a general informational question about teachers (e.g. "who teaches?", "teachers kaun hain?", "faculty details", "who is the teacher for 5pm?"). In these cases, customer_intent is "QUESTION" and selected_teacher MUST BE null!
+
+6. "selected_course":
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
 
-6. "wants_trial":
+7. "wants_trial":
    - boolean: true if customer asks for demo, trial class, free trial, or wanting to try before enrolling.
 
-7. "requests_human_agent":
+8. "requests_human_agent":
    - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
    - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "need help", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
 
-8. "is_coupon_requested":
+9. "is_coupon_requested":
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").
 
-9. "is_disinterested":
+10. "is_disinterested":
     - boolean: true if the customer refuses, declines, rejects, or signals they will NOT enroll.
     - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
       • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "no", "nahi lena", "rehne do".
@@ -128,13 +147,14 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
 
-10. "is_complaint_or_refund":
+11. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
 
-11. "customer_intent":
+12. "customer_intent":
     Must be EXACTLY ONE of:
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
+    - "TEACHER_SELECTION": Customer is selecting or stating their preferred instructor/teacher (e.g. "madhuri mam", "i want sneha mam", "vibha mittal", "aditi vyas").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
     - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
@@ -146,10 +166,10 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "PAYMENT_CLAIM": Customer states they completed payment, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment ("paid", "payment done", "maine pay kar diya", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
-12. "question_summary":
+13. "question_summary":
     - Brief 3-8 word English description of what they are asking about if customer_intent is "QUESTION", else null.
 
-13. "detected_language":
+14. "detected_language":
     - Detect the customer's exact language and writing script from any language in the world (e.g. "English", "Hinglish (Latin script)", "Hindi (Devanagari script)", "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "French", "German", "Arabic", etc.).
     - STRICT SCRIPT RULES — READ CAREFULLY:
       • LATIN/ROMAN ALPHABET = NEVER DEVANAGARI: If the customer's message contains ONLY standard ASCII/Latin characters (a-z, A-Z, 0-9, punctuation, spaces), it is physically impossible for it to be Devanagari script. You MUST classify it as "Hinglish (Latin script)" (if Indic/Hindi meaning) or "English" (if pure English).
@@ -158,20 +178,31 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Classify as "Hindi (Devanagari script)" ONLY IF the customer's message literally contains Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते", "क्या टाइमिंग है"). If you do NOT see actual Devanagari characters (अ आ इ ई etc.) in the message, NEVER output "Hindi (Devanagari script)"!
       • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
-14. "explicit_language_request":
+15. "explicit_language_request":
     - string or null: If customer explicitly asks to change language or talk in a specific language (e.g. "talk in Hindi", "speak in English", "Hindi please", "English me bolo", "switch language to Hindi"), specify the target language name (e.g. "Hindi", "English", "Hinglish"). Otherwise null.
 
-15. "wants_resend_video":
-    - boolean: true if customer explicitly asks to send or resend a video tutorial or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video"). Otherwise false.
+16. "wants_resend_video":
+    - boolean: true if customer explicitly asks to send or resend a tutorial video or guide (e.g. "video bhejo", "video nahi aayi", "send video again", "video dobara bhejo", "tutorial video", "resend video", "app video"). Otherwise false.
+    - CRITICAL NEGATIVE GUARD: Set to FALSE if customer is asking for an INSTRUCTOR DEMO VIDEO, sample class, or teacher preview (e.g. "demo video", "demo", "sample video", "teacher demo", "nidhi demo", "video dikhao", "demo dikhao")! Teacher demo requests are informational queries ("QUESTION"), NOT tutorial video requests!
 
-16. "claims_payment_or_enrollment":
+17. "claims_payment_or_enrollment":
     - boolean: true if customer states they already paid, completed payment, transferred money, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment / confirm admission ("paid", "payment done", "maine payment kar di", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo", "is my payment received?"). Otherwise false.
+
+18. "wants_app_guide":
+    - boolean: true if customer asks for or wants the app guide, app download video, profile setup video, or installation video/tutorial (e.g. "app guide", "app video", "how to download app video", "app video guide", "download video", "how to install app", "app kaise download kare video", "send app guide", "profile video"). Otherwise false.
+
+19. "wants_trial_guide":
+    - boolean: true if customer asks for or wants the trial booking video guide or how to book a trial class video/tutorial (e.g. "trial video guide", "trial video", "trial booking video", "how to book trial video", "demo booking video", "trial guide", "trial class video guide"). Otherwise false.
+
+20. "unoffered_timing_mentioned":
+    - string or null: If customer requested, proposed, or selected a timing that does NOT exist in the Allowed Canonical Batch Timings (e.g. "11-12", "3 pm", "2 to 3"), extract that timing string here. Otherwise null.
 
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
   "profile_created_stated": "confirmed" | "denied" | "unmentioned",
   "selected_timing": string | null,
+  "selected_teacher": string | null,
   "selected_package": string | null,
   "selected_course": string | null,
   "wants_trial": boolean,
@@ -184,7 +215,10 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "detected_language": string,
   "explicit_language_request": string | null,
   "wants_resend_video": boolean,
-  "claims_payment_or_enrollment": boolean
+  "claims_payment_or_enrollment": boolean,
+  "wants_app_guide": boolean,
+  "wants_trial_guide": boolean,
+  "unoffered_timing_mentioned": string | null
 }"""
 
 
@@ -220,17 +254,33 @@ async def extract_intent_and_state_changes(
     )
 
     from src.core import kb_loader
-    active_cid = s.get("course") or ""
+    from src.core.helpers import (
+        get_available_timings,
+        get_course_instructors,
+        resolve_canonical_teacher,
+    )
+    active_cid = s.get("course") or kb_loader.detect_course_from_text(text, default_course=None) or ""
     course_pkgs = list(kb_loader.get_valid_packages(active_cid).keys()) if active_cid else ["1 Month", "3 Months", "6 Months", "1 Year"]
     pkgs_str = ", ".join(f'"{p}"' for p in course_pkgs) if course_pkgs else '"1 Month", "3 Months", "6 Months", "1 Year"'
+
+    # Canonical teachers for active course (or all catalog courses if course not yet known)
+    course_teachers = get_course_instructors(active_cid if active_cid else None)
+    teachers_str = ", ".join(f'"{t}"' for t in course_teachers) if course_teachers else '"Check Course Batches"'
+
+    # Canonical timings for active course
+    course_batches = [b.get("time_12h", "").strip() for b in get_available_timings(active_cid)] if active_cid else []
+    timings_str = ", ".join(f'"{t}"' for t in course_batches if t) if course_batches else '"Check Course Batches"'
 
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
         f"- Active Course: {s.get('course') or 'None (Not Selected)'}\n"
+        f"- Allowed Canonical Batch Timings for Active Course: [{timings_str}]\n"
         f"- Allowed Canonical Packages for Active Course: [{pkgs_str}]\n"
-        f"- Selected Package: {s.get('package') or 'None'}\n"
-        f"- Selected Timing: {s.get('timing') or 'None'}\n"
+        f"- Allowed Canonical Instructors for Active Course: [{teachers_str}]\n"
+        f"- Selected Package: {s.get('package') or s.get('selected_duration') or 'None'}\n"
+        f"- Selected Timing: {s.get('timing') or s.get('selected_timing') or 'None'}\n"
+        f"- Selected Teacher: {s.get('selected_teacher') or 'None'}\n"
         f"- App Installed in State: {bool(s.get('app_installed'))}\n"
         f"- Profile Created in State: {bool(s.get('profile_created'))}\n"
         f"- Welcome Coupon Already Sent: {bool(s.get('coupon_sent'))}\n\n"
@@ -254,12 +304,69 @@ async def extract_intent_and_state_changes(
             if k in data:
                 clean[k] = data[k]
 
+        clean["wants_app_guide"] = bool(clean.get("wants_app_guide") or data.get("wants_app_video_guide"))
+        clean["wants_app_video_guide"] = clean["wants_app_guide"]
+        clean["wants_trial_guide"] = bool(clean.get("wants_trial_guide") or data.get("wants_trial_video_guide"))
+        clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
+
+        # Teacher demo inquiries must never trigger tutorial or install video guides
+        if re.search(r"\b(demo|sample|preview)\b", text, re.IGNORECASE):
+            clean["wants_resend_video"] = False
+            clean["wants_app_guide"] = False
+            clean["wants_app_video_guide"] = False
+            clean["wants_trial_guide"] = False
+            clean["wants_trial_video_guide"] = False
+
+        # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
+        raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")
+        if not raw_timing and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+            raw_timing = text.strip()
+
+        matched_batch = None
+        if raw_timing and isinstance(raw_timing, str):
+            r_low = raw_timing.strip().lower()
+            clean_user = r_low.replace(" ", "").replace("-", "to")
+            for b in course_batches:
+                b_low = b.lower()
+                if r_low == b_low or b_low.startswith(r_low):
+                    matched_batch = b
+                    break
+                # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
+                start_part = b_low.split(" to ")[0].replace(":00", "").replace(" ", "")
+                if clean_user == start_part or start_part.startswith(clean_user):
+                    matched_batch = b
+                    break
+                # Match full range: e.g. '12to1' or '12pmto1pm'
+                clean_batch = b_low.replace(":00", "").replace(" ", "")
+                if clean_user == clean_batch or clean_user == clean_batch.replace("pm", "").replace("am", ""):
+                    matched_batch = b
+                    break
+
+        if matched_batch:
+            clean["selected_timing"] = matched_batch
+            clean["unoffered_timing_mentioned"] = None
+            if clean.get("customer_intent") in ("QUESTION", "COURSE_INQUIRY"):
+                clean["customer_intent"] = "TIMING_SELECTION"
+        else:
+            clean["selected_timing"] = None
+
         # Strict canonical package normalization against allowed course packages
         raw_pkg = clean.get("selected_package")
         if raw_pkg and isinstance(raw_pkg, str):
             from src.core.coupons import normalize_package_name
             norm_pkg = normalize_package_name(raw_pkg, course_id=active_cid or "yoga")
             clean["selected_package"] = norm_pkg or (raw_pkg if raw_pkg in course_pkgs else None)
+
+        # Strict canonical teacher normalization against allowed course teachers
+        raw_teacher = clean.get("selected_teacher")
+        matched_teacher = None
+        if raw_teacher and isinstance(raw_teacher, str):
+            matched_teacher = resolve_canonical_teacher(raw_teacher, course_id=active_cid or None)
+        elif not raw_teacher and clean.get("customer_intent") not in ("QUESTION", "DISINTEREST", "COMPLAINT"):
+            # Check if user named an instructor in text without LLM extracting it
+            matched_teacher = resolve_canonical_teacher(text, course_id=active_cid or None)
+
+        clean["selected_teacher"] = matched_teacher or (raw_teacher if raw_teacher in course_teachers else None)
 
         # Deterministic course detection from user text overrides ambiguous LLM extraction
         llm_course = clean.get("selected_course")
@@ -288,11 +395,22 @@ async def extract_intent_and_state_changes(
         flags = _empty_flags()
         try:
             from src.core import kb_loader
+            from src.core.helpers import resolve_canonical_teacher
             detected_course = kb_loader.detect_course_from_text_fallback(text, default_course=None)
             if detected_course:
                 flags["selected_course"] = detected_course
+            detected_teacher = resolve_canonical_teacher(text, course_id=detected_course)
+            if detected_teacher:
+                flags["selected_teacher"] = detected_teacher
+                flags["customer_intent"] = "TEACHER_SELECTION"
             if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
+            if re.search(r"\b(app guide|app video|download video|how to download|app kaise download|how to install)\b", text, re.IGNORECASE):
+                flags["wants_app_guide"] = True
+                flags["wants_app_video_guide"] = True
+            if re.search(r"\b(trial video|trial guide|how to book trial|trial booking video)\b", text, re.IGNORECASE):
+                flags["wants_trial_guide"] = True
+                flags["wants_trial_video_guide"] = True
         except Exception:
             pass
         return flags
@@ -306,45 +424,101 @@ def is_app_link_request(text: str) -> bool:
 
 def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Merges classifier flags into persistent session state.
-    Pure data merge, no LLM calls, safe to unit-test.
+    Merges classifier flags into persistent session state cleanly and monotonically.
+    Guarantees:
+    1. Zero regression: previously confirmed slots (timing, teacher, package, fee)
+       are NEVER overwritten by None, empty strings, questions, disinterest, or casual turns.
+    2. Course switching: switching course resets course-specific slots cleanly only
+       when the course truly changes.
+    3. Deterministic pricing: when package duration is selected, fee is calculated
+       via pricing_engine with exact GST and total payable (zero LLM math).
+    4. Monotonic stage progression: stage only advances forward via advance_stage().
     """
+    from src.state.chat_state import advance_stage
+    from src.core import kb_loader
+    from src.core.helpers import calculate_exact_fee, resolve_canonical_teacher
+
     new_state = dict(state)
+    intent = flags.get("customer_intent") or "QUESTION"
+    is_selection_turn = intent not in ("QUESTION", "OTHER", "DISINTEREST", "COMPLAINT", "GREETING", "AGENT_REQUEST")
 
-    if flags.get("app_installed_stated") == "confirmed":
-        new_state["app_installed"] = True
-    elif flags.get("app_installed_stated") == "denied":
-        new_state["app_installed"] = False
-
-    if flags.get("profile_created_stated") == "confirmed":
-        new_state["profile_created"] = True
-        if new_state.get("stage") != "COUPON_SENT":
-            new_state["stage"] = "PROFILE_COMPLETED"
-    elif flags.get("profile_created_stated") == "denied":
-        new_state["profile_created"] = False
-
-    if flags.get("selected_timing") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
-        new_state["timing"] = flags["selected_timing"]
-
-    if flags.get("selected_package") and flags.get("customer_intent") not in ("QUESTION", "OTHER"):
-        from src.core.coupons import normalize_package_name
-        course_for_pkg = new_state.get("course") or "yoga"
-        canonical_pkg = normalize_package_name(flags["selected_package"], course_id=course_for_pkg)
-        new_state["package"] = canonical_pkg or flags["selected_package"]
-
+    # 1. Course Selection / Switching
     if flags.get("selected_course"):
-        from src.core import kb_loader
         raw_c = flags["selected_course"]
         entry = kb_loader.get_catalog_entry(raw_c)
-        if entry:
-            new_state["course"] = entry["id"]
-        else:
-            detected = kb_loader.detect_course_from_text(raw_c)
-            if detected:
-                new_state["course"] = detected
+        cand_course = entry["id"] if entry else (kb_loader.detect_course_from_text(raw_c) or None)
+        if cand_course:
+            old_course = new_state.get("course")
+            if old_course and old_course != cand_course:
+                # User switched course! Reset course-specific slots unless new ones arrived in the same turn
+                if not flags.get("selected_timing"):
+                    new_state["timing"] = None
+                    new_state["selected_timing"] = None
+                if not flags.get("selected_teacher"):
+                    new_state["selected_teacher"] = None
+                if not flags.get("selected_package"):
+                    new_state["package"] = None
+                    new_state["selected_duration"] = None
+                    new_state["fee"] = None
+            new_state["course"] = cand_course
+
+    active_course = new_state.get("course")
+
+    # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
+    if flags.get("selected_timing") and is_selection_turn:
+        new_state["timing"] = flags["selected_timing"]
+        new_state["selected_timing"] = flags["selected_timing"]
+        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+    elif flags.get("unoffered_timing_mentioned"):
+        new_state["timing"] = None
+        new_state["selected_timing"] = None
+
+    # 3. Teacher Slot Merge (Only on selection turns, canonical resolution)
+    if flags.get("selected_teacher") and is_selection_turn:
+        resolved = resolve_canonical_teacher(flags["selected_teacher"], course_id=active_course)
+        teacher_val = resolved or flags["selected_teacher"]
+        new_state["selected_teacher"] = teacher_val
+        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
+
+    # 4. Package / Duration Slot Merge & Deterministic Pricing
+    if flags.get("selected_package") and is_selection_turn:
+        from src.core.coupons import normalize_package_name
+        canonical_pkg = normalize_package_name(flags["selected_package"], course_id=active_course or "yoga")
+        pkg_val = canonical_pkg or flags["selected_package"]
+        new_state["package"] = pkg_val
+        new_state["selected_duration"] = pkg_val
+        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "PACKAGE_SELECTED")
+
+        # Deterministic fee calculation via pricing engine
+        if active_course:
+            pricing = calculate_exact_fee(active_course, pkg_val)
+            if pricing and "total_payable" in pricing:
+                new_state["fee"] = pricing.get("total_payable")
+                new_state["base_fee"] = pricing.get("base_price")
+                new_state["offer_fee"] = pricing.get("offer_price")
+                new_state["gst_amount"] = pricing.get("gst_amount")
+                new_state["gst_percentage"] = pricing.get("gst_percentage")
+
+    # 5. App & Profile State Merge
+    app_stated = flags.get("app_installed_stated", "unmentioned")
+    if app_stated == "confirmed":
+        new_state["app_installed"] = True
+    elif app_stated == "denied":
+        new_state["app_installed"] = False
+
+    profile_stated = flags.get("profile_created_stated", "unmentioned")
+    if profile_stated == "confirmed":
+        new_state["profile_created"] = True
+        new_state["app_installed"] = True
+        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "PROFILE_COMPLETED")
+    elif profile_stated == "denied":
+        new_state["profile_created"] = False
 
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
+
+    if flags.get("claims_payment_or_enrollment"):
+        new_state["claims_payment"] = True
 
     # Language management: Lock selected language until explicitly changed
     from src.core import language_loader
@@ -426,6 +600,11 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
         "wants_trial": flags.get("wants_trial", False),
+        "wants_app_guide": flags.get("wants_app_guide", False),
+        "wants_app_video_guide": flags.get("wants_app_guide", False),
+        "wants_trial_guide": flags.get("wants_trial_guide", False),
+        "wants_trial_video_guide": flags.get("wants_trial_guide", False),
+        "wants_resend_video": flags.get("wants_resend_video", False),
         "requests_human_agent": flags.get("requests_human_agent", False),
         "is_coupon_requested": flags.get("is_coupon_requested", False),
         "is_disinterested": flags.get("is_disinterested", False),
@@ -433,6 +612,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
+        "unoffered_timing_mentioned": flags.get("unoffered_timing_mentioned"),
     }
 
     return new_state

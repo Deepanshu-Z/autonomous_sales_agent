@@ -108,6 +108,7 @@
         "batches": [
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "05:00-06:00",
                 "time_12h": "5:00 AM to 6:00 AM",
                 "instructors": [
@@ -116,6 +117,7 @@
             },
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "06:00-07:00",
                 "time_12h": "6:00 AM to 7:00 AM",
                 "instructors": [
@@ -125,6 +127,7 @@
             },
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "07:00-08:00",
                 "time_12h": "7:00 AM to 8:00 AM",
                 "instructors": [
@@ -133,6 +136,7 @@
             },
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "08:00-09:00",
                 "time_12h": "8:00 AM to 9:00 AM",
                 "instructors": [
@@ -142,6 +146,7 @@
             },
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "10:00-11:00",
                 "time_12h": "10:00 AM to 11:00 AM",
                 "instructors": [
@@ -150,6 +155,7 @@
             },
             {
                 "slot": "Afternoon",
+                "days": "Monday to Friday",
                 "time_24h": "12:00-13:00",
                 "time_12h": "12:00 PM to 1:00 PM",
                 "instructors": [
@@ -158,6 +164,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "16:00-17:00",
                 "time_12h": "4:00 PM to 5:00 PM",
                 "instructors": [
@@ -166,6 +173,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "17:00-18:00",
                 "time_12h": "5:00 PM to 6:00 PM",
                 "instructors": [
@@ -174,6 +182,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "18:00-19:00",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "instructors": [
@@ -182,6 +191,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "19:00-20:00",
                 "time_12h": "7:00 PM to 8:00 PM",
                 "instructors": [

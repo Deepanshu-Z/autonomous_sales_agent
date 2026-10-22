@@ -39,7 +39,7 @@ from src.state.chat_state import (
     matches_any,
     advance_stage,
 )
-from src.services.redis_client import get_redis_connection
+from src.services.redis_client import get_redis_connection, get_async_redis_connection
 from src.core.sales_followup import get_sales_followup
 from src.services.agent_summary import send_agent_summary_async
 from src.services.agent_handoff import execute_agent_handoff_async, get_next_agent_email
@@ -690,7 +690,8 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     t0 = time.perf_counter()
 
     # Developer/tester reset command
-    if text.strip().lower() in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
+    clean_cmd = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text or "", flags=re.IGNORECASE).strip().lower()
+    if clean_cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"] or clean_cmd.startswith("#reset") or clean_cmd.startswith("/reset"):
         await reset_user_state_async(phone)
         reply = "🔄 Session reset successfully! You can now test from the beginning as a new customer. How can I help you? 😊"
         await send_text_message_async(phone, reply)
@@ -708,17 +709,12 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
     if not state.get("welcome_sent") and not has_prior_ai_reply:
         campaign = campaign_loader.match_campaign(referral=referral, text=text)
         if not campaign:
-            if phone.startswith("ig_") or phone.startswith("fb_") or phone.startswith("wa_"):
-                # Meta DM or WhatsApp Cloud: route directly into conversational AI handler instead of dropping
-                print(f"[tasks] {phone}: Direct message with no campaign match — routing directly to conversational AI.")
-                state["is_target_ad"] = True
-                state["welcome_sent"] = True
-                await save_user_state_async(phone, state)
-                await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
-                return
-            else:
-                print(f"[tasks] {phone}: No registered campaign matches referral ad_id — ignoring 1st message.")
-                return
+            print(f"[tasks] {phone}: Direct message with no campaign match — routing directly to conversational AI.")
+            state["is_target_ad"] = True
+            state["welcome_sent"] = True
+            await save_user_state_async(phone, state)
+            await handle_conversation_turn_async(phone, text, history=history, start_time=start_time)
+            return
 
         matched_course = campaign.get("course")
         if matched_course:
@@ -811,8 +807,8 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         pass
 
     # Developer / Tester control commands
-    cmd = text.strip().lower()
-    if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"]:
+    cmd = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text or "", flags=re.IGNORECASE).strip().lower()
+    if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"] or cmd.startswith("#reset") or cmd.startswith("/reset"):
         await reset_user_state_async(phone)
         reply = "🔄 Session reset successfully! Escalation cleared and AI re-enabled. How can I help you? 😊"
         await send_text_message_async(phone, reply)
@@ -837,6 +833,17 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
             reason="AI re-enabled command executed",
         )
         return
+    elif cmd in ["#summary", "/summary", "#info", "#client", "summary"]:
+        from src.core.helpers.client_summary import get_client_summary_async
+        summary_text = await get_client_summary_async(phone)
+        await send_text_message_async(phone, summary_text)
+        log_lead_action(
+            lead_no=phone,
+            lead_details=lead_details,
+            action_taken="REPLIED",
+            reason="Summary command executed",
+        )
+        return
 
     # Check escalation
     if await is_escalated_async(phone):
@@ -850,14 +857,18 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         )
         return
 
-    # Initial lead assignment to Supreme Owner for monitoring
+    # Initial lead assignment to Supreme Owner for monitoring (Interakt only)
     if not state.get("already_assigned"):
-        if OWNER_EMAIL:
+        is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
+        if OWNER_EMAIL and is_interakt:
             success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)
             if success:
                 state["already_assigned"] = True
                 state["assigned_agent_email"] = OWNER_EMAIL
                 await save_user_state_async(phone, state)
+        else:
+            state["already_assigned"] = True
+            await save_user_state_async(phone, state)
 
     # Check for human agent trigger words
     text_lower = text.lower()
@@ -891,36 +902,43 @@ async def process_incoming_message_async(phone: str, text: str, referral: dict =
     If the AI is actively generating a reply for this phone number, new incoming messages
     are safely queued and processed together as 1 clean follow-up turn when active processing ends.
     """
+    ar = get_async_redis_connection()
     proc_lock_key = f"is_processing:{phone}"
     pending_queue_key = f"pending_queue:{phone}"
 
     # Check if AI is currently busy generating a reply for this user
-    if redis_conn.get(proc_lock_key):
-        print(f"[tasks] {phone}: AI is currently busy generating a reply — queueing message '{text}'")
-        redis_conn.rpush(pending_queue_key, text)
-        return
+    try:
+        if await ar.get(proc_lock_key):
+            print(f"[tasks] {phone}: AI is currently busy generating a reply — queueing message '{text}'")
+            await ar.rpush(pending_queue_key, text)
+            return
+    except Exception as e:
+        print(f"[tasks] {phone}: Redis busy check failed (non-fatal): {e}")
 
     # Acquire lock (30s max safety TTL)
-    redis_conn.setex(proc_lock_key, 30, "true")
+    try:
+        await ar.setex(proc_lock_key, 30, "true")
+    except Exception:
+        pass
 
     try:
         await _execute_pipeline_async(phone, text, referral)
     finally:
         # Drain pending queue if any messages arrived while AI was typing
         try:
-            raw_pending = redis_conn.lrange(pending_queue_key, 0, -1)
-            redis_conn.delete(pending_queue_key)
+            raw_pending = await ar.lrange(pending_queue_key, 0, -1)
+            await ar.delete(pending_queue_key)
+            await ar.delete(proc_lock_key)
             if raw_pending:
                 pending_msgs = [m.decode() if isinstance(m, bytes) else m for m in raw_pending]
                 combined_pending = "\n".join(pending_msgs)
                 print(f"[tasks] {phone}: draining {len(pending_msgs)} queued messages -> '{combined_pending}'")
-                # Release processing lock before recursive drain call
-                redis_conn.delete(proc_lock_key)
                 await process_incoming_message_async(phone, combined_pending, referral=referral)
-            else:
-                redis_conn.delete(proc_lock_key)
         except Exception as ex:
-            redis_conn.delete(proc_lock_key)
+            try:
+                await ar.delete(proc_lock_key)
+            except Exception:
+                pass
             print(f"[tasks] {phone}: error during queue drain: {ex}")
 
 

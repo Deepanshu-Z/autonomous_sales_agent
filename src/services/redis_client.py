@@ -42,7 +42,7 @@ def get_upstash_redis():
     """
     if REDIS_URL:
         from redis import Redis as StandardRedis
-        return StandardRedis.from_url(REDIS_URL, decode_responses=True)
+        return StandardRedis.from_url(REDIS_URL, decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
 
     if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         from upstash_redis import Redis as UpstashRedis
@@ -50,7 +50,7 @@ def get_upstash_redis():
         return UpstashRedisWrapper(client)
     
     from redis import Redis as StandardRedis
-    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True)
+    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
 
 
 def get_redis_connection():
@@ -61,14 +61,14 @@ def get_redis_connection():
     from redis import Redis as StandardRedis
 
     if REDIS_URL:
-        return StandardRedis.from_url(REDIS_URL, decode_responses=True)
+        return StandardRedis.from_url(REDIS_URL, decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
 
     if UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
         tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
-        return StandardRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
+        return StandardRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None, socket_timeout=5.0, socket_connect_timeout=5.0)
 
-    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True)
+    return StandardRedis.from_url("redis://localhost:6379", decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
 
 
 _async_redis_clients = {}
@@ -92,13 +92,13 @@ def get_async_redis_connection():
             return _async_redis_clients[loop]
 
     if REDIS_URL:
-        client = AsyncRedis.from_url(REDIS_URL, decode_responses=True)
+        client = AsyncRedis.from_url(REDIS_URL, decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
     elif UPSTASH_REST_URL and UPSTASH_REST_TOKEN:
         host = UPSTASH_REST_URL.replace("https://", "").replace("http://", "").strip("/")
         tcp_url = f"rediss://default:{UPSTASH_REST_TOKEN}@{host}:6379"
-        client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None)
+        client = AsyncRedis.from_url(tcp_url, decode_responses=True, ssl_cert_reqs=None, socket_timeout=5.0, socket_connect_timeout=5.0)
     else:
-        client = AsyncRedis.from_url("redis://localhost:6379", decode_responses=True)
+        client = AsyncRedis.from_url("redis://localhost:6379", decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
 
     if loop:
         _async_redis_clients[loop] = client

@@ -1,7 +1,19 @@
 import sys
 import os
+
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+
+# Auto-switch to virtual environment if running directly with unactivated global Python
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+_venv_python_win = os.path.join(_base_dir, "venv", "Scripts", "python.exe")
+_venv_python_unix = os.path.join(_base_dir, "venv", "bin", "python")
+_venv_python = _venv_python_win if os.path.exists(_venv_python_win) else (_venv_python_unix if os.path.exists(_venv_python_unix) else None)
+
+if _venv_python and os.path.abspath(sys.executable).lower() != os.path.abspath(_venv_python).lower() and __name__ == "__main__":
+    import subprocess
+    sys.exit(subprocess.call([_venv_python, os.path.abspath(__file__)] + sys.argv[1:]))
+
 import uvicorn
 from dotenv import load_dotenv
 
@@ -24,12 +36,17 @@ def check_env_vars():
         "REDIS_URL",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
+        "PHONE_NUMBER_ID",
+        "WHATSAPP_TOKEN",
         "QDRANT_URL",
         "QDRANT_API_KEY",
         "PRIORITY_AGENT_EMAIL",
         "OWNER_EMAIL",
         "TARGET_AD_ID",
         "TARGET_MESSAGE_TEXT",
+        "RAZORPAY_KEY_ID",
+        "RAZORPAY_KEY_SECRET",
+        "RAZORPAY_WEBHOOK_SECRET",
     ]
 
     print("=" * 60)
@@ -72,6 +89,7 @@ if __name__ == "__main__":
 
     print(f"\n🌐 Starting uvicorn on {host}:{port}")
     print(f"   Webhook URL:         http://{host}:{port}/webhook")
+    print(f"   Razorpay Webhook:    http://{host}:{port}/api/razorpay/webhook")
     print(f"   Interakt Test URL:   http://{host}:{port}/test-webhook")
     print(f"   WhatsApp Cloud URL:  http://{host}:{port}/test-whatsapp-webhook\n")
 

@@ -86,8 +86,19 @@ async def send_text_message_async(phone: str, message: str):
         return None
 
 
+import re
+
+
 def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
-    payload = {"user_phone_number": phone, "agent_email": agent_email}
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_") or clean_phone.startswith("wa_"):
+        return True
+
+    digits_only = re.sub(r"\D", "", clean_phone)
+    if len(digits_only) < 10:
+        return True
+
+    payload = {"user_phone_number": clean_phone, "agent_email": agent_email}
     t0 = time.perf_counter()
     try:
         response = httpx.post(
@@ -115,11 +126,15 @@ def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
 
 async def assign_chat_to_agent_async(phone: str, agent_email: str) -> bool:
     clean_phone = str(phone or "").strip()
-    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
-        print(f"[interakt] Meta user {clean_phone} handoff to {agent_email} noted (managed via Meta Inbox).")
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_") or clean_phone.startswith("wa_"):
+        # Cloud API & Meta channels do not use Interakt agent assignment
         return True
 
-    payload = {"user_phone_number": phone, "agent_email": agent_email}
+    digits_only = re.sub(r"\D", "", clean_phone)
+    if len(digits_only) < 10:
+        return True
+
+    payload = {"user_phone_number": clean_phone, "agent_email": agent_email}
     t0 = time.perf_counter()
     try:
         client = _get_async_client()
@@ -166,7 +181,11 @@ def verify_webhook_signature(payload: bytes, signature: str) -> bool:
 
 
 def send_text_message(phone: str, message: str):
-    country_code, number = _split_phone(phone)
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_") or clean_phone.startswith("wa_"):
+        return None
+
+    country_code, number = _split_phone(clean_phone)
     payload = {
         "countryCode": country_code,
         "phoneNumber": number,
@@ -214,6 +233,17 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
             print(f"[interakt] send_video_message_async Meta error for {clean_phone}: {e}")
         return False
 
+    if clean_phone.startswith("wa_"):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_video_async
+        recipient_id = clean_phone.split("_", 1)[1]
+        try:
+            res = await send_whatsapp_cloud_video_async(recipient_id, video_url, caption=caption)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[interakt] send_video_message_async WhatsApp Cloud error for {clean_phone}: {e}")
+        return False
+
     country_code, number = _split_phone(clean_phone)
     payload = {
         "countryCode": country_code,
@@ -247,3 +277,70 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
         elapsed = time.perf_counter() - t0
         print(f"[interakt] send_video_message_async error ({elapsed:.2f}s): {e}")
         return False
+
+
+async def send_image_message_async(phone: str, image_url: str, caption: str = "") -> bool:
+    """
+    Sends an image file (PNG/JPEG) to WhatsApp via Interakt or to Meta DMs via Graph API.
+    Returns True if successfully delivered, False on timeout or failure.
+    """
+    if not image_url:
+        return False
+    clean_phone = str(phone or "").strip()
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        from src.services.meta_client import send_media_message_async
+        recipient_id = clean_phone.split("_", 1)[1]
+        channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
+        try:
+            res = await send_media_message_async(recipient_id, "image", image_url, channel=channel)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[interakt] send_image_message_async Meta error for {clean_phone}: {e}")
+        return False
+
+    if clean_phone.startswith("wa_"):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_image_async
+        recipient_id = clean_phone.split("_", 1)[1]
+        try:
+            res = await send_whatsapp_cloud_image_async(recipient_id, image_url, caption=caption)
+            if isinstance(res, dict) and "error" not in res:
+                return True
+        except Exception as e:
+            print(f"[interakt] send_image_message_async WhatsApp Cloud error for {clean_phone}: {e}")
+        return False
+
+    country_code, number = _split_phone(clean_phone)
+    payload = {
+        "countryCode": country_code,
+        "phoneNumber": number,
+        "type": "Image",
+        "data": {
+            "mediaUrl": image_url,
+            "caption": caption or "",
+        },
+    }
+    t0 = time.perf_counter()
+    try:
+        client = _get_async_client()
+        response = await client.post(
+            f"{BASE_URL}/message/",
+            headers=_headers(),
+            json=payload,
+        )
+        elapsed = time.perf_counter() - t0
+        if response.status_code in (200, 201):
+            print(f"[interakt] send_image_message_async SUCCESS ({elapsed:.2f}s)")
+            return True
+        else:
+            print(f"[interakt] send_image_message_async failed: {response.status_code} ({response.text})")
+            return False
+    except httpx.TimeoutException:
+        elapsed = time.perf_counter() - t0
+        print(f"[interakt] send_image_message_async TIMEOUT after {elapsed:.2f}s")
+        return False
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        print(f"[interakt] send_image_message_async error ({elapsed:.2f}s): {e}")
+        return False
+

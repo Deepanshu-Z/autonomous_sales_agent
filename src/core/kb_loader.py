@@ -247,276 +247,32 @@ def get_course_prompt_str(course_id: Optional[str] = None, minified: bool = True
     return prompt_str
 
 
-def get_valid_timings(course_id: Optional[str] = None) -> List[str]:
-    """Dynamically extracts valid batch timings straight from the course JSON — never a hand-typed list."""
-    if not course_id:
-        return []
-    data = get_course_data(course_id)
-    batches = data.get("batch_timings", {}).get("batches", [])
-    valid_timings = []
-    for b in batches:
-        t = b.get("time_12h", "")
-        m = re.match(r"(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))", t, re.IGNORECASE)
-        if m:
-            start, end = m.group(1).strip(), m.group(2).strip()
-            sp, ep = start.split(), end.split()
-            canonical = f"{sp[0]}–{ep[0]} {ep[1].upper()}" if sp[1].upper() == ep[1].upper() else f"{start}–{end}"
-            valid_timings.append(canonical)
-        elif t:
-            valid_timings.append(t)
-    # Deduplicate while preserving order across multi-teacher/day-pair batches
-    seen = set()
-    deduped = []
-    for vt in valid_timings:
-        if vt not in seen:
-            seen.add(vt)
-            deduped.append(vt)
-    return deduped
+# ── Re-exported Schedule & Timing Helpers (from src.core.helpers.schedule_engine) ──
+from src.core.helpers.schedule_engine import (
+    classify_time_period,
+    get_available_timings,
+    get_valid_timings,
+    get_teachers_for_slot,
+    get_slots_for_teacher,
+    get_course_time_periods,
+    format_batch_timings_display,
+    format_teacher_batch_schedule,
+)
 
+# ── Re-exported Pricing & Package Helpers (from src.core.pricing_engine) ──
+from src.core.pricing_engine import (
+    get_course_gst_percentage,
+    get_valid_packages,
+    get_package_by_duration,
+    calculate_exact_fee,
+    get_course_coupons,
+    format_package_fees_display,
+    get_pricing_and_timings_summary,
+    format_order_summary,
+    get_order_summary_details,
+    generate_order_summary,
+)
 
-def classify_time_period(time_str: str) -> Optional[str]:
-    """Dynamically categorizes any timing string into 'Morning', 'Afternoon', or 'Evening'.
-    - Morning (AM): 4:00 AM – 11:59 AM
-    - Afternoon (PM): 12:00 PM – 3:59 PM
-    - Evening (PM): 4:00 PM – 11:59 PM
-    """
-    if not time_str:
-        return None
-    m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM)", time_str, re.IGNORECASE)
-    if not m:
-        m24 = re.search(r"(\d{1,2}):(\d{2})", time_str)
-        if m24:
-            hr = int(m24.group(1))
-            if 4 <= hr < 12:
-                return "Morning"
-            elif 12 <= hr < 16:
-                return "Afternoon"
-            elif 16 <= hr <= 23:
-                return "Evening"
-        return None
-    hr = int(m.group(1))
-    merid = m.group(3).upper()
-    if merid == "AM":
-        return "Morning"
-    else:
-        if hr == 12 or 1 <= hr < 4:
-            return "Afternoon"
-        return "Evening"
-
-
-def get_course_time_periods(course_id: Optional[str] = None) -> Dict[str, Any]:
-    """Dynamically parses and categorizes all batches for a course into time periods:
-    'Morning', 'Afternoon', and 'Evening'. Zero hardcoding.
-    Returns:
-    {
-        "has_timings": bool,
-        "available_periods": List[str], # e.g. ["Evening"] or ["Morning", "Afternoon", "Evening"]
-        "missing_periods": List[str],   # e.g. ["Morning", "Afternoon"]
-        "batches_by_period": Dict[str, List[str]],
-        "summary": str
-    }
-    """
-    if not course_id:
-        return {
-            "has_timings": False,
-            "available_periods": [],
-            "missing_periods": ["Morning", "Afternoon", "Evening"],
-            "batches_by_period": {},
-            "summary": "Check official app/website for schedule.",
-        }
-    data = get_course_data(course_id)
-    batches = data.get("batch_timings", {}).get("batches", [])
-    if not batches:
-        return {
-            "has_timings": False,
-            "available_periods": [],
-            "missing_periods": ["Morning", "Afternoon", "Evening"],
-            "batches_by_period": {},
-            "summary": "Live batch schedules are available on the Sensationz App and website.",
-        }
-
-    batches_by_period: Dict[str, List[str]] = {"Morning": [], "Afternoon": [], "Evening": []}
-    for b in batches:
-        t = b.get("time_12h", "") or b.get("time_24h", "")
-        period = classify_time_period(t)
-        if not period and b.get("slot") in ("Morning", "Afternoon", "Evening"):
-            period = b.get("slot")
-        if period and period in batches_by_period:
-            if t and t not in batches_by_period[period]:
-                batches_by_period[period].append(t)
-
-    available = [p for p in ["Morning", "Afternoon", "Evening"] if batches_by_period[p]]
-    missing = [p for p in ["Morning", "Afternoon", "Evening"] if not batches_by_period[p]]
-
-    course_name = data.get("course_overview", {}).get("name", course_id.title())
-    if len(available) == 1:
-        only_p = available[0]
-        missing_str = " or ".join(missing)
-        summary = (
-            f"Batches are held in the {only_p} only ({', '.join(batches_by_period[only_p])}). "
-            f"CRITICAL: {course_name} has NO {missing_str} batches!"
-        )
-    elif available:
-        descs = [f"{p} ({', '.join(batches_by_period[p])})" for p in available]
-        missing_str = f" (NO {' or '.join(missing)} batches)" if missing else ""
-        summary = f"Batches available: {'; '.join(descs)}{missing_str}."
-    else:
-        summary = "Check the Sensationz App or website for live batch schedules."
-
-    return {
-        "has_timings": True,
-        "available_periods": available,
-        "missing_periods": missing,
-        "batches_by_period": batches_by_period,
-        "summary": summary,
-    }
-
-
-
-def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
-    """Dynamically extracts package names + formatted fee strings from the course JSON."""
-    if not course_id:
-        return {}
-    data = get_course_data(course_id)
-    packages = data.get("pricing", {}).get("packages", [])
-    valid_pkgs = {}
-    for p in packages:
-        duration = p.get("duration")
-        if not duration:
-            continue
-        base = p.get("base_price")
-        offer = p.get("offer_price")
-        coupon = p.get("coupon_code")
-        if base is not None and offer is not None:
-            coupon_str = f" with coupon *{coupon}*" if coupon else ""
-            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,}{coupon_str})"
-        elif base is not None and coupon:
-            valid_pkgs[duration] = f"₹{base:,} (Coupon: {coupon})"
-        elif base is not None:
-            valid_pkgs[duration] = f"₹{base:,}"
-        elif offer is not None:
-            valid_pkgs[duration] = f"Offer Price: ₹{offer:,}"
-    return valid_pkgs
-
-
-def get_pricing_and_timings_summary(course_id: str) -> Dict[str, Any]:
-    """Compact packages+timings for CROSS-course reference blocks — no coupon
-    codes, no teachers/syllabus/policies. Used when a course is relevant but
-    isn't the active one this turn."""
-    data = get_course_data(course_id)
-    entry = get_catalog_entry(course_id) or {}
-    return {
-        "name": data.get("course_overview", {}).get("name", entry.get("name", course_id.title())),
-        "packages": get_valid_packages(course_id),
-        "timings": get_valid_timings(course_id),
-    }
-
-
-def get_course_coupons(course_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
-    """Dynamically extracts coupon codes per package duration — zero hardcoded codes."""
-    if not course_id:
-        return {}
-    data = get_course_data(course_id)
-    packages = data.get("pricing", {}).get("packages", [])
-    cid_upper = course_id.upper().replace(" ", "_")
-    coupons = {}
-    for pkg in packages:
-        duration = pkg.get("duration")
-        if not duration:
-            continue
-        offer = pkg.get("offer_price")
-        base = pkg.get("base_price", 0)
-        coupons[duration] = {
-            "code": pkg.get("coupon_code") or f"{cid_upper}{offer if offer is not None else base}",
-            "base_price": base,
-            "offer_price": offer if offer is not None else base,
-            "duration": duration,
-        }
-    return coupons
-
-
-def format_batch_timings_display(course_id: Optional[str] = None) -> str:
-    if not course_id:
-        return ""
-    data = get_course_data(course_id)
-    batches = data.get("batch_timings", {}).get("batches", [])
-    slots: Dict[str, List[str]] = {}
-    for b in batches:
-        slot_name = b.get("slot") or b.get("days") or "Available"
-        slot_name = slot_name.strip()
-        t = b.get("time_12h", "")
-        if t and t not in slots.setdefault(slot_name, []):
-            slots[slot_name].append(t)
-    if not slots:
-        return "• Flexible batch timings available — check the app/website for the current schedule."
-    lines = []
-    for slot, times in slots.items():
-        formatted_slot = slot.replace("/", " & ")
-        lines.append(f"• *{formatted_slot}:* " + ", ".join(times))
-    return "\n".join(lines)
-
-
-def format_teacher_batch_schedule(course_id: Optional[str] = None) -> str:
-    """Pre-computes a human-readable teacher → batch timings mapping from course JSON.
-    Injected into the system prompt so the LLM doesn't need to traverse minified JSON
-    to answer teacher-specific timing queries — eliminates teacher-timing hallucinations."""
-    if not course_id:
-        return ""
-    data = get_course_data(course_id)
-    batches = data.get("batch_timings", {}).get("batches", [])
-    if not batches:
-        return ""
-
-    # Build teacher -> list of (days, time) tuples
-    teacher_map: Dict[str, List[str]] = {}
-    for b in batches:
-        days = b.get("days") or b.get("slot") or ""
-        time_str = b.get("time_12h", "")
-        if not days or not time_str:
-            continue
-        for instructor in b.get("instructors", []):
-            teacher_map.setdefault(instructor, []).append(f"{days} {time_str}")
-
-    if not teacher_map:
-        return ""
-
-    lines = []
-    for teacher, slots in teacher_map.items():
-        # Deduplicate while preserving order
-        seen = set()
-        unique_slots = []
-        for s in slots:
-            if s not in seen:
-                seen.add(s)
-                unique_slots.append(s)
-        lines.append(f"• {teacher}: {' | '.join(unique_slots)}")
-    return "\n".join(lines)
-
-
-def get_course_gst_percentage(course_id: Optional[str] = None) -> int:
-    """Dynamically retrieves the official GST percentage for the course (e.g. 18 for Kathak, 5 for Yoga/Face Yoga)."""
-    if not course_id:
-        return 5
-    data = get_course_data(course_id)
-    pricing = data.get("pricing", {})
-    if pricing.get("gst_percentage") is not None:
-        return int(pricing["gst_percentage"])
-    entry = get_catalog_entry(course_id)
-    if entry and entry.get("gst_percentage") is not None:
-        return int(entry["gst_percentage"])
-    return 5
-
-
-def format_package_fees_display(course_id: Optional[str] = None) -> str:
-    if not course_id:
-        return ""
-    pkgs = get_valid_packages(course_id)
-    if not pkgs:
-        return ""
-    gst_pct = get_course_gst_percentage(course_id)
-    lines = [f"• *{pkg}:* {fee}" for pkg, fee in pkgs.items()]
-    lines.append(f"\n*Note:* {gst_pct}% GST will be applicable at checkout on the app/website.")
-    return "\n".join(lines)
 
 
 def format_demo_videos_display(course_id: Optional[str] = None) -> str:
@@ -619,3 +375,30 @@ def is_app_link_request_fallback(text: str) -> bool:
 
 # Backward-compatible alias for existing test suites and modules
 detect_course_from_text = detect_course_from_text_fallback
+
+# Backward-compatible helper re-exports from src.core.helpers
+from src.core.helpers.schedule_engine import (
+    classify_time_period,
+    get_available_timings,
+    get_valid_timings,
+    get_teachers_for_slot,
+    get_slots_for_teacher,
+    get_course_time_periods,
+    format_batch_timings_display,
+    format_teacher_batch_schedule,
+    get_course_instructors,
+    resolve_canonical_teacher,
+)
+
+from src.core.pricing_engine import (
+    get_course_gst_percentage,
+    get_valid_packages,
+    get_package_by_duration,
+    calculate_exact_fee,
+    get_course_coupons,
+    format_package_fees_display,
+    get_pricing_and_timings_summary,
+    format_order_summary,
+    get_order_summary_details,
+    generate_order_summary,
+)

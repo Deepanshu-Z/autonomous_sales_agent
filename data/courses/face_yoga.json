@@ -107,6 +107,7 @@
         "batches": [
             {
                 "slot": "Morning",
+                "days": "Monday to Friday",
                 "time_24h": "07:00-08:00",
                 "time_12h": "7:00 AM to 8:00 AM",
                 "instructors": [
@@ -115,6 +116,7 @@
             },
             {
                 "slot": "Afternoon",
+                "days": "Monday to Friday",
                 "time_24h": "12:00-13:00",
                 "time_12h": "12:00 PM to 1:00 PM",
                 "instructors": [
@@ -123,6 +125,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "16:00-17:00",
                 "time_12h": "4:00 PM to 5:00 PM",
                 "instructors": [
@@ -131,6 +134,7 @@
             },
             {
                 "slot": "Evening",
+                "days": "Monday to Friday",
                 "time_24h": "18:00-19:00",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "instructors": [

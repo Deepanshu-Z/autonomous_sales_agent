@@ -97,42 +97,49 @@
     "batches": [
       {
         "slot": "Morning",
+        "days": "Monday to Friday",
         "time_24h": "11:00-12:00",
         "time_12h": "11:00 AM to 12:00 PM",
         "instructors": ["Aditi Vyas"]
       },
       {
         "slot": "Afternoon",
+        "days": "Monday to Friday",
         "time_24h": "12:00-13:00",
         "time_12h": "12:00 PM to 1:00 PM",
         "instructors": ["Aditi Vyas"]
       },
       {
         "slot": "Afternoon",
+        "days": "Monday to Friday",
         "time_24h": "13:00-14:00",
         "time_12h": "1:00 PM to 2:00 PM",
         "instructors": ["Lokesh Kumar"]
       },
       {
         "slot": "Evening",
+        "days": "Monday to Friday",
         "time_24h": "16:00-17:00",
         "time_12h": "4:00 PM to 5:00 PM",
         "instructors": ["Gresi Gurung"]
       },
       {
         "slot": "Evening",
+        "days": "Monday to Friday",
         "time_24h": "17:00-18:00",
         "time_12h": "5:00 PM to 6:00 PM",
         "instructors": ["Mansi Pal"]
       },
       {
         "slot": "Evening",
+        "days": "Monday to Friday",
         "time_24h": "18:00-19:00",
         "time_12h": "6:00 PM to 7:00 PM",
         "instructors": ["Aditi Vyas"]
       },
       {
         "slot": "Evening",
+        "days": "Monday to Friday",
         "time_24h": "20:00-21:00",
         "time_12h": "8:00 PM to 9:00 PM",
         "instructors": ["Aditi Vyas"]

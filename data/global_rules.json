@@ -106,12 +106,10 @@
         "how_to_create_profile_video_url": "https://youtube.com/shorts/EekAQFAM_HQ?feature=share",
         "video_caption": "🎬 How to Download Sensationz App & Create Profile",
         "steps": [
-            "Select preferred batch timing",
-            "Select package duration (1M / 3M / 6M / 1Y)",
-            "Download the Sensationz App or visit the website",
-            "Create your profile (login via Google)",
-            "Apply coupon received with pricing at checkout for offer price",
-            "Complete payment"
+            "Select your preferred batch timing and package duration",
+            "Complete payment via UPI QR code or Sensationz App / website checkout",
+            "Download the Sensationz App and log in using your registered phone number",
+            "Access your live interactive classes under 'My Classes' on your dashboard"
         ],
         "payment_platform": "Sensationz App or official website only",
         "coupon_delivery": "Provided upfront with package pricing"

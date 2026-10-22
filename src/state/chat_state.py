@@ -26,7 +26,7 @@ except Exception as e:
 # In-memory session dictionary: maps unique phone number -> user state dictionary
 import time
 import threading
-_memory_lock = threading.Lock()
+_memory_lock = threading.RLock()
 _memory_sessions: dict[str, dict] = {}
 
 
@@ -39,8 +39,12 @@ def matches_any(text: str, words: list[str]) -> bool:
         return any(fuzz.ratio(t, w) > 85 for w in words)
     return False
 
-STAGE_ORDER = ["NEW", "ENROLL_ASKED", "ENROLL_CONFIRMED", "TIMING_SELECTED", "PACKAGE_ASKED", "TRIAL_REQUESTED", "TRIAL_STEPS_SENT",
-               "PACKAGE_SELECTED", "READY_FOR_APP_LINK", "APP_LINK_SENT", "PROFILE_COMPLETED", "COUPON_SENT"]
+STAGE_ORDER = [
+    "NEW", "ENROLL_ASKED", "ENROLL_CONFIRMED", "TIMING_SELECTED", "TEACHER_SELECTED",
+    "PACKAGE_ASKED", "TRIAL_REQUESTED", "TRIAL_STEPS_SENT", "PACKAGE_SELECTED",
+    "PAYMENT_QR_SENT", "PAYMENT_CONFIRMED", "READY_FOR_APP_LINK", "APP_LINK_SENT",
+    "PROFILE_COMPLETED", "COUPON_SENT", "ENROLLED"
+]
 
 
 def advance_stage(current: str, proposed: str) -> str:
@@ -118,10 +122,19 @@ def get_default_state(phone: str) -> dict:
     """
     return {
         "phone": phone,               # Customer's unique phone number key
-        "stage": "NEW",               # Funnel stage: NEW -> ENROLL_ASKED -> ENROLL_CONFIRMED -> TIMING_SELECTED -> PACKAGE_SELECTED -> READY_FOR_APP_LINK -> APP_LINK_SENT -> PROFILE_COMPLETED -> COUPON_SENT
-        "timing": None,               # Selected batch timing string (e.g. "7:00–8:00 AM")
-        "package": None,              # Selected package string (e.g. "3 Months")
+        "stage": "NEW",               # Funnel stage: NEW -> ENROLL_ASKED -> ENROLL_CONFIRMED -> TIMING_SELECTED -> TEACHER_SELECTED -> PACKAGE_SELECTED -> PAYMENT_QR_SENT -> PAYMENT_CONFIRMED -> ENROLLED
+        "timing": None,               # Selected batch timing string (e.g. "7:00–8:00 AM", syncs with selected_timing)
+        "package": None,              # Selected package string (e.g. "3 Months", syncs with selected_duration)
         "fee": None,                  # Package fee string (e.g. "₹1,750")
+
+        # New Interactive Sales & Razorpay Payment Flow Fields
+        "selected_timing": None,      # Selected batch timing string (e.g. "5:00 PM to 6:00 PM")
+        "selected_teacher": None,     # Selected instructor name (e.g. "Ms. Madhuri")
+        "selected_duration": None,    # Selected package duration (e.g. "3 Months")
+        "order_id": None,             # Razorpay Order ID / QR ID (e.g. "qr_xxxx")
+        "payment_status": "NONE",     # Payment lifecycle: "NONE" | "PENDING" | "PAID"
+        "reset_at": int(time.time()), # Epoch timestamp when state was initialized / reset
+
         "app_installed": False,       # Boolean flag indicating if user installed the Sensationz App
         "profile_created": False,     # Boolean flag indicating if user created an in-app profile
         "coupon_sent": False,         # Boolean flag indicating if welcome coupon code was delivered
@@ -153,6 +166,57 @@ def arm_followup_timer(state: dict, topic:str , delay_seconds:int = 300):
     state["follow_up_count"] = 0
 
 
+def get_phone_variants(phone: str) -> list:
+    """Returns canonical and common key representations for an Indian phone number."""
+    digits = re.sub(r"\D", "", phone)
+    last10 = digits[-10:] if len(digits) >= 10 else digits
+    if not last10:
+        return [phone]
+    return list(dict.fromkeys([
+        phone,
+        f"wa_91{last10}",
+        f"91{last10}",
+        last10,
+        f"+91{last10}",
+        f"wa_{last10}"
+    ]))
+
+
+def _check_sync_paid_status(phone: str, state: dict) -> dict:
+    if state.get("payment_status") == "PAID":
+        return state
+    variants = [p for p in get_phone_variants(phone) if p != phone]
+    if not variants:
+        return state
+    # 1. First check in-memory cache (0ms)
+    for alt_phone in variants:
+        with _memory_lock:
+            entry = _memory_sessions.get(alt_phone)
+        if entry:
+            alt_st = entry[0] if isinstance(entry, tuple) else entry
+            if alt_st and alt_st.get("payment_status") == "PAID":
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "selected_duration", "package", "fee"]:
+                    if alt_st.get(k) is not None:
+                        state[k] = alt_st[k]
+                return state
+    # 2. Check Redis with a single round-trip mget
+    try:
+        keys = [f"user_state:{alt}" for alt in variants]
+        raw_list = redis_conn.mget(keys)
+        for raw in raw_list:
+            if not raw:
+                continue
+            alt_st = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+            if isinstance(alt_st, dict) and alt_st.get("payment_status") == "PAID":
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "selected_duration", "package", "fee"]:
+                    if alt_st.get(k) is not None:
+                        state[k] = alt_st[k]
+                return state
+    except Exception:
+        pass
+    return state
+
+
 def get_user_state(phone: str) -> dict:
     """
     Retrieves active session state dictionary for a phone number.
@@ -161,15 +225,19 @@ def get_user_state(phone: str) -> dict:
     MEMORY_TTL = 5  # seconds — prevents stale reads in multi-worker mode
 
     # 1. Check in-memory cache (with TTL)
+    cached_to_check = None
     with _memory_lock:
         if phone in _memory_sessions:
             entry = _memory_sessions[phone]
             if isinstance(entry, tuple):
                 cached_state, cached_at = entry
                 if (time.time() - cached_at) < MEMORY_TTL:
-                    return cached_state
+                    cached_to_check = dict(cached_state)
             elif isinstance(entry, dict):
-                return entry  # legacy format, no TTL
+                cached_to_check = dict(entry)
+
+    if cached_to_check is not None:
+        return _check_sync_paid_status(phone, cached_to_check)
 
     # 2. Check Redis cache (persists across server restarts)
     state = get_default_state(phone)
@@ -179,6 +247,16 @@ def get_user_state(phone: str) -> dict:
         if raw_state:
             cached_dict = json.loads(raw_state)
             state.update(cached_dict)
+            # Bidirectional slot synchronization
+            if state.get("selected_timing") and not state.get("timing"):
+                state["timing"] = state["selected_timing"]
+            elif state.get("timing") and not state.get("selected_timing"):
+                state["selected_timing"] = state["timing"]
+            if state.get("selected_duration") and not state.get("package"):
+                state["package"] = state["selected_duration"]
+            elif state.get("package") and not state.get("selected_duration"):
+                state["selected_duration"] = state["package"]
+            state = _check_sync_paid_status(phone, state)
             with _memory_lock:
                 _memory_sessions[phone] = (state, time.time())
             return state
@@ -192,15 +270,40 @@ def get_user_state(phone: str) -> dict:
             if res.data and len(res.data) > 0:
                 row = dict(res.data[0])
                 raw_topic = row.get("last_topic") or ""
-                if isinstance(raw_topic, str) and raw_topic.startswith("COURSE:"):
-                    parts = raw_topic.split("||", 1)
-                    c_id = parts[0].replace("COURSE:", "").strip()
-                    if c_id:
-                        row["course"] = c_id
-                    row["last_topic"] = parts[1] if len(parts) > 1 else ""
+                if isinstance(raw_topic, str) and ("COURSE:" in raw_topic or "TEACHER:" in raw_topic or "PAY:" in raw_topic or "ORDER:" in raw_topic):
+                    parts = raw_topic.split("||")
+                    clean_topic_parts = []
+                    for part in parts:
+                        part_str = part.strip()
+                        if part_str.startswith("COURSE:"):
+                            c_id = part_str.replace("COURSE:", "").strip()
+                            if c_id:
+                                row["course"] = c_id
+                        elif part_str.startswith("TEACHER:"):
+                            t_name = part_str.replace("TEACHER:", "").strip()
+                            if t_name:
+                                row["selected_teacher"] = t_name
+                        elif part_str.startswith("PAY:"):
+                            p_stat = part_str.replace("PAY:", "").strip()
+                            if p_stat:
+                                row["payment_status"] = p_stat
+                        elif part_str.startswith("ORDER:"):
+                            o_id = part_str.replace("ORDER:", "").strip()
+                            if o_id:
+                                row["order_id"] = o_id
+                        else:
+                            clean_topic_parts.append(part_str)
+                    row["last_topic"] = "||".join(clean_topic_parts)
+                # Sync timing & duration from database row
+                if row.get("timing") and not row.get("selected_timing"):
+                    row["selected_timing"] = row["timing"]
+                if row.get("package") and not row.get("selected_duration"):
+                    row["selected_duration"] = row["package"]
                 state.update(row)
         except Exception as e:
             print(f"[chat_state] Supabase get_user_state read failed: {e}")
+
+    state = _check_sync_paid_status(phone, state)
 
     # Save to Redis & memory cache for future fast reads
     with _memory_lock:
@@ -217,13 +320,29 @@ def save_user_state(phone: str, state: dict):
     """
     Persists updated session state dictionary across Memory, Redis, and Supabase.
     """
+    # Bidirectional slot synchronization before saving
+    if state.get("selected_timing") and not state.get("timing"):
+        state["timing"] = state["selected_timing"]
+    elif state.get("timing") and not state.get("selected_timing"):
+        state["selected_timing"] = state["timing"]
+    if state.get("selected_duration") and not state.get("package"):
+        state["package"] = state["selected_duration"]
+    elif state.get("package") and not state.get("selected_duration"):
+        state["selected_duration"] = state["package"]
+
     with _memory_lock:
         _memory_sessions[phone] = (state, time.time())
     redis_key = f"user_state:{phone}"
 
-    # Persist in Redis across restarts
+    # Persist in Redis across restarts (stores all keys natively in JSON)
     try:
         redis_conn.setex(redis_key, STATE_CACHE_TTL, json.dumps(state))
+        if state.get("payment_status") == "PAID":
+            for alt_phone in get_phone_variants(phone):
+                if alt_phone != phone:
+                    redis_conn.setex(f"user_state:{alt_phone}", STATE_CACHE_TTL, json.dumps(state))
+                    with _memory_lock:
+                        _memory_sessions[alt_phone] = (state, time.time())
     except Exception as e:
         print(f"[chat_state] Redis save_user_state failed (non-fatal): {e}")
 
@@ -238,10 +357,29 @@ def save_user_state(phone: str, state: dict):
             }
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
             db_state["phone"] = phone
+            db_state["timing"] = state.get("selected_timing") or state.get("timing")
+            db_state["package"] = state.get("selected_duration") or state.get("package")
+
+            # Encode metadata safely in last_topic to avoid schema cache errors
+            meta_parts = []
             course_val = state.get("course") or ""
-            topic_val = str(state.get("last_topic") or "")
             if course_val:
-                db_state["last_topic"] = f"COURSE:{course_val}||{topic_val}"[:200]
+                meta_parts.append(f"COURSE:{course_val}")
+            teacher_val = state.get("selected_teacher") or ""
+            if teacher_val:
+                meta_parts.append(f"TEACHER:{teacher_val}")
+            pay_val = state.get("payment_status") or ""
+            if pay_val and pay_val != "NONE":
+                meta_parts.append(f"PAY:{pay_val}")
+            order_val = state.get("order_id") or ""
+            if order_val:
+                meta_parts.append(f"ORDER:{order_val}")
+
+            topic_val = str(state.get("last_topic") or "")
+            meta_header = "||".join(meta_parts)
+            if meta_header:
+                db_state["last_topic"] = f"{meta_header}||{topic_val}"[:200]
+
             if "next_followup_due_at" in db_state and db_state["next_followup_due_at"] is not None:
                 val = db_state["next_followup_due_at"]
                 if isinstance(val, (int, float)):
@@ -250,6 +388,7 @@ def save_user_state(phone: str, state: dict):
             supabase.table("user_session_state").upsert(db_state, on_conflict="phone").execute()
         except Exception as e:
             print(f"[chat_state] Supabase save_user_state failed: {e}")
+
 
 
 # ---------------------------------------------------------------------------
@@ -277,24 +416,42 @@ async def clear_escalation_async(phone: str):
 
 
 def reset_user_state(phone: str) -> dict:
-    """Completely resets a user's session state in-memory, in Redis, and in Supabase."""
+    """Completely resets a user's session state in-memory, in Redis, and in Supabase across all phone variants."""
+    variants = get_phone_variants(phone)
     with _memory_lock:
-        _memory_sessions.pop(phone, None)
-    try:
-        redis_conn.delete(f"user_state:{phone}")
-        redis_conn.delete(f"phone-lock:{phone}")
-        redis_conn.delete(f"is_processing:{phone}")
-        redis_conn.delete(f"pending_queue:{phone}")
-    except Exception as e:
-        print(f"[chat_state] Redis reset error for {phone}: {e}")
+        for v in variants:
+            _memory_sessions.pop(v, None)
+
+    for v in variants:
+        try:
+            redis_conn.delete(f"user_state:{v}")
+            redis_conn.delete(f"phone-lock:{v}")
+            redis_conn.delete(f"is_processing:{v}")
+            redis_conn.delete(f"pending_queue:{v}")
+            redis_conn.delete(f"history:{v}")
+        except Exception as e:
+            print(f"[chat_state] Redis reset error for {v}: {e}")
+
     if supabase:
         try:
-            supabase.table("user_session_state").delete().eq("phone", phone).execute()
-            supabase.table("escalated_chats").delete().eq("phone", phone).execute()
+            for v in variants:
+                supabase.table("user_session_state").delete().eq("phone", v).execute()
+                supabase.table("escalated_chats").delete().eq("phone", v).execute()
+                supabase.table("chat_history").delete().eq("phone", v).execute()
         except Exception as e:
             print(f"[chat_state] Supabase reset error for {phone}: {e}")
+
     initial = get_default_state(phone)
-    save_user_state(phone, initial)
+    for v in variants:
+        st = get_default_state(v)
+        redis_key = f"user_state:{v}"
+        try:
+            redis_conn.setex(redis_key, STATE_CACHE_TTL, json.dumps(st))
+        except Exception:
+            pass
+        with _memory_lock:
+            _memory_sessions[v] = (st, time.time())
+
     return initial
 
 

@@ -160,8 +160,9 @@ async def execute_agent_handoff_async(
         asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE, response_time_sec=latency_sec))
         asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
 
-    # 4. Assign chat in Interakt
-    if agent:
+    # 4. Assign chat in Interakt (native Interakt WhatsApp leads only)
+    is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
+    if agent and is_interakt:
         assignment_success = await assign_chat_to_agent_async(phone, agent)
         print(f"[agent_handoff] Interakt assignment to {agent}: {assignment_success}")
 

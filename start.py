@@ -97,7 +97,7 @@ if __name__ == "__main__":
         "main:app",
         host=host,
         port=port,
-        workers=1,  # Single worker — in-memory state requires it
+        reload=True,
         log_level="info",
     )
 

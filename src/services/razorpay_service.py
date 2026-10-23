@@ -365,7 +365,15 @@ async def fulfill_razorpay_payment_async(
     payment_entity = (
         payload.get("payment", {}).get("entity", {})
         if isinstance(payload.get("payment"), dict)
-        else {}
+        else (
+            payload.get("order", {}).get("entity", {})
+            if isinstance(payload.get("order"), dict)
+            else (
+                payload.get("payment_link", {}).get("entity", {})
+                if isinstance(payload.get("payment_link"), dict)
+                else {}
+            )
+        )
     )
     qr_entity = (
         payload.get("qr_code", {}).get("entity", {})
@@ -537,7 +545,7 @@ async def verify_and_sync_payment_async(
         return False, state
 
     # 1. Check by active QR code ID in user state
-    qr_id = state.get("order_id")
+    qr_id = state.get("order_id") or state.get("last_qr_id")
     if qr_id and str(qr_id).startswith("qr_"):
         try:
             qr_data = rzp_client.qrcode.fetch(qr_id)

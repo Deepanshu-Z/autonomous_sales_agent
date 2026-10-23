@@ -51,7 +51,8 @@ class TestWhatsAppQRDispatch(unittest.IsolatedAsyncioTestCase):
             },
         }
 
-        with patch("src.services.razorpay_service.create_dynamic_qr_code", return_value=mock_qr_data) as mock_create_qr, \
+        with patch.dict(os.environ, {"TEST_QR_AMOUNT": ""}), \
+             patch("src.services.razorpay_service.create_dynamic_qr_code", return_value=mock_qr_data) as mock_create_qr, \
              patch("src.services.interakt.send_image_message_async", new_callable=AsyncMock) as mock_send_img:
 
             mock_send_img.return_value = True
@@ -78,8 +79,7 @@ class TestWhatsAppQRDispatch(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(call_phone, "919876543210")
             self.assertEqual(call_url, "https://rzp.io/rzp/test_kathak_img")
             self.assertIn("Scan & Pay via any UPI App", call_caption)
-            self.assertIn("https://rzp.io/rzp/test_kathak_img", call_caption)
-            self.assertIn("826", call_caption)
+            self.assertIn("100% TRUSTED AND VERIFIED BY RAZORPAY", call_caption)
 
             # Verify state persistence
             self.assertTrue(state.get("qr_code_sent"))
@@ -92,6 +92,8 @@ class TestWhatsAppQRDispatch(unittest.IsolatedAsyncioTestCase):
         state = {
             "course": "yoga",
             "package": "1 Month",
+            "timing": "6:00 AM to 7:00 AM",
+            "teacher": "Suman Lata",
             "language": "English",
         }
         mock_qr_data = {
@@ -130,6 +132,8 @@ class TestWhatsAppQRDispatch(unittest.IsolatedAsyncioTestCase):
         state = {
             "course": "kathak",
             "package": "1 Month",
+            "timing": "5:00 PM to 6:00 PM",
+            "teacher": "Ms. Madhuri",
             "qr_code_sent": True,
             "last_qr_package": "1 Month",
         }

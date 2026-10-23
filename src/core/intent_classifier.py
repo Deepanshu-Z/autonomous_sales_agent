@@ -71,6 +71,7 @@ def _empty_flags() -> Dict[str, Any]:
         "detected_language": "English",
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
+        "wants_demo": False,
         "wants_app_guide": False,
         "wants_app_video_guide": False,
         "wants_trial_guide": False,
@@ -156,13 +157,14 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "TEACHER_SELECTION": Customer is selecting or stating their preferred instructor/teacher (e.g. "madhuri mam", "i want sneha mam", "vibha mittal", "aditi vyas").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
-    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link.
+    - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR chooses/taps an app store platform button (e.g. "android app", "ios app", "app link", "download link", "play store", "app store", "send link", "link bhejo", "link do", "konsi app", "which app").
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
     - "DISINTEREST": Customer declines or implicitly rejects enrollment — includes explicit refusals ("not interested", "nahi chahiye", "cancel", "no", "nahi lena") AND contextual rejections where the customer refuses to enroll after having been informed of a policy limitation.
     - "GREETING": Pure greeting without substantive question ("hi", "hello", "good morning").
     - "COMPLAINT": Refund dispute or legal grievance.
+    - "PAYMENT_REQUEST": Customer wants to pay online, asks how to pay, asks for UPI QR code, payment scanner, or payment link (e.g. "pay online", "payment qr", "send qr", "scanner bhejo", "payment link", "how to pay", "kahan pay karein", "upi id bhejo").
     - "PAYMENT_CLAIM": Customer states they completed payment, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment ("paid", "payment done", "maine pay kar diya", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
@@ -187,6 +189,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 17. "claims_payment_or_enrollment":
     - boolean: true if customer states they already paid, completed payment, transferred money, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment / confirm admission ("paid", "payment done", "maine payment kar di", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo", "is my payment received?"). Otherwise false.
+    - CRITICAL NEGATIVE GUARD: Set to FALSE if customer is asking HOW to pay, wanting to pay online, or requesting a payment link/QR code (e.g. "pay online", "send qr", "how to pay")! Those are PAYMENT_REQUEST, NOT claims of having completed payment!
 
 18. "wants_app_guide":
     - boolean: true if customer asks for or wants the app guide, app download video, profile setup video, or installation video/tutorial (e.g. "app guide", "app video", "how to download app video", "app video guide", "download video", "how to install app", "app kaise download kare video", "send app guide", "profile video"). Otherwise false.
@@ -310,12 +313,21 @@ async def extract_intent_and_state_changes(
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
         # Teacher demo inquiries must never trigger tutorial or install video guides
-        if re.search(r"\b(demo|sample|preview)\b", text, re.IGNORECASE):
+        if any(w in text.lower() for w in ["demo", "sample", "preview", "teaching style"]):
+            clean["wants_demo"] = True
             clean["wants_resend_video"] = False
             clean["wants_app_guide"] = False
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False
             clean["wants_trial_video_guide"] = False
+
+        # Centralized check for payment request intent if user asked how to pay / QR
+        if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+            unquoted_user_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text, flags=re.IGNORECASE).strip()
+            if re.search(r"\b(qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|pay online|payment qr|how to pay|where to pay)\b", unquoted_user_text, re.IGNORECASE):
+                clean["customer_intent"] = "PAYMENT_REQUEST"
+            elif re.search(r"\b(android|android app|ios|ios app|play store|playstore|app store|appstore|app link|download link|download app|link bhejo|link do|send link|send app|app ka link|app download link)\b", unquoted_user_text, re.IGNORECASE):
+                clean["customer_intent"] = "APP_LINK_REQUEST"
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
         raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")
@@ -411,6 +423,13 @@ async def extract_intent_and_state_changes(
             if re.search(r"\b(trial video|trial guide|how to book trial|trial booking video)\b", text, re.IGNORECASE):
                 flags["wants_trial_guide"] = True
                 flags["wants_trial_video_guide"] = True
+            if re.search(r"\b(qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|pay online|payment qr|how to pay|where to pay)\b", text, re.IGNORECASE):
+                flags["customer_intent"] = "PAYMENT_REQUEST"
+            if re.search(r"\b(paid|already paid|payment done|pay kar diya|payment ho gaya|transfer kar diya|paise bhej diye|fees de di)\b", text, re.IGNORECASE):
+                flags["customer_intent"] = "PAYMENT_CLAIM"
+                flags["claims_payment_or_enrollment"] = True
+            if any(w in text.lower() for w in ["demo", "sample", "preview"]):
+                flags["wants_demo"] = True
         except Exception:
             pass
         return flags
@@ -478,7 +497,34 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         resolved = resolve_canonical_teacher(flags["selected_teacher"], course_id=active_course)
         teacher_val = resolved or flags["selected_teacher"]
         new_state["selected_teacher"] = teacher_val
+        new_state["teacher"] = teacher_val
         new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
+
+        # Deterministic Auto-Binding of Timing: If instructor teaches exactly 1 slot, auto-bind it
+        if active_course and teacher_val and not new_state.get("timing"):
+            from src.core.helpers.schedule_engine import get_slots_for_teacher
+            t_slots = get_slots_for_teacher(active_course, teacher_val)
+            # Filter by period if user already picked a timing period (e.g. morning/evening in session)
+            period_context = (new_state.get("timing_period") or "").lower()
+            if len(t_slots) == 1:
+                auto_slot = t_slots[0].get("time_12h")
+                if auto_slot:
+                    new_state["timing"] = auto_slot
+                    new_state["selected_timing"] = auto_slot
+                    new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+            elif len(t_slots) > 1 and period_context:
+                matching_period_slots = [
+                    s.get("time_12h") for s in t_slots
+                    if period_context in s.get("time_12h", "").lower() or (
+                        period_context == "morning" and "am" in s.get("time_12h", "").lower()
+                    ) or (
+                        period_context in ("evening", "afternoon") and "pm" in s.get("time_12h", "").lower()
+                    )
+                ]
+                if len(matching_period_slots) == 1:
+                    new_state["timing"] = matching_period_slots[0]
+                    new_state["selected_timing"] = matching_period_slots[0]
+                    new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
 
     # 4. Package / Duration Slot Merge & Deterministic Pricing
     if flags.get("selected_package") and is_selection_turn:
@@ -600,6 +646,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
         "wants_trial": flags.get("wants_trial", False),
+        "wants_demo": flags.get("wants_demo", False),
         "wants_app_guide": flags.get("wants_app_guide", False),
         "wants_app_video_guide": flags.get("wants_app_guide", False),
         "wants_trial_guide": flags.get("wants_trial_guide", False),

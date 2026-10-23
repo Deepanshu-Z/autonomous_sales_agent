@@ -152,119 +152,76 @@ def adapt_contextual_quick_replies(
 
     candidate_buttons: List[str] = []
 
-    # ── 1. TIMING SLOT MISSING ──
-    if not timing_val:
-        filtered_timing = []
-        for b_str in cleaned_raw:
-            if "Morning" in missing_periods and re.search(r"\b(morning|subah|sawere|mrng)\b", b_str, re.IGNORECASE):
-                continue
-            if "Evening" in missing_periods and re.search(r"\b(evening|shaam|sham|night|raat|evng)\b", b_str, re.IGNORECASE):
-                continue
-            if "Afternoon" in missing_periods and re.search(r"\b(afternoon|dopahar|dophar)\b", b_str, re.IGNORECASE):
-                continue
-            filtered_timing.append(b_str)
+    # Check if customer explicitly requested a trial path
+    is_trial_customer = bool(
+        state.get("wants_trial")
+        or state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
+        or (state.get("_last_turn") or {}).get("wants_trial")
+    )
 
-        if filtered_timing:
-            candidate_buttons = filtered_timing
-        elif avail_periods:
+    # 1. Prioritize LLM's contextual buttons matching its own follow-up question
+    if cleaned_raw:
+        safe_raw: List[str] = []
+        for b in cleaned_raw:
+            b_norm = str(b).strip()
+            # Guard: Block premature payment buttons before all 5 prerequisites are fulfilled
+            if any(w in b_norm.lower() for w in ["pay", "checkout", "scanner", "upi qr"]):
+                if not (timing_val and teacher_val and duration_val):
+                    continue
+            # Guard: Block unoffered periods for this course (e.g. Morning for Kathak)
+            if any(m.lower() in b_norm.lower() for m in missing_periods):
+                continue
+            # Guard: Block proactive trial buttons if customer never asked for trial
+            if not is_trial_customer and any(w in b_norm.lower() for w in ["free trial", "book trial", "trial class"]):
+                continue
+            safe_raw.append(b_norm)
+
+        if safe_raw:
+            candidate_buttons = safe_raw
+
+    # 2. Fallback to catalog slot buttons if raw buttons are absent or invalid
+    if not candidate_buttons:
+        if is_trial_customer:
+            candidate_buttons = ["Android App", "iOS App"]
+
+        # ── 1. TIMING SLOT MISSING ──
+        elif not timing_val:
             if avail_periods == ["Evening"]:
                 candidate_buttons = ["Evening Batch", "Check Timings"]
             elif "Morning" in avail_periods and "Evening" in avail_periods:
                 candidate_buttons = ["Morning Batch", "Evening Batch"]
-            else:
+            elif avail_periods:
                 candidate_buttons = [f"{p} Batch" for p in avail_periods[:2]]
-        else:
-            valid_timings = kb_loader.get_valid_timings(cid)
-            candidate_buttons = valid_timings[:2] if valid_timings else ["View Timings", "Trial Class"]
+            else:
+                valid_timings = kb_loader.get_valid_timings(cid)
+                candidate_buttons = valid_timings[:2] if valid_timings else ["View Timings", "Check Batches"]
 
-    # ── 2. TEACHER SLOT MISSING ──
-    elif not teacher_val:
-        course_data = kb_loader.get_course_data(cid)
-        course_teachers = [t.get("name") for t in course_data.get("teachers", []) if t.get("name")]
-        for b in course_data.get("batch_timings", {}).get("batches", []):
-            for inst in b.get("instructors", []):
-                if inst and inst not in course_teachers:
-                    course_teachers.append(inst)
-
-        # Check if cleaned_raw has any teacher names
-        raw_has_teacher = False
-        if cleaned_raw:
-            for b_str in cleaned_raw:
-                b_low = b_str.lower()
-                if any(t.lower() in b_low or b_low in t.lower() for t in course_teachers):
-                    raw_has_teacher = True
-                    break
-
-        if raw_has_teacher:
-            candidate_buttons = cleaned_raw
-        else:
-            # Look up instructors assigned to the selected timing
+        # ── 2. TEACHER SLOT MISSING ──
+        elif not teacher_val:
             slot_teachers = kb_loader.get_teachers_for_slot(cid, str(timing_val))
-            if slot_teachers:
-                candidate_teachers = slot_teachers
+            course_data = kb_loader.get_course_data(cid)
+            course_teachers = [t.get("name") for t in course_data.get("teachers", []) if t.get("name")]
+            allowed_teachers = slot_teachers or course_teachers
+            if len(allowed_teachers) >= 2:
+                candidate_buttons = allowed_teachers[:2]
+            elif len(allowed_teachers) == 1:
+                candidate_buttons = [allowed_teachers[0], "View Schedule"]
             else:
-                candidate_teachers = course_teachers
+                candidate_buttons = ["Instructor Info", "Course Details"]
 
-            if len(candidate_teachers) >= 2:
-                candidate_buttons = candidate_teachers[:2]
-            elif len(candidate_teachers) == 1:
-                t_name = candidate_teachers[0]
-                t_profile = next((t for t in course_data.get("teachers", []) if t.get("name") == t_name), None)
-                if t_profile and t_profile.get("demo_video"):
-                    candidate_buttons = [t_name, "Demo Video"]
-                else:
-                    candidate_buttons = [t_name, "Free Trial"]
-            else:
-                candidate_buttons = ["Instructor Info", "Free Trial"]
-
-    # ── 3. DURATION SLOT MISSING ──
-    elif not duration_val:
-        # Check if raw_buttons already contains package duration, trial, or instructor options
-        raw_has_duration = False
-        if cleaned_raw:
-            for b_str in cleaned_raw:
-                if re.search(r"\b(\d+\s*(?:m|month|months|mahina|mahine|y|year|years|saal)?|pack|package|trial|demo|instructor|teacher)\b", b_str, re.IGNORECASE):
-                    raw_has_duration = True
-                    break
-
-        if raw_has_duration:
-            candidate_buttons = cleaned_raw
-        else:
+        # ── 3. DURATION SLOT MISSING ──
+        elif not duration_val:
             valid_pkgs = kb_loader.get_valid_packages(cid)
-            durations = list(valid_pkgs.keys()) if valid_pkgs else []
-            if not durations:
-                course_data = kb_loader.get_course_data(cid)
-                durations = [p.get("duration") for p in course_data.get("pricing", {}).get("packages", []) if p.get("duration")]
+            pkg_keys = list(valid_pkgs.keys()) if valid_pkgs else ["1 Month", "3 Months"]
+            candidate_buttons = [f"{d} Pack" for d in pkg_keys[:2]]
 
-            if durations:
-                pkg_buttons = []
-                for d in durations[:2]:
-                    d_str = str(d).strip()
-                    btn_text = f"{d_str} Pack" if not re.search(r"\b(pack|package)\b", d_str, re.IGNORECASE) else d_str
-                    pkg_buttons.append(btn_text)
-                candidate_buttons = pkg_buttons
-            else:
-                candidate_buttons = ["1 Month Pack", "3 Months Pack"]
-
-    # ── 4. ENROLLED / PAID STUDENT ──
-    elif is_client_paid:
-        candidate_buttons = [b for b in cleaned_raw if not re.search(r"\b(pay|checkout)\b", b, re.IGNORECASE)]
-        if not candidate_buttons:
+        # ── 4. ENROLLED / PAID STUDENT ──
+        elif is_client_paid:
             candidate_buttons = ["Download App", "My Classes"]
 
-    # ── 5. PAYMENT SUMMARY & CHECKOUT (UNPAID) ──
-    else:
-        raw_has_checkout = False
-        if cleaned_raw:
-            for b_str in cleaned_raw:
-                if re.search(r"\b(pay|checkout|app|download|online|website|portal)\b", b_str, re.IGNORECASE):
-                    raw_has_checkout = True
-                    break
-
-        if raw_has_checkout:
-            candidate_buttons = cleaned_raw
+        # ── 5. PAYMENT SUMMARY & CHECKOUT (UNPAID) ──
         else:
-            candidate_buttons = ["Pay Online", "Download App"]
+            candidate_buttons = ["Pay Online", "UPI QR"]
 
     # Deduplicate, sanitize length <= 20 chars, max 2 contextual buttons
     final_contextual: List[str] = []
@@ -309,13 +266,14 @@ async def handle_incoming_message(
     flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
 
-    # Real-time payment verification: If user claims payment or asks about checkout/QR, check Razorpay directly
+    # Real-time payment verification: If user claims payment or had a QR code sent, check Razorpay directly
     phone_key = session_state.get("phone") or new_state.get("phone") or ""
     if phone_key and new_state.get("payment_status") != "PAID":
         is_payment_query = bool(
             flags.get("claims_payment_or_enrollment")
             or flags.get("customer_intent") == "PAYMENT_CLAIM"
-            or re.search(r"\b(paid|already paid|payment done|pay kar diya|payment ho gaya|transfer kar diya|paise bhej diye|fees de di|pay online)\b", user_message, re.IGNORECASE)
+            or session_state.get("qr_code_sent")
+            or new_state.get("qr_code_sent")
         )
         if is_payment_query:
             from src.services.razorpay_service import verify_and_sync_payment_async
@@ -733,17 +691,19 @@ def _sanitize_confirmation_guardrails(
             sanitized_reply = (
                 "कृपया ध्यान दें: हमने आपके पेमेंट रिकॉर्ड्स चेक किए हैं, लेकिन आपका ट्रांजेक्शन अभी तक प्राप्त/कन्फर्म नहीं हुआ है। "
                 "यदि आपने Sensationz ऐप या वेबसाइट पर पेमेंट किया है, तो वह आपके अकाउंट में अपने आप अपडेट हो जाता है। "
-                "यदि आपने UPI या ट्रांसफर किया है और राशि कट गई है, तो कृपया *agent* टाइप करें ताकि हमारी टीम तुरंत आपकी मदद कर सके! 😊"
+                "यदि आपने UPI या ट्रांसफर किया है और राशि कट गई है, तो कृपया *agent* टाइप करें ताकि हमारी अकाउंट्स टीम तुरंत आपकी मदद कर सके! 😊"
             )
         elif is_english:
             sanitized_reply = (
-                "Please note: We checked our payment records, but your transaction has not been confirmed yet. "
+                "Please note: As an AI assistant, I do not have access to bank accounts to verify payments directly. "
+                "Our accounts team will verify your records. "
                 "If you completed payment through our official Sensationz App or website checkout, it will reflect automatically under your account. "
                 "If you transferred via UPI and amount was deducted, please type *agent* so a support coordinator can check and confirm your payment! 😊"
             )
         else:
             sanitized_reply = (
-                "Dhyan dein: Humne aapke payment records check kiye hain, lekin aapka transaction abhi tak confirm nahi hua hai. "
+                "Dhyan dein: Main ek AI assistant hoon aur direct payment confirm karne ka access mere paas nahi hai. "
+                "Humari accounts team aapke records verify karegi. "
                 "Agar aapne official Sensationz App ya website par checkout kiya hai, toh payment aapke account mein automatically update ho jata hai. "
                 "Agar aapne manual UPI ya transfer kiya hai aur paise kat gaye hain, toh kripya *agent* type karein taaki humari team verify kar sake! 😊"
             )
@@ -867,7 +827,15 @@ async def dispatch_payment_qr_async(
     """
     cid = (course_id or state.get("course") or "").lower().strip()
     pkg = package or state.get("package") or state.get("selected_duration")
-    if not cid or not pkg:
+    timing_val = state.get("timing") or state.get("selected_timing")
+    teacher_val = state.get("selected_teacher") or state.get("teacher")
+
+    # Hard guard: ALL mandatory slots (Course, Package, Timing, Teacher) must be explicitly selected
+    if not (cid and pkg and timing_val and teacher_val):
+        logger.warning(
+            f"[QR Dispatch] Blocked: Missing mandatory slot(s) for {phone}. "
+            f"course={cid!r}, pkg={pkg!r}, timing={timing_val!r}, teacher={teacher_val!r}"
+        )
         return None
 
     # Anti-spam guard: Send once per package unless forced or requested
@@ -876,7 +844,8 @@ async def dispatch_payment_qr_async(
 
     from src.core.pricing_engine import calculate_exact_fee
     exact_bill = calculate_exact_fee(cid, pkg)
-    if not exact_bill or not exact_bill.get("final_payable_amount"):
+    if not exact_bill or not exact_bill.get("final_payable_amount") or exact_bill["final_payable_amount"] <= 0:
+        logger.warning(f"[QR Dispatch] Blocked: Invalid fee calculation for {cid} / {pkg}: {exact_bill}")
         return None
 
     final_amount = exact_bill["final_payable_amount"]
@@ -938,23 +907,12 @@ async def dispatch_payment_qr_async(
             f"• *कुल फीस:* {display_amount} ({exact_bill.get('gst_percentage', 18)}% GST सहित)\n\n"
             f"👉 *सीधा UPI पेमेंट लिंक (मोबाइल पर टैप करें):*\n"
             f"{image_url}\n\n"
-            f"📝 *पेमेंट निर्देश:*\n"
-            f"1. ऊपर दिए गए QR कोड को किसी भी UPI ऐप (GPay, PhonePe, Paytm, BHIM) से स्कैन करें।\n"
-            f"2. या मोबाइल पर सीधे भुगतान करने के लिए ऊपर दिए गए लिंक पर टैप करें।\n"
-            f"3. पेमेंट पूरा होते ही आपकी क्लासेस एक्टिवेट हो जाएंगी! 🙏"
+            f"🔒 *100% TRUSTED AND VERIFIED BY RAZORPAY*"
         )
     else:
         caption = (
             f"📲 *Scan & Pay via any UPI App (GPay, PhonePe, Paytm, BHIM):*\n\n"
-            f"• *Course:* {course_name}\n"
-            f"• *Duration:* {pkg}\n"
-            f"• *Total Payable:* {display_amount} (Includes {exact_bill.get('gst_percentage', 18)}% GST)\n\n"
-            f"👉 *Direct UPI Payment Link (Tap to Pay on Mobile):*\n"
-            f"{image_url}\n\n"
-            f"📝 *Payment Instructions:*\n"
-            f"1. Scan this QR code using Google Pay, PhonePe, Paytm, or BHIM.\n"
-            f"2. Or tap the direct payment link above to open your UPI app on mobile.\n"
-            f"3. Your classes and account will be activated upon payment! 🙏"
+            f"🔒 *100% TRUSTED AND VERIFIED BY RAZORPAY*"
         )
 
     # Deliver QR image directly to WhatsApp
@@ -972,6 +930,7 @@ async def dispatch_payment_qr_async(
     if delivered:
         state["qr_code_sent"] = True
         state["last_qr_id"] = qr_id
+        state["order_id"] = qr_id
         state["last_qr_package"] = pkg
         state["last_qr_url"] = image_url
         state["last_qr_amount"] = final_amount
@@ -1174,11 +1133,7 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
-    user_asked_links = bool(
-        last_turn.get("intent") == "APP_LINK_REQUEST"
-        or re.search(r"\b(download link|app link|website link|site link|play\s*store link|app\s*store link)\b", text_clean, re.IGNORECASE)
-        or (re.search(r"\b(link|links)\b", text_clean, re.IGNORECASE) and not re.search(r"\b(demo|video|sample|preview|recording)\b", text_clean, re.IGNORECASE))
-    )
+    user_asked_links = bool(last_turn.get("intent") == "APP_LINK_REQUEST")
     prev_ai_demo = False
     if history:
         for h_turn in reversed(history):
@@ -1189,12 +1144,12 @@ async def handle_conversation_turn_async(
                 break
 
     user_asked_demo = bool(
-        re.search(r"\b(demo|video|videos|recording|recordings|sample|preview)\b", text_clean, re.IGNORECASE)
+        last_turn.get("wants_demo")
         or "demo" in (last_turn.get("question_summary") or "").lower()
         or last_turn.get("wants_resend_video")
         or prev_ai_demo
         or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
-        or bool(re.search(r"\b(demo videos?|teaching styles?|instructor videos?|sample videos?)\b", main_reply, re.IGNORECASE))
+        or any(w in main_reply.lower() for w in ("demo video", "teaching style", "sample video", "instructor video"))
     )
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
@@ -1250,8 +1205,13 @@ async def handle_conversation_turn_async(
     )
     sending_video = will_send_trial_video or will_send_install_video
 
-    # App links are ONLY allowed when customer explicitly asked for links or clicked Lock My Seat
-    allow_app_links = bool(user_asked_links or "lock my seat" in text_clean.lower())
+    # App links are allowed when customer explicitly asked for links, clicked platform button, or clicked Lock My Seat
+    unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
+    allow_app_links = bool(
+        user_asked_links
+        or "lock my seat" in unquoted_text
+        or re.search(r"\b(android|ios|play\s*store|app\s*store|app\s*link|download\s*link|download\s*app|link\s*bhejo|link\s*do|send\s*link)\b", unquoted_text, re.IGNORECASE)
+    )
 
     is_client_paid = bool(
         new_state.get("payment_status") == "PAID"
@@ -1272,7 +1232,12 @@ async def handle_conversation_turn_async(
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=user_asked_demo)
 
     # Strict Zero Follow-up on Payment Claim (only for unverified/unpaid users)
-    if not is_client_paid and (new_state.get("payment_claimed") or last_turn.get("claims_payment_or_enrollment") or last_turn.get("intent") == "PAYMENT_CLAIM"):
+    # Note: Asking how to pay, requesting QR code, or choosing to pay online is PAYMENT_REQUEST, NOT a claim of having already paid.
+    is_asking_to_pay = bool(
+        last_turn.get("intent") == "PAYMENT_REQUEST"
+        or re.search(r"\b(pay online|qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|how to pay|where to pay)\b", text_clean, re.IGNORECASE)
+    )
+    if not is_client_paid and not is_asking_to_pay and (new_state.get("payment_claimed") or last_turn.get("claims_payment_or_enrollment") or last_turn.get("intent") == "PAYMENT_CLAIM"):
         new_state["payment_claimed"] = True
         clean_followup = None
         result["buttons"] = []
@@ -1314,23 +1279,33 @@ async def handle_conversation_turn_async(
         await dispatch_media_guide_async(phone, new_state, enroll_cfg, "app_download_video_sent", force_resend=bool(user_wants_app_guide or wants_resend))
 
     # Subtask 5.3: Dispatch dynamic Razorpay UPI QR code when every detail is selected or user requests payment
-    user_asked_qr = bool(
-        re.search(r"\b(qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|pay online|payment qr|how to pay|where to pay)\b", text_clean, re.IGNORECASE)
-    )
+    user_asked_qr = bool(last_turn.get("intent") == "PAYMENT_REQUEST")
+    has_course_selected = bool(active_cid or new_state.get("course"))
     is_package_selected = bool(new_state.get("package") or new_state.get("selected_duration"))
     has_timing_selected = bool(new_state.get("timing") or new_state.get("selected_timing"))
+    has_teacher_selected = bool(new_state.get("teacher") or new_state.get("selected_teacher"))
 
-    # Check if the assistant is still asking the customer for timing or teacher details
-    is_asking_details = bool(
-        re.search(
-            r"\b(batch timing|which timing|which batch|konsa batch|konsi timing|select a batch|selecting a batch|select timing|which instructor|which teacher|prefer for your classes)\b",
-            f"{clean_reply} {clean_followup or ''}",
-            re.IGNORECASE,
-        )
+    # Verify pricing calculation (Fee / Price slot)
+    has_valid_fee = False
+    if has_course_selected and is_package_selected:
+        try:
+            from src.core.pricing_engine import calculate_exact_fee
+            cid_check = (active_cid or new_state.get("course") or "").lower().strip()
+            pkg_check = new_state.get("package") or new_state.get("selected_duration")
+            bill_check = calculate_exact_fee(cid_check, pkg_check)
+            if bill_check and bill_check.get("final_payable_amount", 0) > 0:
+                has_valid_fee = True
+        except Exception:
+            has_valid_fee = False
+
+    # 5 Mandatory prerequisites: Course, Timing, Teacher, Package, Fee
+    all_prerequisites_met = bool(
+        has_course_selected
+        and has_timing_selected
+        and has_teacher_selected
+        and is_package_selected
+        and has_valid_fee
     )
-
-    # Ready for payment: either user explicitly asks for QR, OR all details (package + timing) are selected and not currently asking details
-    all_details_selected = bool(is_package_selected and has_timing_selected and not is_asking_details)
 
     is_client_paid = bool(
         new_state.get("payment_status") == "PAID"
@@ -1340,14 +1315,12 @@ async def handle_conversation_turn_async(
 
     is_payment_step = bool(
         not is_client_paid
-        and is_package_selected
-        and not new_state.get("payment_claimed")
+        and all_prerequisites_met
         and (
             user_asked_qr
-            or (all_details_selected and (
+            or (not new_state.get("payment_claimed") and (
                 new_state.get("stage") in ["PACKAGE_SELECTED", "TIMING_SELECTED", "TEACHER_SELECTED", "COUPON_SENT", "PAYMENT_PENDING", "CHECKOUT"]
                 or last_turn.get("intent") in ["PACKAGE_SELECTION", "TIMING_SELECTION", "TEACHER_SELECTION", "PAYMENT_REQUEST"]
-                or re.search(r"\b(pay online|complete checkout|payment link|fee breakdown|total payable|scan & pay|scan and pay)\b", clean_reply, re.IGNORECASE)
             ))
         )
     )

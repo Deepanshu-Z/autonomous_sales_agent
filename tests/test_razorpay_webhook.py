@@ -412,6 +412,47 @@ class TestRazorpayWebhook(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resp.json().get("status"), "ok")
         mock_fulfill.assert_called_once_with(payload)
 
+    @patch("src.services.razorpay_service.save_user_state_async", new_callable=AsyncMock)
+    @patch("src.services.razorpay_service.get_user_state_async", new_callable=AsyncMock)
+    @patch("src.services.razorpay_service.send_text_message_async", new_callable=AsyncMock)
+    async def test_unrelated_razorpay_payment_ignored(
+        self,
+        mock_send_txt,
+        mock_get_state,
+        mock_save_state,
+    ):
+        """Payments from external sources without bot metadata or course must be ignored."""
+        mock_get_state.return_value = {
+            "phone": "916392007887",
+            "stage": "NEW",
+            "payment_status": "NONE",
+        }
+
+        unrelated_payload = {
+            "entity": "event",
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_unrelated_123",
+                        "amount": 52500,
+                        "currency": "INR",
+                        "status": "captured",
+                        "method": "upi",
+                        "contact": "+916392007887",
+                        "notes": {},
+                    }
+                }
+            },
+        }
+
+        result = await fulfill_razorpay_payment_async(unrelated_payload)
+
+        self.assertEqual(result["status"], "ignored")
+        self.assertEqual(result["reason"], "unrelated_transaction")
+        mock_save_state.assert_not_called()
+        mock_send_txt.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

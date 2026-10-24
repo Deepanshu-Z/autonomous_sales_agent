@@ -286,7 +286,7 @@ async def receive_razorpay_webhook(request: Request):
         )
 
     event_type = event_payload.get("event", "unknown")
-    accepted_events = {"payment.captured", "qr_code.credited", "order.paid", "payment.authorized", "payment_link.paid"}
+    accepted_events = {"payment.captured", "qr_code.credited"}
     if event_type not in accepted_events:
         print(f"[razorpay_webhook] ℹ️ Event '{event_type}' ignored (not in {accepted_events})")
         return {"status": "ignored", "event": event_type}
@@ -317,7 +317,7 @@ async def receive_test_razorpay_webhook(request: Request):
         )
 
     event_type = event_payload.get("event", "unknown")
-    accepted_events = {"payment.captured", "qr_code.credited", "order.paid", "payment.authorized", "payment_link.paid"}
+    accepted_events = {"payment.captured", "qr_code.credited"}
     if event_type not in accepted_events:
         return {"status": "ignored", "event": event_type}
 

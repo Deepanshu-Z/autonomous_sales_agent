@@ -766,6 +766,90 @@ def _sanitize_confirmation_guardrails(
     return reply, followup
 
 
+def _sanitize_state_grounded_replies(
+    reply: str,
+    followup: Optional[str],
+    state: Dict[str, Any],
+    last_turn: Dict[str, Any],
+    active_cid: str,
+) -> Tuple[str, Optional[str]]:
+    """
+    State is the Highest Authority (Database Guardrail):
+    - Prevents hallucinated re-asking for slots that are already settled in state.
+    - Prevents premature payment QR push in follow-up when customer is exploring questions/demos.
+    - Suppresses follow-up when customer is in refusal/complaint mode.
+    """
+    if not reply:
+        return reply, followup
+
+    has_course = bool(active_cid or state.get("course"))
+    has_timing = bool(state.get("timing") or state.get("selected_timing"))
+    has_teacher = bool(state.get("teacher") or state.get("selected_teacher"))
+    has_package = bool(state.get("package") or state.get("selected_duration"))
+
+    intent = (last_turn.get("intent") or "").upper()
+    is_question = bool(
+        intent == "QUESTION"
+        or last_turn.get("wants_demo")
+        or last_turn.get("wants_trial_guide")
+        or last_turn.get("wants_app_guide")
+    )
+    is_objection = bool(
+        intent in ("COMPLAINT", "DISINTEREST")
+        or state.get("refusal_stage", 0) > 0
+        or last_turn.get("is_complaint_or_refund")
+    )
+
+    # 1. OBJECTION / COMPLAINT GUARD: Suppress sales follow-up completely
+    if is_objection:
+        return reply, None
+
+    # 2. QUESTION / DEMO GUARD: Ensure followup does NOT force payment QR assistance
+    if is_question and followup:
+        PAYMENT_PUSH_PATTERNS = [
+            r"\b(complete your payment|pay via|upi qr|qr code|assistance completing your payment)\b",
+            r"\b(start with\s*—\s*1 Month|1 Month or 3 Months)\b",
+        ]
+        if any(re.search(p, followup, re.IGNORECASE) for p in PAYMENT_PUSH_PATTERNS):
+            if last_turn.get("wants_demo"):
+                followup = "Did you get a chance to watch the demo video, or would you like to see another instructor? 😊"
+            else:
+                followup = "Does this answer your question, or would you like to know more? 😊"
+
+    # 3. ALL SLOTS SETTLED GUARD: When Course + Timing + Teacher + Package are all complete
+    if has_course and has_timing and has_teacher and has_package and not is_question and not is_objection:
+        PACKAGE_ASK_PATTERNS = [
+            r"\b(which package|kaunsa package|package duration|choose a package|select a package|select package duration|preferred duration|preferred package)\b",
+            r"\b(start with\s*—\s*1 Month|1 Month ya 3 Months|1 Month or 3 Months)\b",
+            r"\b(move on to the package duration|package duration.*available options)\b",
+        ]
+        has_hallucinated_package_ask = any(re.search(p, reply, re.IGNORECASE) for p in PACKAGE_ASK_PATTERNS) or (followup and any(re.search(p, followup, re.IGNORECASE) for p in PACKAGE_ASK_PATTERNS))
+
+        if has_hallucinated_package_ask:
+            from src.core.pricing_engine import calculate_exact_fee
+            cid_curr = (active_cid or state.get("course") or "").lower().strip()
+            pkg_curr = state.get("package") or state.get("selected_duration")
+            bill = calculate_exact_fee(cid_curr, pkg_curr) if cid_curr and pkg_curr else None
+            if bill:
+                t_name = state.get("teacher") or state.get("selected_teacher") or "your instructor"
+                t_slot = state.get("timing") or state.get("selected_timing") or ""
+                course_title = kb_loader.get_catalog_entry(cid_curr).get("name", cid_curr.title()) if kb_loader.get_catalog_entry(cid_curr) else cid_curr.title()
+
+                reply = (
+                    f"Great! You have selected *{t_name}* for the *{t_slot}* batch of *{course_title}*.\n\n"
+                    f"Here is your order summary for the *{pkg_curr}* package:\n"
+                    f"• *Base Price:* ₹{bill['base_price']:,}\n"
+                    f"• *Discount:* -₹{bill['discount']:,} (Coupon: {bill.get('coupon_code') or 'None'})\n"
+                    f"• *Offer Price:* ₹{bill['offer_price']:,}\n"
+                    f"• *GST ({bill['gst_percentage']}%):* +₹{bill['gst_amount']:,}\n"
+                    f"• *Total Payable:* ₹{bill['final_payable_amount']:,}\n\n"
+                    f"Please complete your payment via the UPI QR code below to confirm your seat!"
+                )
+                followup = "Would you like any assistance completing your payment with the UPI QR code? 😊"
+
+    return reply, followup
+
+
 async def dispatch_media_guide_async(
     phone: str,
     state: dict,
@@ -1133,7 +1217,22 @@ async def handle_conversation_turn_async(
         if not followup_msg:
             followup_msg = parts[1].strip() or None
 
-    user_asked_links = bool(last_turn.get("intent") == "APP_LINK_REQUEST")
+    user_asked_links = bool(
+        last_turn.get("intent") == "APP_LINK_REQUEST"
+        or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
+    )
+
+    # Explicit button clicks or requests for tutorial video (trial booking or app install guide)
+    is_video_guide_request = bool(
+        last_turn.get("wants_trial_guide")
+        or last_turn.get("wants_trial_video_guide")
+        or last_turn.get("wants_app_guide")
+        or last_turn.get("wants_app_video_guide")
+        or last_turn.get("wants_resend_video")
+        or text_clean.strip().lower() in ("watch video", "send video", "video tutorial", "video guide")
+        or "watch video" in text_clean.lower()
+    )
+
     prev_ai_demo = False
     if history:
         for h_turn in reversed(history):
@@ -1144,17 +1243,18 @@ async def handle_conversation_turn_async(
                 break
 
     user_asked_demo = bool(
-        last_turn.get("wants_demo")
-        or "demo" in (last_turn.get("question_summary") or "").lower()
-        or last_turn.get("wants_resend_video")
-        or prev_ai_demo
-        or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
-        or any(w in main_reply.lower() for w in ("demo video", "teaching style", "sample video", "instructor video"))
+        (
+            last_turn.get("wants_demo")
+            or "demo" in (last_turn.get("question_summary") or "").lower()
+            or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
+            or any(w in main_reply.lower() for w in ("demo video", "teaching style", "sample video", "instructor video"))
+        )
+        and not is_video_guide_request
     )
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
     course_data_active = kb_loader.get_course_data(active_cid)
-    wants_resend = bool(last_turn.get("wants_resend_video", False))
+    wants_resend = bool(last_turn.get("wants_resend_video", False) or is_video_guide_request)
 
     user_wants_app_guide = bool(
         last_turn.get("wants_app_guide")
@@ -1163,6 +1263,7 @@ async def handle_conversation_turn_async(
     user_wants_trial_guide = bool(
         last_turn.get("wants_trial_guide")
         or last_turn.get("wants_trial_video_guide")
+        or (is_video_guide_request and not user_wants_app_guide)
     )
 
     # General resend resolution if customer asked to resend video without specifying type
@@ -1205,10 +1306,23 @@ async def handle_conversation_turn_async(
     )
     sending_video = will_send_trial_video or will_send_install_video
 
+    # If delivering trial tutorial video, append clickable video link directly to text reply
+    if will_send_trial_video:
+        trial_cfg = (
+            course_data_active.get("trial_classes")
+            or course_data_active.get("trial_class")
+            or kb_loader.get_global_rules().get("universal_course_policies", {}).get("trial_classes", {})
+        )
+        yt_link = trial_cfg.get("how_to_book_video_url") or trial_cfg.get("video_url")
+        if yt_link and yt_link not in main_reply:
+            main_reply = f"{main_reply.rstrip()}\n\n🎬 *Video Link:* {yt_link}"
+
     # App links are allowed when customer explicitly asked for links, clicked platform button, or clicked Lock My Seat
     unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
     allow_app_links = bool(
         user_asked_links
+        or last_turn.get("intent") == "APP_LINK_REQUEST"
+        or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
         or "lock my seat" in unquoted_text
         or re.search(r"\b(android|ios|play\s*store|app\s*store|app\s*link|download\s*link|download\s*app|link\s*bhejo|link\s*do|send\s*link)\b", unquoted_text, re.IGNORECASE)
     )
@@ -1225,19 +1339,30 @@ async def handle_conversation_turn_async(
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(
         clean_reply, followup_msg, language=new_state.get("language"), state=new_state
     )
-    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=user_asked_demo)
+    clean_reply, clean_followup = _sanitize_state_grounded_replies(
+        clean_reply, clean_followup, state=new_state, last_turn=last_turn, active_cid=active_cid
+    )
+    allow_video_links = bool(user_asked_demo or will_send_trial_video or will_send_install_video or is_video_guide_request)
+    clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=allow_video_links)
 
     if clean_followup:
         clean_followup = _format_for_whatsapp(clean_followup)
-        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=user_asked_demo)
+        clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=allow_video_links)
 
     # Strict Zero Follow-up on Payment Claim (only for unverified/unpaid users)
     # Note: Asking how to pay, requesting QR code, or choosing to pay online is PAYMENT_REQUEST, NOT a claim of having already paid.
     is_asking_to_pay = bool(
         last_turn.get("intent") == "PAYMENT_REQUEST"
+        or last_turn.get("customer_intent") == "PAYMENT_REQUEST"
         or re.search(r"\b(pay online|qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|how to pay|where to pay)\b", text_clean, re.IGNORECASE)
     )
-    if not is_client_paid and not is_asking_to_pay and (new_state.get("payment_claimed") or last_turn.get("claims_payment_or_enrollment") or last_turn.get("intent") == "PAYMENT_CLAIM"):
+    is_payment_claim = bool(
+        last_turn.get("claims_payment_or_enrollment")
+        or last_turn.get("intent") == "PAYMENT_CLAIM"
+        or last_turn.get("customer_intent") == "PAYMENT_CLAIM"
+        or new_state.get("payment_claimed")
+    )
+    if not is_client_paid and not is_asking_to_pay and is_payment_claim:
         new_state["payment_claimed"] = True
         clean_followup = None
         result["buttons"] = []

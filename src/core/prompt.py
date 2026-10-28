@@ -49,9 +49,10 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - If Timing is ALREADY selected/known, NEVER ask for timing again! Move immediately to Step 2 (Teacher).
 
     2. TEACHER SLOT (If Timing is SELECTED, but Customer's Selected Instructor is NOT SELECTED):
-       - Message #1: Warmly acknowledge their chosen timing. Introduce the instructor(s) assigned to that specific batch timing from COURSE_DATA. (If only 1 instructor teaches that batch, introduce them warmly and proceed toward package duration).
+       - Message #1: Warmly acknowledge their chosen timing. Introduce the instructor(s) assigned to that specific batch timing from COURSE_DATA. (If only 1 instructor teaches that batch, introduce them warmly).
        - Message #2 (followup): Ask which instructor they would prefer for their classes, or if they would like to know more about their background/demo video (e.g. "Which instructor would you like to learn with, or would you like to explore their demo video? 😊").
-       - If Instructor is ALREADY selected/known, NEVER ask for instructor again! (If on trial path, guide them to confirm their trial in the app; otherwise proceed to Step 3).
+       - If Instructor is ALREADY selected/known, NEVER ask for instructor again!
+       - SPECIAL GUARD: If Package Duration is ALREADY selected/known in session context, do NOT ask for package duration! Advance directly to Payment Summary (Step 4).
        - SPECIAL CASE (Teacher Selected First, Timing Missing): If customer selected an instructor who teaches multiple timings and timing is not yet confirmed, ask which of that instructor's batch timings they prefer before presenting packages!
 
     3. DURATION SLOT (If Timing & Instructor are BOTH SELECTED, but Package Duration is NOT SELECTED):
@@ -522,6 +523,73 @@ def format_system_prompt(
         or (s.get("_last_turn") or {}).get("wants_trial")
     )
 
+    # ── Database State Calculation (State is Highest Authority) ──
+    settled_slots = []
+    missing_slots = []
+
+    if cid and active_title != "Not Selected":
+        settled_slots.append(f"Course: {active_title}")
+    else:
+        missing_slots.append("Course Selection")
+
+    if timing_str != "NOT SELECTED":
+        settled_slots.append(f"Batch Timing: {timing_str}")
+    else:
+        missing_slots.append("Batch Timing")
+
+    if teacher_str != "NOT SELECTED":
+        settled_slots.append(f"Instructor: {teacher_str}")
+    else:
+        missing_slots.append("Instructor Preference")
+
+    if package_str != "NOT SELECTED":
+        settled_slots.append(f"Package Duration: {package_str}")
+    else:
+        missing_slots.append("Package Duration")
+
+    last_turn_dict = s.get("_last_turn") or {}
+    last_intent = (last_turn_dict.get("intent") or "").upper()
+    q_summary = last_turn_dict.get("question_summary") or ""
+
+    is_question_turn = bool(
+        last_intent == "QUESTION"
+        or last_turn_dict.get("wants_demo")
+        or last_turn_dict.get("wants_trial_guide")
+        or last_turn_dict.get("wants_app_guide")
+        or (q_summary and not last_intent.endswith("_SELECTION"))
+    )
+    is_objection_turn = bool(
+        last_intent in ("COMPLAINT", "DISINTEREST")
+        or s.get("refusal_stage", 0) > 0
+        or last_turn_dict.get("is_complaint_or_refund")
+        or last_turn_dict.get("is_disinterested")
+    )
+
+    if is_objection_turn:
+        turn_intent_guidance = (
+            "- ⚠️ CURRENT TURN CONVERSATIONAL MODE: OBJECTION / COMPLAINT / HESITATION\n"
+            "  • Message #1: Warmly and empathetically acknowledge their concern without being pushy or arguing.\n"
+            "  • Message #2 (followup): Set 'followup': null and 'buttons': []. NEVER ask for payment or push course packages!\n"
+        )
+    elif is_question_turn:
+        turn_intent_guidance = (
+            f"- ℹ️ CURRENT TURN CONVERSATIONAL MODE: INFORMATIONAL INQUIRY ({q_summary or 'Customer question/demo request'})\n"
+            "  • Message #1: Directly, thoroughly, and warmly address their specific question FIRST.\n"
+            "  • Message #2 (followup): Your follow-up question MUST be directly relevant to their question (e.g. asking for their thoughts on the demo/instructor/topic). DO NOT force payment assistance, and DO NOT badger them to select missing funnel slots while they are actively exploring/asking questions!\n"
+        )
+    elif not missing_slots:
+        turn_intent_guidance = (
+            f"- 🎯 CURRENT ENROLLMENT STATUS: ALL 4 DETAILS COMPLETED (Course: {active_title}, Timing: {timing_str}, Instructor: {teacher_str}, Package: {package_str})\n"
+            "  • CRITICAL RULE: Under NO circumstances ask the customer to choose a package, timing, or instructor! They are ALL ALREADY CHOSEN and LOCKED in database.\n"
+            f"  • Message #1: Confirm their selected class ({teacher_str} for {timing_str} batch) and present the transparent pre-computed order fee breakdown for {package_str}.\n"
+            "  • Message #2 (followup): Ask if they would like any assistance completing their payment with the UPI QR code.\n"
+        )
+    else:
+        turn_intent_guidance = (
+            f"- 📋 CURRENT FUNNEL SELECTION: The next incomplete detail to guide is: {missing_slots[0]}.\n"
+            f"  • DO NOT ask for already settled items ({', '.join(settled_slots)}).\n"
+        )
+
     # Identify the next missing slot in the funnel sequence: Course -> Timing -> Teacher -> Duration -> Payment Summary -> Enrolled
     if not cid:
         next_funnel_slot = "COURSE (Active Course is NOT SELECTED! Ask customer which course they are interested in from catalog)."
@@ -541,23 +609,20 @@ def format_system_prompt(
             "DO NOT collect trial timing or teacher in chat! "
             "DO NOT pitch paid package durations or enrollment checkout!)"
         )
-    elif not s.get("timing") and not s.get("selected_timing") and not teacher_val:
-        next_funnel_slot = f"TIMING (Active course is identified as {active_title}. Share available batch timings from COURSE_DATA and ask which batch timing works best for their routine. DO NOT ask which course they want — course is ALREADY identified!)"
-    elif not teacher_val and (s.get("timing") or s.get("selected_timing")):
-        next_funnel_slot = "TEACHER (Introduce instructor(s) assigned to their selected timing and ask teacher preference. NOTE: If customer asked to pay or asked for QR, instructor must be confirmed before QR can be generated!)"
-    elif not s.get("timing") and not s.get("selected_timing") and teacher_val:
-        # Teacher is selected, but timing slot is still ambiguous
-        next_funnel_slot = f"TIMING FOR TEACHER (Instructor {teacher_str} is selected, but specific batch timing is not yet chosen. Present {teacher_str}'s assigned batch timings from COURSE_DATA and ask which timing works best. DO NOT advance to packages until batch timing is confirmed!)"
-    elif not s.get("package") and not s.get("selected_duration"):
-        next_funnel_slot = "DURATION (Present 1 Month vs 3 Months package options and ask preferred duration. NOTE: Package duration is required before payment QR can be generated!)"
-    else:
+    elif not missing_slots:
         next_funnel_slot = "PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (All 5 prerequisites complete: Course, Timing, Teacher, Package, Fee. Present transparent order fee breakdown and guide direct in-chat UPI QR payment)"
+    else:
+        next_funnel_slot = f"NEXT MISSING SLOT: {missing_slots[0]} (Settled: {', '.join(settled_slots)})"
 
     paid_status_str = "PAID (Enrollment Confirmed)" if is_paid else (s.get("payment_status") or "UNPAID")
     paid_amt_val = s.get("paid_amount")
     paid_amt_display = f"₹{paid_amt_val}" if paid_amt_val is not None else "₹0.00"
 
     state_context += (
+        f"- DATABASE ENROLLMENT FACTS (STATE IS HIGHEST AUTHORITY):\n"
+        f"  • SETTLED IN DATABASE (DO NOT RE-ASK): {', '.join(settled_slots) if settled_slots else 'None'}\n"
+        f"  • STILL NEEDED: {', '.join(missing_slots) if missing_slots else 'NONE (All completed)'}\n"
+        f"{turn_intent_guidance}"
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Instructor: {teacher_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"

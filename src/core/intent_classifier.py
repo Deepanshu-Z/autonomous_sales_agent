@@ -12,6 +12,8 @@ from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 
+_local_env = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+load_dotenv(_local_env)
 load_dotenv()
 
 _classifier_llm = None
@@ -59,6 +61,7 @@ def _empty_flags() -> Dict[str, Any]:
         "profile_created_stated": "unmentioned",
         "selected_timing": None,
         "selected_teacher": None,
+        "selected_days": None,
         "selected_package": None,
         "selected_course": None,
         "wants_trial": False,
@@ -127,20 +130,24 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - Output ONLY the exact canonical string from the allowed list, or null. NEVER invent unlisted names.
    - CRITICAL NEGATIVE GUARD: Set to null if the customer is asking a general informational question about teachers (e.g. "who teaches?", "teachers kaun hain?", "faculty details", "who is the teacher for 5pm?"). In these cases, customer_intent is "QUESTION" and selected_teacher MUST BE null!
 
-6. "selected_course":
+6. "selected_days":
+   - Specific batch/class days definitively chosen, preferred, or requested by the user from the Allowed Canonical Batch Days in context (e.g. "Tuesday/Thursday", "Saturday/Sunday", "Wednesday/Friday", "Monday to Friday", "weekend", "weekdays", "Tue/Thu", "Sat/Sun").
+   - Output ONLY the canonical string from Allowed Canonical Batch Days (e.g. "Tuesday/Thursday", "Saturday/Sunday", "Wednesday/Friday", "Monday to Friday"), or null.
+
+7. "selected_course":
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
 
-7. "wants_trial":
+8. "wants_trial":
    - boolean: true if customer asks for demo, trial class, free trial, or wanting to try before enrolling.
 
-8. "requests_human_agent":
+9. "requests_human_agent":
    - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
    - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "need help", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
 
-9. "is_coupon_requested":
+10. "is_coupon_requested":
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").
 
-10. "is_disinterested":
+11. "is_disinterested":
     - boolean: true if the customer refuses, declines, rejects, or signals they will NOT enroll.
     - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
       • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "no", "nahi lena", "rehne do".
@@ -148,14 +155,15 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
 
-11. "is_complaint_or_refund":
+12. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
 
-12. "customer_intent":
+13. "customer_intent":
     Must be EXACTLY ONE of:
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
     - "TEACHER_SELECTION": Customer is selecting or stating their preferred instructor/teacher (e.g. "madhuri mam", "i want sneha mam", "vibha mittal", "aditi vyas").
+    - "DAY_SELECTION": Customer is selecting or stating their preferred batch days (e.g. "tuesday thursday", "weekend batch", "sat sun", "tue/thu", "sat & sun").
     - "PACKAGE_SELECTION": Customer is selecting or stating their preferred package duration (e.g. "3 months", "1 month", "1 year", "3 mahine").
     - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR chooses/taps an app store platform button (e.g. "android app", "ios app", "app link", "download link", "play store", "app store", "send link", "link bhejo", "link do", "konsi app", "which app").
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
@@ -206,6 +214,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "profile_created_stated": "confirmed" | "denied" | "unmentioned",
   "selected_timing": string | null,
   "selected_teacher": string | null,
+  "selected_days": string | null,
   "selected_package": string | null,
   "selected_course": string | null,
   "wants_trial": boolean,
@@ -261,6 +270,9 @@ async def extract_intent_and_state_changes(
         get_available_timings,
         get_course_instructors,
         resolve_canonical_teacher,
+        get_available_days_for_batch,
+        normalize_day_string,
+        get_day_code,
     )
     active_cid = s.get("course") or kb_loader.detect_course_from_text(text, default_course=None) or ""
     course_pkgs = list(kb_loader.get_valid_packages(active_cid).keys()) if active_cid else ["1 Month", "3 Months", "6 Months", "1 Year"]
@@ -274,16 +286,22 @@ async def extract_intent_and_state_changes(
     course_batches = [b.get("time_12h", "").strip() for b in get_available_timings(active_cid)] if active_cid else []
     timings_str = ", ".join(f'"{t}"' for t in course_batches if t) if course_batches else '"Check Course Batches"'
 
+    # Canonical days for active course
+    course_days = get_available_days_for_batch(active_cid if active_cid else None)
+    days_str = ", ".join(f'"{d}"' for d in course_days) if course_days else '"Check Course Batches"'
+
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
         f"- Active Course: {s.get('course') or 'None (Not Selected)'}\n"
         f"- Allowed Canonical Batch Timings for Active Course: [{timings_str}]\n"
+        f"- Allowed Canonical Batch Days for Active Course: [{days_str}]\n"
         f"- Allowed Canonical Packages for Active Course: [{pkgs_str}]\n"
         f"- Allowed Canonical Instructors for Active Course: [{teachers_str}]\n"
         f"- Selected Package: {s.get('package') or s.get('selected_duration') or 'None'}\n"
         f"- Selected Timing: {s.get('timing') or s.get('selected_timing') or 'None'}\n"
         f"- Selected Teacher: {s.get('selected_teacher') or 'None'}\n"
+        f"- Selected Days: {s.get('days') or s.get('selected_days') or 'None'}\n"
         f"- App Installed in State: {bool(s.get('app_installed'))}\n"
         f"- Profile Created in State: {bool(s.get('profile_created'))}\n"
         f"- Welcome Coupon Already Sent: {bool(s.get('coupon_sent'))}\n\n"
@@ -338,21 +356,54 @@ async def extract_intent_and_state_changes(
         if raw_timing and isinstance(raw_timing, str):
             r_low = raw_timing.strip().lower()
             clean_user = r_low.replace(" ", "").replace("-", "to")
-            for b in course_batches:
-                b_low = b.lower()
-                if r_low == b_low or b_low.startswith(r_low):
-                    matched_batch = b
-                    break
-                # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
-                start_part = b_low.split(" to ")[0].replace(":00", "").replace(" ", "")
-                if clean_user == start_part or start_part.startswith(clean_user):
-                    matched_batch = b
-                    break
-                # Match full range: e.g. '12to1' or '12pmto1pm'
-                clean_batch = b_low.replace(":00", "").replace(" ", "")
-                if clean_user == clean_batch or clean_user == clean_batch.replace("pm", "").replace("am", ""):
-                    matched_batch = b
-                    break
+
+            # Ambiguous bare digit resolution (e.g. '5', '6', '7' without AM/PM)
+            if clean_user.isdigit():
+                target_hr = int(clean_user)
+                candidates = []
+                for b in course_batches:
+                    try:
+                        start_hr = int(b.split(":")[0])
+                        if start_hr == target_hr:
+                            candidates.append(b)
+                    except Exception:
+                        pass
+                if len(candidates) == 1:
+                    matched_batch = candidates[0]
+                elif len(candidates) > 1:
+                    period_hint = (s.get("timing_period") or "").lower()
+                    if not period_hint:
+                        if any(w in text.lower() for w in ["evening", "sham", "shaam", "raat", "night", "pm", "afternoon", "dopahar"]):
+                            period_hint = "evening"
+                        elif any(w in text.lower() for w in ["morning", "subah", "am"]):
+                            period_hint = "morning"
+                    if period_hint in ("evening", "afternoon", "pm"):
+                        pm_cands = [c for c in candidates if "pm" in c.lower()]
+                        if pm_cands:
+                            matched_batch = pm_cands[0]
+                    elif period_hint in ("morning", "am"):
+                        am_cands = [c for c in candidates if "am" in c.lower()]
+                        if am_cands:
+                            matched_batch = am_cands[0]
+                    if not matched_batch:
+                        matched_batch = candidates[0]
+
+            if not matched_batch:
+                for b in course_batches:
+                    b_low = b.lower()
+                    if r_low == b_low or b_low.startswith(r_low):
+                        matched_batch = b
+                        break
+                    # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
+                    start_part = b_low.split(" to ")[0].replace(":00", "").replace(" ", "")
+                    if clean_user == start_part or start_part.startswith(clean_user):
+                        matched_batch = b
+                        break
+                    # Match full range: e.g. '12to1' or '12pmto1pm'
+                    clean_batch = b_low.replace(":00", "").replace(" ", "")
+                    if clean_user == clean_batch or clean_user == clean_batch.replace("pm", "").replace("am", ""):
+                        matched_batch = b
+                        break
 
         if matched_batch:
             clean["selected_timing"] = matched_batch
@@ -374,11 +425,27 @@ async def extract_intent_and_state_changes(
         matched_teacher = None
         if raw_teacher and isinstance(raw_teacher, str):
             matched_teacher = resolve_canonical_teacher(raw_teacher, course_id=active_cid or None)
-        elif not raw_teacher and clean.get("customer_intent") not in ("QUESTION", "DISINTEREST", "COMPLAINT"):
-            # Check if user named an instructor in text without LLM extracting it
+        if not matched_teacher and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
+            # Check if user named an instructor in text (including when asking question or requesting demo)
             matched_teacher = resolve_canonical_teacher(text, course_id=active_cid or None)
 
         clean["selected_teacher"] = matched_teacher or (raw_teacher if raw_teacher in course_teachers else None)
+        if clean.get("selected_teacher") and clean.get("customer_intent") in ("QUESTION", "OTHER") and not clean.get("wants_demo"):
+            clean["customer_intent"] = "TEACHER_SELECTION"
+
+        # Strict canonical day normalization against allowed course days
+        raw_day = clean.get("selected_days")
+        matched_day = None
+        if raw_day and isinstance(raw_day, str):
+            from src.core.helpers.schedule_engine import normalize_day_string
+            matched_day = normalize_day_string(raw_day)
+        elif not raw_day and clean.get("customer_intent") not in ("QUESTION", "DISINTEREST", "COMPLAINT"):
+            from src.core.helpers.schedule_engine import normalize_day_string
+            matched_day = normalize_day_string(text)
+
+        clean["selected_days"] = matched_day
+        if matched_day and clean.get("customer_intent") in ("QUESTION", "OTHER"):
+            clean["customer_intent"] = "DAY_SELECTION"
 
         # Deterministic course detection from user text overrides ambiguous LLM extraction
         llm_course = clean.get("selected_course")
@@ -411,10 +478,51 @@ async def extract_intent_and_state_changes(
             detected_course = kb_loader.detect_course_from_text_fallback(text, default_course=None)
             if detected_course:
                 flags["selected_course"] = detected_course
+
+            # Timing fallback matching
+            cid_for_timing = detected_course or active_cid or s.get("course") or "yoga"
+            batches_for_fallback = [b.get("time_12h", "").strip() for b in kb_loader.get_available_timings(cid_for_timing)]
+            raw_t = text.strip().lower()
+            clean_t = raw_t.replace(" ", "").replace("-", "to")
+            if clean_t.isdigit():
+                t_hr = int(clean_t)
+                cands = [b for b in batches_for_fallback if b.startswith(f"{t_hr}:") or b.startswith(f"0{t_hr}:")]
+                if len(cands) == 1:
+                    flags["selected_timing"] = cands[0]
+                    flags["customer_intent"] = "TIMING_SELECTION"
+                elif len(cands) > 1:
+                    p_hint = (s.get("timing_period") or "").lower()
+                    if p_hint in ("evening", "afternoon", "pm"):
+                        pm_c = [c for c in cands if "pm" in c.lower()]
+                        flags["selected_timing"] = pm_c[0] if pm_c else cands[0]
+                    else:
+                        flags["selected_timing"] = cands[0]
+                    flags["customer_intent"] = "TIMING_SELECTION"
+            elif any(w in clean_t for w in ["am", "pm", "to"]):
+                for b in batches_for_fallback:
+                    b_clean = b.lower().replace(" ", "").replace(":00", "")
+                    if clean_t in b_clean or clean_t == b_clean:
+                        flags["selected_timing"] = b
+                        flags["customer_intent"] = "TIMING_SELECTION"
+                        break
+
+            # Package fallback matching
+            from src.core.coupons import normalize_package_name
+            norm_p = normalize_package_name(text, course_id=cid_for_timing)
+            if norm_p:
+                flags["selected_package"] = norm_p
+                flags["customer_intent"] = "PACKAGE_SELECTION"
+
             detected_teacher = resolve_canonical_teacher(text, course_id=detected_course)
             if detected_teacher:
                 flags["selected_teacher"] = detected_teacher
                 flags["customer_intent"] = "TEACHER_SELECTION"
+            from src.core.helpers import normalize_day_string
+            detected_day = normalize_day_string(text)
+            if detected_day:
+                flags["selected_days"] = detected_day
+                if flags.get("customer_intent") in ("QUESTION", "OTHER"):
+                    flags["customer_intent"] = "DAY_SELECTION"
             if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
             if re.search(r"\b(app guide|app video|download video|how to download|app kaise download|how to install)\b", text, re.IGNORECASE):
@@ -473,12 +581,22 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
                 if not flags.get("selected_timing"):
                     new_state["timing"] = None
                     new_state["selected_timing"] = None
+                    new_state["stage"] = "NEW"
                 if not flags.get("selected_teacher"):
                     new_state["selected_teacher"] = None
+                    new_state["teacher"] = None
+                if not flags.get("selected_days"):
+                    new_state["days"] = None
+                    new_state["selected_days"] = None
+                    new_state["days_code"] = None
                 if not flags.get("selected_package"):
                     new_state["package"] = None
                     new_state["selected_duration"] = None
                     new_state["fee"] = None
+                    new_state["base_fee"] = None
+                    new_state["offer_fee"] = None
+                    new_state["gst_amount"] = None
+                    new_state["gst_percentage"] = None
             new_state["course"] = cand_course
 
     active_course = new_state.get("course")
@@ -492,39 +610,122 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["timing"] = None
         new_state["selected_timing"] = None
 
-    # 3. Teacher Slot Merge (Only on selection turns, canonical resolution)
-    if flags.get("selected_teacher") and is_selection_turn:
-        resolved = resolve_canonical_teacher(flags["selected_teacher"], course_id=active_course)
-        teacher_val = resolved or flags["selected_teacher"]
+    # 3. Teacher Slot Merge (On selection turns OR when teacher is explicitly mentioned / demo requested)
+    teacher_flag = flags.get("selected_teacher")
+    if teacher_flag and (is_selection_turn or flags.get("wants_demo") or not new_state.get("selected_teacher")):
+        resolved = resolve_canonical_teacher(teacher_flag, course_id=active_course)
+        teacher_val = resolved or teacher_flag
         new_state["selected_teacher"] = teacher_val
         new_state["teacher"] = teacher_val
         new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
 
-        # Deterministic Auto-Binding of Timing: If instructor teaches exactly 1 slot, auto-bind it
-        if active_course and teacher_val and not new_state.get("timing"):
-            from src.core.helpers.schedule_engine import get_slots_for_teacher
+        # Deterministic Auto-Binding of Timing: If timing missing OR teacher doesn't teach current timing
+        if active_course and teacher_val:
+            from src.core.helpers.schedule_engine import get_slots_for_teacher, extract_time_tokens
             t_slots = get_slots_for_teacher(active_course, teacher_val)
-            # Filter by period if user already picked a timing period (e.g. morning/evening in session)
-            period_context = (new_state.get("timing_period") or "").lower()
-            if len(t_slots) == 1:
-                auto_slot = t_slots[0].get("time_12h")
-                if auto_slot:
-                    new_state["timing"] = auto_slot
-                    new_state["selected_timing"] = auto_slot
-                    new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
-            elif len(t_slots) > 1 and period_context:
-                matching_period_slots = [
-                    s.get("time_12h") for s in t_slots
-                    if period_context in s.get("time_12h", "").lower() or (
-                        period_context == "morning" and "am" in s.get("time_12h", "").lower()
-                    ) or (
-                        period_context in ("evening", "afternoon") and "pm" in s.get("time_12h", "").lower()
-                    )
-                ]
-                if len(matching_period_slots) == 1:
-                    new_state["timing"] = matching_period_slots[0]
-                    new_state["selected_timing"] = matching_period_slots[0]
-                    new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+            current_timing = new_state.get("timing")
+
+            teacher_teaches_current = False
+            if current_timing and t_slots:
+                c_hr, c_merid = extract_time_tokens(current_timing)
+                for s in t_slots:
+                    s_hr, s_merid = extract_time_tokens(s.get("time_12h"))
+                    if c_hr is not None and s_hr is not None and c_hr == s_hr and c_merid == s_merid:
+                        teacher_teaches_current = True
+                        break
+
+            if not current_timing or not teacher_teaches_current:
+                # Filter by period if user already picked a timing period (e.g. morning/evening in session)
+                period_context = (new_state.get("timing_period") or "").lower()
+                if not period_context and current_timing:
+                    _, c_merid = extract_time_tokens(current_timing)
+                    if c_merid:
+                        period_context = "evening" if c_merid == "PM" else "morning"
+
+                if len(t_slots) == 1:
+                    auto_slot = t_slots[0].get("time_12h")
+                    if auto_slot:
+                        new_state["timing"] = auto_slot
+                        new_state["selected_timing"] = auto_slot
+                        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+                elif len(t_slots) > 1 and period_context:
+                    matching_period_slots = [
+                        s.get("time_12h") for s in t_slots
+                        if period_context in s.get("time_12h", "").lower() or (
+                            period_context == "morning" and "am" in s.get("time_12h", "").lower()
+                        ) or (
+                            period_context in ("evening", "afternoon") and "pm" in s.get("time_12h", "").lower()
+                        )
+                    ]
+                    if len(matching_period_slots) == 1:
+                        new_state["timing"] = matching_period_slots[0]
+                        new_state["selected_timing"] = matching_period_slots[0]
+                        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+
+    # Deterministic Auto-Binding of Single Teacher from Timing:
+    active_timing = new_state.get("timing") or new_state.get("selected_timing")
+    if active_course and active_timing and not new_state.get("selected_teacher"):
+        from src.core.helpers.schedule_engine import get_teachers_for_slot
+        slot_teachers = get_teachers_for_slot(active_course, active_timing)
+        if len(slot_teachers) == 1:
+            auto_t = slot_teachers[0]
+            new_state["selected_teacher"] = auto_t
+            new_state["teacher"] = auto_t
+            new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
+
+    # 3.5 Days Slot Merge & Deterministic Auto-Binding
+    # A. Explicit day selection from customer
+    if flags.get("selected_days"):
+        from src.core.helpers.schedule_engine import normalize_day_string, get_day_code
+        norm_d = normalize_day_string(flags["selected_days"])
+        if norm_d:
+            new_state["days"] = norm_d
+            new_state["selected_days"] = norm_d
+            new_state["days_code"] = get_day_code(norm_d)
+
+    # B. Dynamic Days Auto-Binding vs Confirmation
+    # Whenever course is known, check if timing/teacher restricts days to exactly 1 option
+    active_timing = new_state.get("timing") or new_state.get("selected_timing")
+    active_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
+
+    if active_course:
+        from src.core.helpers.schedule_engine import (
+            get_available_days_for_batch,
+            get_day_code,
+            normalize_day_string,
+        )
+        avail_days = get_available_days_for_batch(
+            course_id=active_course,
+            timing=active_timing,
+            teacher=active_teacher,
+        )
+
+        raw_user_text = (flags.get("_raw_text") or "").strip()
+        user_stated_day = flags.get("selected_days") or normalize_day_string(raw_user_text)
+
+        if len(avail_days) == 1:
+            # AUTO-BIND: Exactly 1 day option exists for this teacher + timing!
+            # Automatically bind without asking the user.
+            auto_day = avail_days[0]
+            new_state["days"] = auto_day
+            new_state["selected_days"] = auto_day
+            new_state["days_code"] = get_day_code(auto_day)
+        elif len(avail_days) > 1:
+            # Multiple day options exist for this teacher + timing!
+            if user_stated_day and user_stated_day in avail_days:
+                # User specified/confirmed one of the valid day options
+                new_state["days"] = user_stated_day
+                new_state["selected_days"] = user_stated_day
+                new_state["days_code"] = get_day_code(user_stated_day)
+            elif new_state.get("days") and new_state.get("days") in avail_days:
+                # Previously selected day is still valid for this combination
+                new_state["selected_days"] = new_state["days"]
+                new_state["days_code"] = get_day_code(new_state["days"])
+            else:
+                # Days ambiguous! Keep None so conversation asks user to confirm
+                new_state["days"] = None
+                new_state["selected_days"] = None
+                new_state["days_code"] = None
 
     # 4. Package / Duration Slot Merge & Deterministic Pricing
     if flags.get("selected_package") and is_selection_turn:

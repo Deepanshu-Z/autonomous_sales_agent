@@ -130,10 +130,20 @@ def get_default_state(phone: str) -> dict:
         # New Interactive Sales & Razorpay Payment Flow Fields
         "selected_timing": None,      # Selected batch timing string (e.g. "5:00 PM to 6:00 PM")
         "selected_teacher": None,     # Selected instructor name (e.g. "Ms. Madhuri")
+        "days": None,                 # Selected batch days string (e.g. "Tuesday/Thursday", "Monday to Friday")
+        "selected_days": None,        # Selected batch days (synced with days)
+        "days_code": None,            # Standard schedule code (e.g. "TT", "SS", "WF", "MTWTF")
         "selected_duration": None,    # Selected package duration (e.g. "3 Months")
         "order_id": None,             # Razorpay Order ID / QR ID (e.g. "qr_xxxx")
         "payment_status": "NONE",     # Payment lifecycle: "NONE" | "PENDING" | "PAID"
         "reset_at": int(time.time()), # Epoch timestamp when state was initialized / reset
+
+        "student_email": None,              # Customer's Gmail address for in-app account linking
+        "awaiting_email_fulfillment": False, # Flag waiting for user to send Gmail post-payment or post-trial
+        "awaiting_trial_email": False,      # Flag waiting for user to send Gmail to schedule trial
+        "staged_enrollment": False,         # Boolean flag indicating paid enrollment was staged to sensationz-hono
+        "staged_trial": False,              # Boolean flag indicating trial class was staged to sensationz-hono
+        "staged_id": None,                  # UUID of the staged record in PendingAiEnrollmentTable or profile_id
 
         "app_installed": False,       # Boolean flag indicating if user installed the Sensationz App
         "profile_created": False,     # Boolean flag indicating if user created an in-app profile
@@ -195,7 +205,7 @@ def _check_sync_paid_status(phone: str, state: dict) -> dict:
         if entry:
             alt_st = entry[0] if isinstance(entry, tuple) else entry
             if alt_st and alt_st.get("payment_status") == "PAID":
-                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "selected_duration", "package", "fee"]:
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee"]:
                     if alt_st.get(k) is not None:
                         state[k] = alt_st[k]
                 return state
@@ -208,7 +218,7 @@ def _check_sync_paid_status(phone: str, state: dict) -> dict:
                 continue
             alt_st = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
             if isinstance(alt_st, dict) and alt_st.get("payment_status") == "PAID":
-                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "selected_duration", "package", "fee"]:
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee"]:
                     if alt_st.get(k) is not None:
                         state[k] = alt_st[k]
                 return state
@@ -270,7 +280,7 @@ def get_user_state(phone: str) -> dict:
             if res.data and len(res.data) > 0:
                 row = dict(res.data[0])
                 raw_topic = row.get("last_topic") or ""
-                if isinstance(raw_topic, str) and ("COURSE:" in raw_topic or "TEACHER:" in raw_topic or "PAY:" in raw_topic or "ORDER:" in raw_topic):
+                if isinstance(raw_topic, str) and ("COURSE:" in raw_topic or "TEACHER:" in raw_topic or "PAY:" in raw_topic or "ORDER:" in raw_topic or "EMAIL:" in raw_topic):
                     parts = raw_topic.split("||")
                     clean_topic_parts = []
                     for part in parts:
@@ -291,6 +301,10 @@ def get_user_state(phone: str) -> dict:
                             o_id = part_str.replace("ORDER:", "").strip()
                             if o_id:
                                 row["order_id"] = o_id
+                        elif part_str.startswith("EMAIL:"):
+                            e_val = part_str.replace("EMAIL:", "").strip()
+                            if e_val:
+                                row["student_email"] = e_val
                         else:
                             clean_topic_parts.append(part_str)
                     row["last_topic"] = "||".join(clean_topic_parts)
@@ -374,6 +388,9 @@ def save_user_state(phone: str, state: dict):
             order_val = state.get("order_id") or ""
             if order_val:
                 meta_parts.append(f"ORDER:{order_val}")
+            email_val = state.get("student_email") or ""
+            if email_val:
+                meta_parts.append(f"EMAIL:{email_val}")
 
             topic_val = str(state.get("last_topic") or "")
             meta_header = "||".join(meta_parts)

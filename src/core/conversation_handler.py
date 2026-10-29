@@ -117,6 +117,7 @@ def adapt_contextual_quick_replies(
         state.get("payment_status") == "PAID"
         or state.get("is_enrolled")
         or state.get("stage") == "ENROLLED"
+        or state.get("staged_enrollment")
     )
     if state.get("is_escalated") or (not is_client_paid and (
         state.get("payment_claimed")
@@ -209,14 +210,20 @@ def adapt_contextual_quick_replies(
             else:
                 candidate_buttons = ["Instructor Info", "Course Details"]
 
-        # ── 3. DURATION SLOT MISSING ──
+        # ── 3. DURATION SLOT MISSING OR DAYS CONFIRMATION ──
         elif not duration_val:
-            valid_pkgs = kb_loader.get_valid_packages(cid)
-            pkg_keys = list(valid_pkgs.keys()) if valid_pkgs else ["1 Month", "3 Months"]
-            candidate_buttons = [f"{d} Pack" for d in pkg_keys[:2]]
+            avail_days = kb_loader.get_available_days_for_batch(cid, str(timing_val), str(teacher_val)) if (timing_val and teacher_val) else []
+            followup_lower = (followup or "").lower()
+            asking_pkg = any(w in followup_lower for w in ["package", "month", "pack", "duration", "tier", "plan"])
+            if not state.get("days") and len(avail_days) > 1 and not asking_pkg:
+                candidate_buttons = [kb_loader.format_days_for_button(d) for d in avail_days[:2]]
+            else:
+                valid_pkgs = kb_loader.get_valid_packages(cid)
+                pkg_keys = list(valid_pkgs.keys()) if valid_pkgs else ["1 Month", "3 Months"]
+                candidate_buttons = [f"{d} Pack" for d in pkg_keys[:2]]
 
-        # ── 4. ENROLLED / PAID STUDENT ──
-        elif is_client_paid:
+        # ── 4. ENROLLED / PAID STUDENT / CONFIRMED TRIAL ──
+        elif is_client_paid or state.get("staged_trial") or state.get("stage") == "TRIAL_CONFIRMED":
             candidate_buttons = ["Download App", "My Classes"]
 
         # ── 5. PAYMENT SUMMARY & CHECKOUT (UNPAID) ──
@@ -312,13 +319,268 @@ async def handle_incoming_message(
         new_state["course"] = effective_course_id
         session_state["course"] = effective_course_id
         # When switching to a different course, clear old course-specific timings and packages
-        if old_course and old_course != effective_course_id:
+        old_entry = kb_loader.get_catalog_entry(old_course) or kb_loader.get_catalog_entry(kb_loader.detect_course_from_text(old_course) or "")
+        norm_old_course = old_entry["id"] if old_entry else old_course
+        if norm_old_course and norm_old_course != effective_course_id:
             new_state["timing"] = None
+            new_state["selected_timing"] = None
+            new_state["teacher"] = None
+            new_state["selected_teacher"] = None
             new_state["package"] = None
+            new_state["selected_duration"] = None
             new_state["fee"] = None
             session_state["timing"] = None
+            session_state["selected_timing"] = None
+            session_state["teacher"] = None
+            session_state["selected_teacher"] = None
             session_state["package"] = None
+            session_state["selected_duration"] = None
             session_state["fee"] = None
+
+    # ── Gmail Interception & Auto-Staging Pipeline ──────────────────────────
+    from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
+    user_email = clean_email(user_message)
+
+    if user_email:
+        new_state["student_email"] = user_email
+        session_state["student_email"] = user_email
+
+        phone_val = session_state.get("phone") or new_state.get("phone") or ""
+        timing_val = new_state.get("timing") or new_state.get("selected_timing")
+        teacher_val = new_state.get("selected_teacher") or new_state.get("teacher")
+        days_val = new_state.get("days") or new_state.get("selected_days")
+        days_code_val = new_state.get("days_code")
+        pkg_val = new_state.get("package") or new_state.get("selected_duration") or "1 Month"
+
+        catalog_entry = kb_loader.get_catalog_entry(effective_course_id) if effective_course_id else None
+        course_display_name = catalog_entry.get("name", effective_course_id.title()) if catalog_entry else (effective_course_id.title() if effective_course_id else "Dance & Performing Arts")
+
+        lang = (new_state.get("language") or session_state.get("language") or "English").lower()
+        is_hindi = "hindi" in lang and "hinglish" not in lang
+
+        is_paid_student = bool(
+            new_state.get("payment_status") == "PAID"
+            or new_state.get("is_enrolled")
+            or new_state.get("stage") == "ENROLLED"
+            or new_state.get("awaiting_email_fulfillment")
+            or session_state.get("awaiting_email_fulfillment")
+        )
+
+        is_trial_candidate = bool(
+            not is_paid_student
+            and (
+                new_state.get("wants_trial")
+                or flags.get("wants_trial")
+                or new_state.get("stage") in ("TRIAL_REQUESTED", "TRIAL_STEPS_SENT")
+                or session_state.get("awaiting_trial_email")
+                or re.search(r"\b(trial|demo)\b", user_message, re.IGNORECASE)
+            )
+        )
+
+        # ── Path A: Paid Course Auto-Staging upon receiving Gmail ────────────
+        if is_paid_student:
+            payment_id_val = new_state.get("payment_id") or new_state.get("order_id") or session_state.get("payment_id")
+            paid_amt_val = new_state.get("paid_amount") or session_state.get("paid_amount") or 0.0
+            staging_successful = bool(new_state.get("staged_enrollment") and new_state.get("student_email") == user_email)
+
+            if not staging_successful:
+                try:
+                    staging_res = await stage_ai_enrollment_async(
+                        email=user_email,
+                        contact=phone_val,
+                        course=course_display_name,
+                        timing=str(timing_val) if timing_val else None,
+                        teacher=str(teacher_val) if teacher_val else None,
+                        days=days_val,
+                        days_code=days_code_val,
+                        enrollment_type="COURSE",
+                        package_duration=pkg_val,
+                        payment_id=payment_id_val,
+                        amount=paid_amt_val,
+                        currency="INR",
+                    )
+                    if staging_res.get("success"):
+                        staging_successful = True
+                        new_state["staged_enrollment"] = True
+                        new_state["staged_id"] = staging_res.get("staged_id") or staging_res.get("profile_id")
+                        new_state["awaiting_email_fulfillment"] = False
+                        session_state.update(new_state)
+                        logger.info(f"[conversation_handler] ✅ Auto-staged paid enrollment for {phone_val} ({user_email})")
+                    else:
+                        logger.warning(
+                            f"[conversation_handler] ⚠️ Staging call returned unsuccessful for {phone_val}: "
+                            f"{staging_res.get('error') or staging_res.get('message')}"
+                        )
+                except Exception as exc:
+                    logger.error(f"[conversation_handler] Staging exception for paid student: {exc}")
+
+            if staging_successful:
+                if is_hindi:
+                    reply_text = (
+                        f"🎉 *आपका अकाउंट ऐप से सफलतापूर्वक लिंक हो गया है!* 🎉\n\n"
+                        f"नमस्ते! हमने आपका *{course_display_name}* का एडमिशन आपके Gmail (**{user_email}**) से कनेक्ट कर दिया है। 🌟\n\n"
+                        f"📋 *आपके बैच का विवरण:*\n"
+                        f"• *कोर्स:* {course_display_name} ({pkg_val})\n"
+                        f"• *बैच टाइमिंग:* {timing_val or 'As per app schedule'}\n"
+                        f"• *टीचर:* {teacher_val or 'Assigned Instructor'}\n\n"
+                        f"🚀 *लाइव क्लास शुरू करने के स्टेप्स:*\n"
+                        f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                        f"2. ऐप खोलें और **'Continue with Google'** पर टैप करके **{user_email}** से साइन इन करें।\n"
+                        f"3. आपका बैच सीधे \"My Classes\" सेक्शन में एक्टिव मिलेगा।\n\n"
+                        f"क्लास में मिलते हैं! 🙏✨"
+                    )
+                    followup_text = "क्या आपको ऐप डाउनलोड करने या लॉगिन करने में कोई सहायता चाहिए? 😊"
+                else:
+                    reply_text = (
+                        f"🎉 *Your Account is Successfully Linked!* 🎉\n\n"
+                        f"We have connected your *{course_display_name}* admission to your Gmail: **{user_email}**. 🌟\n\n"
+                        f"📋 *Your Enrolled Batch Details:*\n"
+                        f"• *Course:* {course_display_name} ({pkg_val})\n"
+                        f"• *Batch Timing:* {timing_val or 'As per app schedule'}\n"
+                        f"• *Assigned Teacher:* {teacher_val or 'Assigned Instructor'}\n\n"
+                        f"🚀 *Next Steps to Access Your Classes:*\n"
+                        f"1. *Download the Sensationz App:*\n"
+                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                        f"2. Open the app, tap **'Continue with Google'**, and select **{user_email}**.\n"
+                        f"3. Your enrolled course and live sessions are ready under \"My Classes\"!\n\n"
+                        f"We look forward to seeing you in class! 🙏✨"
+                    )
+                    followup_text = "Would you like any assistance downloading the app or logging in? 😊"
+            else:
+                if is_hindi:
+                    reply_text = (
+                        f"✅ *आपकी जानकारी और पेमेंट दर्ज कर ली गई है!* 🌟\n\n"
+                        f"हमने आपका Gmail (**{user_email}**) और पेमेंट संदर्भ (**{payment_id_val or 'Verified'}**) रिकॉर्ड कर लिया है।\n"
+                        f"हमारी टीम आपका *{course_display_name}* ({pkg_val}) बैच एक्टिवेट कर रही है।\n\n"
+                        f"📱 *कृपया Sensationz ऐप डाउनलोड कर लें:*\n"
+                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
+                        f"बैच एक्टिव होते ही आपके 'My Classes' सेक्शन में क्लास दिखने लगेगी!"
+                    )
+                    followup_text = "क्या आपको ऐप डाउनलोड करने में कोई सहायता चाहिए? 😊"
+                else:
+                    reply_text = (
+                        f"✅ *Your Payment & Details Are Registered!* 🌟\n\n"
+                        f"We have noted your Gmail (**{user_email}**) and payment reference (**{payment_id_val or 'Verified'}**).\n"
+                        f"Our support desk is currently finalizing your batch provisioning for *{course_display_name}* ({pkg_val}).\n\n"
+                        f"📱 *Please download the Sensationz App:*\n"
+                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
+                        f"Once logged in via Google, your classes will appear under **\"My Classes\"** shortly!"
+                    )
+                    followup_text = "Would you like any assistance downloading the app? 😊"
+
+            return {
+                "reply": reply_text,
+                "followup": followup_text,
+                "buttons": ["Download App", "Talk to Agent"],
+                "new_state": new_state,
+            }
+
+        # ── Path B: Free Trial Auto-Staging upon receiving Gmail ─────────────
+        elif is_trial_candidate:
+            trial_staged_successful = bool(new_state.get("staged_trial") and new_state.get("student_email") == user_email)
+            if not trial_staged_successful:
+                try:
+                    staging_res = await stage_ai_enrollment_async(
+                        email=user_email,
+                        contact=phone_val,
+                        course=course_display_name,
+                        timing=str(timing_val) if timing_val else None,
+                        teacher=str(teacher_val) if teacher_val else None,
+                        days=days_val,
+                        days_code=days_code_val,
+                        enrollment_type="TRIAL",
+                        package_duration="Trial",
+                        payment_id=None,
+                        amount=0.0,
+                        currency="INR",
+                    )
+                    new_state["stage"] = "TRIAL_CONFIRMED"
+                    new_state["wants_trial"] = True
+                    new_state["awaiting_trial_email"] = False
+                    if staging_res.get("success"):
+                        trial_staged_successful = True
+                        new_state["staged_trial"] = True
+                        new_state["staged_id"] = staging_res.get("staged_id") or staging_res.get("profile_id")
+                        session_state.update(new_state)
+                        logger.info(f"[conversation_handler] ✅ Auto-staged trial for {phone_val} ({user_email})")
+                    else:
+                        logger.warning(
+                            f"[conversation_handler] ⚠️ Trial staging returned unsuccessful for {phone_val}: "
+                            f"{staging_res.get('error') or staging_res.get('message')}"
+                        )
+                except Exception as exc:
+                    logger.error(f"[conversation_handler] Staging error for trial student: {exc}")
+
+            if trial_staged_successful:
+                if is_hindi:
+                    reply_text = (
+                        f"🎉 *आपकी फ्री ट्रायल क्लास कन्फर्म हो गई है!* 🎉\n\n"
+                        f"नमस्ते! हमने आपके *{course_display_name}* की फ्री ट्रायल क्लास आपके Gmail (**{user_email}**) से लिंक कर दी है। 🌟\n\n"
+                        f"📋 *ट्रायल क्लास का विवरण:*\n"
+                        f"• *कोर्स:* {course_display_name}\n"
+                        f"• *बैच टाइमिंग:* {timing_val or 'As per app schedule'}\n"
+                        f"• *टीचर:* {teacher_val or 'Assigned Instructor'}\n\n"
+                        f"🚀 *ट्रायल क्लास जॉइन करने के स्टेप्स:*\n"
+                        f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                        f"2. ऐप में **'Continue with Google'** पर टैप करके **{user_email}** से साइन इन करें।\n"
+                        f"3. आपकी फ्री ट्रायल क्लास सीधे डैशबोर्ड पर तैयार मिलेगी!\n\n"
+                        f"क्लास में मिलते हैं! 🙏✨"
+                    )
+                    followup_text = "क्या आपको ऐप डाउनलोड करने या क्लास में शामिल होने में कोई सहायता चाहिए? 😊"
+                else:
+                    reply_text = (
+                        f"🎉 *Your Free Trial Class is Confirmed!* 🎉\n\n"
+                        f"We have successfully reserved your free trial for *{course_display_name}* linked to your Gmail: **{user_email}**. 🌟\n\n"
+                        f"📋 *Trial Session Details:*\n"
+                        f"• *Course:* {course_display_name}\n"
+                        f"• *Batch Timing:* {timing_val or 'As per app schedule'}\n"
+                        f"• *Assigned Teacher:* {teacher_val or 'Assigned Instructor'}\n\n"
+                        f"🚀 *How to Join Your Free Trial:*\n"
+                        f"1. *Download the Sensationz App:*\n"
+                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                        f"2. Tap **'Continue with Google'** and sign in using **{user_email}**.\n"
+                        f"3. Your trial session is ready on your dashboard!\n\n"
+                        f"We look forward to seeing you in class! 🙏✨"
+                    )
+                    followup_text = "Would you like any assistance downloading the app or joining the session? 😊"
+            else:
+                if is_hindi:
+                    reply_text = (
+                        f"✅ *आपकी फ्री ट्रायल रिक्वेस्ट दर्ज कर ली गई है!* 🌟\n\n"
+                        f"हमने आपका Gmail (**{user_email}**) नोट कर लिया है।\n"
+                        f"हमारी टीम आपका *{course_display_name}* का ट्रायल स्लॉट तैयार कर रही है।\n\n"
+                        f"📱 *कृपया Sensationz ऐप डाउनलोड कर लें:*\n"
+                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
+                        f"Google से लॉगिन करने पर आपका ट्रायल सेशन डैशबोर्ड पर लाइव दिखेगा!"
+                    )
+                    followup_text = "क्या आपको ऐप डाउनलोड करने में कोई सहायता चाहिए? 😊"
+                else:
+                    reply_text = (
+                        f"✅ *Your Free Trial Request is Registered!* 🌟\n\n"
+                        f"We have noted your Gmail (**{user_email}**).\n"
+                        f"Our support desk is currently scheduling your trial session for *{course_display_name}*.\n\n"
+                        f"📱 *Please download the Sensationz App:*\n"
+                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
+                        f"Once logged in via Google, your trial will appear on your dashboard!"
+                    )
+                    followup_text = "Would you like any assistance downloading the app? 😊"
+
+            return {
+                "reply": reply_text,
+                "followup": followup_text,
+                "buttons": ["Download App", "Talk to Agent"],
+                "new_state": new_state,
+            }
 
     # 3. Build the system prompt with the freshly-understood state.
     # The bot strictly uses the customer's selected language unless explicitly switched.
@@ -677,6 +939,13 @@ def _sanitize_confirmation_guardrails(
             state.get("payment_status") == "PAID"
             or state.get("is_enrolled")
             or state.get("stage") == "ENROLLED"
+            or state.get("staged_enrollment")
+        )
+    )
+    is_trial_confirmed = bool(
+        state and (
+            state.get("staged_trial")
+            or state.get("stage") == "TRIAL_CONFIRMED"
         )
     )
 
@@ -709,8 +978,8 @@ def _sanitize_confirmation_guardrails(
             )
         return sanitized_reply, None
 
-    # 2. Check Free Trial Confirmation
-    if any(re.search(p, full_check, re.IGNORECASE) for p in _TRIAL_CONFIRMATION_PATTERNS):
+    # 2. Check Free Trial Confirmation (only if NOT verified/staged in session state)
+    if not is_trial_confirmed and any(re.search(p, full_check, re.IGNORECASE) for p in _TRIAL_CONFIRMATION_PATTERNS):
         logger.warning(f"[guardrails] Trial confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
         if has_devanagari:
             sanitized_reply = (
@@ -964,6 +1233,7 @@ async def dispatch_payment_qr_async(
             duration=pkg,
             timing=str(timing_val) if timing_val else None,
             teacher=str(teacher_val) if teacher_val else None,
+            days=str(state.get("days") or state.get("selected_days")) if (state.get("days") or state.get("selected_days")) else None,
             customer_phone=phone,
             name=f"Sensationz - {course_name}"[:40],
             description=f"{course_name} ({pkg}) Enrollment"[:255],
@@ -1317,23 +1587,28 @@ async def handle_conversation_turn_async(
         if yt_link and yt_link not in main_reply:
             main_reply = f"{main_reply.rstrip()}\n\n🎬 *Video Link:* {yt_link}"
 
-    # App links are allowed when customer explicitly asked for links, clicked platform button, or clicked Lock My Seat
+    # App links are allowed when customer explicitly asked for links, clicked platform button, or after enrollment/trial staging
     unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
+    is_client_paid = bool(
+        new_state.get("payment_status") == "PAID"
+        or new_state.get("is_enrolled")
+        or new_state.get("stage") == "ENROLLED"
+        or new_state.get("staged_enrollment")
+    )
+    if is_client_paid:
+        new_state["payment_claimed"] = False
+
     allow_app_links = bool(
         user_asked_links
+        or is_client_paid
+        or new_state.get("staged_enrollment")
+        or new_state.get("staged_trial")
+        or new_state.get("stage") in ("ENROLLED", "TRIAL_CONFIRMED")
         or last_turn.get("intent") == "APP_LINK_REQUEST"
         or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
         or "lock my seat" in unquoted_text
         or re.search(r"\b(android|ios|play\s*store|app\s*store|app\s*link|download\s*link|download\s*app|link\s*bhejo|link\s*do|send\s*link)\b", unquoted_text, re.IGNORECASE)
     )
-
-    is_client_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("is_enrolled")
-        or new_state.get("stage") == "ENROLLED"
-    )
-    if is_client_paid:
-        new_state["payment_claimed"] = False
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(

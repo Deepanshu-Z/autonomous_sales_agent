@@ -49,8 +49,12 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - If Timing is ALREADY selected/known, NEVER ask for timing again! Move immediately to Step 2 (Teacher).
 
     2. TEACHER SLOT (If Timing is SELECTED, but Customer's Selected Instructor is NOT SELECTED):
-       - Message #1: Warmly acknowledge their chosen timing. Introduce the instructor(s) assigned to that specific batch timing from COURSE_DATA. (If only 1 instructor teaches that batch, introduce them warmly).
-       - Message #2 (followup): Ask which instructor they would prefer for their classes, or if they would like to know more about their background/demo video (e.g. "Which instructor would you like to learn with, or would you like to explore their demo video? 😊").
+       - CASE A: MULTIPLE INSTRUCTORS for this timing (e.g. 2+ instructors available for that slot):
+         * Message #1: Warmly acknowledge their chosen timing. Introduce the instructors assigned to that specific timing from COURSE_DATA.
+         * Message #2 (followup): Ask which of these instructors they would prefer for their classes, or if they would like to explore their demo videos (e.g. "Which instructor would you like to learn with, or would you like to explore their demo video? 😊").
+       - CASE B: SINGLE INSTRUCTOR for this timing (Only 1 certified instructor teaches that batch):
+         * Message #1: Warmly acknowledge their chosen timing and introduce their assigned instructor (e.g. "You've selected 4:00 PM to 5:00 PM. Your instructor for this timing is Mradula...").
+         * Message #2 (followup): Their instructor is ALREADY settled! Do NOT ask "Which instructor would you like to learn with?". Move directly to Package Duration (Step 3) or offer their demo video before selecting package (e.g. "Which package duration would you like to start with — 1 Month or 3 Months? 😊", or "Would you like to see Mradula's demo video, or are you ready to select your package duration? 😊").
        - If Instructor is ALREADY selected/known, NEVER ask for instructor again!
        - SPECIAL GUARD: If Package Duration is ALREADY selected/known in session context, do NOT ask for package duration! Advance directly to Payment Summary (Step 4).
        - SPECIAL CASE (Teacher Selected First, Timing Missing): If customer selected an instructor who teaches multiple timings and timing is not yet confirmed, ask which of that instructor's batch timings they prefer before presenting packages!
@@ -119,15 +123,9 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          - The default funnel is strictly: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.
        * When a customer EXPLICITLY asks for a trial class:
          - Warmly confirm that Sensationz offers up to 3 free live interactive trial classes.
-         - EXPLAIN CHAT LIMITATION CLEARLY: Inform them transparently that trial classes CANNOT be booked or scheduled directly in WhatsApp chat.
-         - Free trial bookings can ONLY be reserved by the student themselves inside the Sensationz App:
-           1. Download the Sensationz App
-           2. Log in with Google and complete your profile
-           3. Go to Profile -> Trial Links
-           4. Select your batch timing & teacher, and tap 'Confirm Trial Enrollment'
-         - In Message #2 (followup): Ask if they would like the app download link or a short video tutorial on how to book in the app.
-         - Contextual Buttons: ["Android App", "iOS App"] or ["Download App", "Watch Video"].
-         - DO NOT collect trial timing or trial teacher in chat — all trial scheduling happens inside the app!
+         - Inform them that we can reserve their trial session directly: ask them to share their Gmail address (used for Google Sign-In) and preferred batch timing!
+         - In Message #2 (followup): Ask them to share their Gmail address so we can reserve their free trial class in the app (e.g. "Please share your Gmail address so we can reserve your free trial class in the app! 😊").
+         - Contextual Buttons: ["Morning Batch", "Evening Batch"] or ["Download App", "Watch Video"].
          - ABSOLUTE GUARD: NEVER pitch paid course packages, fee durations (1 Month / 3 Months), or enrollment checkout to a customer who is pursuing a trial!
   • FORMAT EXAMPLE:
     {{
@@ -542,9 +540,19 @@ def format_system_prompt(
     else:
         missing_slots.append("Instructor Preference")
 
+    days_val = s.get("days") or s.get("selected_days")
+    from src.core.helpers.schedule_engine import get_available_days_for_batch
+    avail_days = (
+        get_available_days_for_batch(cid, timing=timing_str, teacher=teacher_str)
+        if (cid and timing_str != "NOT SELECTED" and teacher_str != "NOT SELECTED")
+        else []
+    )
+
     if package_str != "NOT SELECTED":
         settled_slots.append(f"Package Duration: {package_str}")
     else:
+        if len(avail_days) > 1 and not days_val:
+            missing_slots.append(f"Batch Days ({', '.join(avail_days)})")
         missing_slots.append("Package Duration")
 
     last_turn_dict = s.get("_last_turn") or {}
@@ -625,6 +633,7 @@ def format_system_prompt(
         f"{turn_intent_guidance}"
         f"- Customer's Selected Batch Timing: {timing_str}\n"
         f"- Customer's Selected Instructor: {teacher_str}\n"
+        f"- Customer's Selected Class Days: {days_val or ('AUTO-SET (Single option)' if len(avail_days) <= 1 else 'NOT SELECTED')}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
         f"- Payment Status: {paid_status_str} (Amount Paid: {paid_amt_display})\n"
         f"- Next Funnel Slot to Steer Toward: {next_funnel_slot}\n"

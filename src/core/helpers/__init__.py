@@ -13,6 +13,10 @@ from src.core.helpers.schedule_engine import (
     format_teacher_batch_schedule,
     get_course_instructors,
     resolve_canonical_teacher,
+    get_available_days_for_batch,
+    get_day_code,
+    normalize_day_string,
+    format_days_for_button,
 )
 
 from src.core.pricing_engine import (
@@ -51,6 +55,10 @@ __all__ = [
     "format_teacher_batch_schedule",
     "get_course_instructors",
     "resolve_canonical_teacher",
+    "get_available_days_for_batch",
+    "get_day_code",
+    "normalize_day_string",
+    "format_days_for_button",
     # Pricing & Packages
     "get_course_gst_percentage",
     "calculate_gst_breakdown",

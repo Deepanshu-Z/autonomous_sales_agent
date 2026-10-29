@@ -84,6 +84,7 @@ async def get_client_summary_async(raw_phone: str) -> str:
     stage = state.get("stage") or "NEW"
     timing = state.get("timing") or state.get("selected_timing") or "Not Selected"
     teacher = state.get("selected_teacher") or state.get("teacher") or "Not Selected"
+    days = state.get("days") or state.get("selected_days") or "Not Selected"
     package = state.get("package") or state.get("selected_duration") or "Not Selected"
 
     fee = state.get("fee")
@@ -94,6 +95,8 @@ async def get_client_summary_async(raw_phone: str) -> str:
     paid_amt_str = f"₹{paid_amt}" if paid_amt is not None else "₹0.00"
 
     payment_id = state.get("payment_id") or state.get("order_id") or "None"
+    student_email = state.get("student_email") or "Not Provided"
+    staged_status = "✅ Linked / Staged" if (state.get("staged_enrollment") or state.get("staged_trial")) else ("⏳ Awaiting Gmail" if state.get("awaiting_email_fulfillment") else "❌ Not Staged")
     app_installed = "✅ Yes" if state.get("app_installed") else "❌ Pending"
     profile_created = "✅ Yes" if state.get("profile_created") else "❌ Pending"
     coupon_sent = "✅ Yes" if state.get("coupon_sent") else "❌ No"
@@ -108,12 +111,15 @@ async def get_client_summary_async(raw_phone: str) -> str:
         f"📚 *Course:* {course_title}",
         f"⏰ *Batch Timing:* {timing}",
         f"👩‍🏫 *Instructor:* {teacher}",
+        f"🗓️ *Batch Days:* {days}",
         f"📦 *Package Duration:* {package}",
         f"💰 *Fee / Price:* {fee_str}",
         "────────────────────",
         f"💳 *Payment Status:* {payment_status}",
         f"💵 *Amount Paid:* {paid_amt_str}",
         f"🧾 *Transaction / Order ID:* {payment_id}",
+        f"📧 *Student Email:* {student_email}",
+        f"🚀 *In-App Staging:* {staged_status}",
         "────────────────────",
         f"📲 *App Installed:* {app_installed}",
         f"👤 *Profile Created:* {profile_created}",

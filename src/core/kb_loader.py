@@ -81,10 +81,10 @@ def get_course_catalog() -> List[Dict[str, Any]]:
 
 def get_catalog_entry(course_id: str) -> Optional[Dict[str, Any]]:
     cid = (course_id or "").lower().strip()
-    # Check id OR aliases (e.g. 'zumba' -> matches 'fitness' catalog entry)
+    # Check id OR name OR aliases (e.g. 'zumba' -> matches 'fitness' catalog entry)
     return next(
         (c for c in get_course_catalog() 
-         if c.get("id") == cid or cid in [a.lower() for a in c.get("aliases", [])]), 
+         if c.get("id") == cid or cid == c.get("name", "").lower() or cid in [a.lower() for a in c.get("aliases", [])]), 
         None
     )
 
@@ -388,6 +388,10 @@ from src.core.helpers.schedule_engine import (
     format_teacher_batch_schedule,
     get_course_instructors,
     resolve_canonical_teacher,
+    get_available_days_for_batch,
+    get_day_code,
+    normalize_day_string,
+    format_days_for_button,
 )
 
 from src.core.pricing_engine import (

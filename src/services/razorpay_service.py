@@ -73,6 +73,7 @@ def create_dynamic_qr_code(
     duration: Optional[str] = None,
     timing: Optional[str] = None,
     teacher: Optional[str] = None,
+    days: Optional[str] = None,
     student_name: Optional[str] = None,
     close_by_minutes: int = 30,
     client: Optional[razorpay.Client] = None,
@@ -147,6 +148,7 @@ def create_dynamic_qr_code(
         ("duration", duration),
         ("timing", timing),
         ("teacher", teacher),
+        ("days", days),
         ("student_name", student_name),
         ("source", "whatsapp_sales_agent"),
     ]
@@ -290,10 +292,12 @@ def format_onboarding_confirmation(
     amount_inr: float,
     payment_id: str,
     language: str = "english",
+    student_email: Optional[str] = None,
 ) -> str:
     """
     Formats the WhatsApp confirmation receipt and onboarding instructions template.
-    Adapts dynamically to English or Hindi.
+    Adapts dynamically to English or Hindi, and accurately reflects whether the user's
+    Gmail is already linked to Google Sign-In or still awaiting receipt.
     """
     lang = (language or "english").lower().strip()
     is_hindi = "hindi" in lang and "hinglish" not in lang
@@ -302,6 +306,28 @@ def format_onboarding_confirmation(
     display_teacher = teacher or "Dedicated Sensationz Instructor"
 
     if is_hindi:
+        if student_email:
+            login_instructions = (
+                f"🚀 *शुरुआती निर्देश (Onboarding Steps):*\n"
+                f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                f"2. *लॉगिन करें:* ऐप खोलें और **'Continue with Google'** पर टैप करके अपनी ईमेल (*{student_email}*) से लॉगिन करें।\n"
+                f"3. *लाइव क्लास एक्सेस करें:* आपका कोर्स और बैच आपके इस ईमेल से लिंक हो चुका है। \"My Classes\" सेक्शन में अपनी लाइव क्लास देखें!\n"
+                f"4. *क्लास रिमाइंडर:* क्लास शुरू होने से पहले आपको सूचना भी मिलेगी।\n\n"
+                f"किसी भी सहायता के लिए आप कभी भी यहाँ मैसेज कर सकते हैं। क्लास में मिलते हैं! 🙏✨"
+            )
+        else:
+            login_instructions = (
+                f"🚀 *अंतिम स्टेप — अपना Gmail एड्रेस भेजें:*\n"
+                f"ऐप में आपका कोर्स तुरंत एक्टिवेट करने के लिए, कृपया अपना **Gmail एड्रेस** (जिससे आप ऐप में Google Sign-In करेंगे) यहाँ चैट में भेजें! 📧👇\n\n"
+                f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                f"2. अपना Gmail यहाँ शेयर करते ही आपकी क्लास आपके Google अकाउंट से लिंक हो जाएगी।\n"
+                f"3. ऐप में **'Continue with Google'** से लॉगिन करें और क्लास शुरू करें! 🌟"
+            )
+
         return (
             f"🎉 *फीस पेमेंट सफल और एडमिशन कन्फर्म!* 🎉\n\n"
             f"नमस्ते! *Sensationz Performing Arts* परिवार में आपका हार्दिक स्वागत है! "
@@ -313,14 +339,28 @@ def format_onboarding_confirmation(
             f"• *अध्यापक / इंस्ट्रक्टर:* {display_teacher}\n"
             f"• *जमा की गई राशि:* ₹{amount_inr:,.2f}\n"
             f"• *ट्रांजेक्शन आईडी:* {payment_id}\n\n"
-            f"🚀 *शुरुआती निर्देश (Onboarding Steps):*\n"
-            f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+            f"{login_instructions}"
+        )
+
+    if student_email:
+        login_instructions = (
+            f"🚀 *Next Steps & Onboarding:*\n"
+            f"1. *Download the Sensationz App:*\n"
             f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
             f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            f"2. *लॉगिन करें:* अपने इसी रजिस्टर्ड व्हाट्सएप नंबर से OTP द्वारा लॉगिन करें।\n"
-            f"3. *लाइव क्लास जॉइन करें:* आपके बैच और लाइव क्लास के लिंक्स ऐप में \"My Classes\" सेक्शन में सक्रिय हो चुके हैं।\n"
-            f"4. *क्लास रिमाइंडर:* क्लास शुरू होने से पहले आपको सूचना भी मिलेगी।\n\n"
-            f"किसी भी सहायता के लिए आप कभी भी यहाँ मैसेज कर सकते हैं। क्लास में मिलते हैं! 🙏✨"
+            f"2. *Sign In:* Open the app and tap **'Continue with Google'** using your email: *{student_email}*.\n"
+            f"3. *Access Your Classes:* Your admission is already linked! Your batch and live class links are waiting under \"My Classes\" on your dashboard.\n"
+            f"4. *Live Class Reminder:* You will also receive class joining notifications before your scheduled sessions.\n\n"
+            f"If you have any questions or need onboarding assistance, simply reply here. We look forward to seeing you in class! 🙏✨"
+        )
+    else:
+        login_instructions = (
+            f"🚀 *Final Step — Activate Your In-App Access:*\n"
+            f"To instantly link your enrolled course to your Sensationz App profile, please reply with your **Gmail address** (the one you use for Google Sign-In) right here! 📧👇\n\n"
+            f"1. *Download the Sensationz App:*\n"
+            f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+            f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+            f"2. Once you send your Gmail here, our system connects your classes so they appear the moment you tap **'Continue with Google'**!"
         )
 
     return (
@@ -334,14 +374,7 @@ def format_onboarding_confirmation(
         f"• *Assigned Teacher:* {display_teacher}\n"
         f"• *Amount Paid:* ₹{amount_inr:,.2f}\n"
         f"• *Transaction ID:* {payment_id}\n\n"
-        f"🚀 *Next Steps & Onboarding:*\n"
-        f"1. *Download the Sensationz App:*\n"
-        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-        f"2. *Login:* Use this registered WhatsApp phone number to log in via OTP.\n"
-        f"3. *Access Your Classes:* Your enrolled batch, schedule, and live class links are now active under \"My Classes\" on your dashboard.\n"
-        f"4. *Live Class Reminder:* You will also receive class joining notifications before your scheduled sessions.\n\n"
-        f"If you have any questions or need onboarding assistance, simply reply here or reach out to our support team. We look forward to seeing you in class! 🙏✨"
+        f"{login_instructions}"
     )
 
 
@@ -499,6 +532,65 @@ async def fulfill_razorpay_payment_async(
         state["selected_teacher"] = teacher
         state["teacher"] = teacher
 
+    days = notes.get("days") or state.get("days") or state.get("selected_days")
+    days_code = notes.get("days_code") or state.get("days_code")
+    if days:
+        state["days"] = days
+        state["selected_days"] = days
+    if days_code:
+        state["days_code"] = days_code
+
+    # Extract customer email and auto-stage to backend API if available
+    from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
+    raw_email = (
+        payment_entity.get("email")
+        or notes.get("email")
+        or notes.get("customer_email")
+        or notes.get("student_email")
+        or state.get("student_email")
+    )
+    customer_email = clean_email(raw_email)
+
+    if customer_email:
+        state["student_email"] = customer_email
+        try:
+            staging_res = await stage_ai_enrollment_async(
+                email=customer_email,
+                contact=phone,
+                course=course_name or course_id,
+                timing=timing if timing != "Flexible / To be confirmed" else None,
+                teacher=teacher if teacher != "Assigned Instructor" else None,
+                days=days,
+                days_code=days_code,
+                enrollment_type="COURSE",
+                payment_id=payment_id,
+                amount=amount_inr,
+                currency="INR",
+            )
+            if staging_res.get("success"):
+                state["staged_enrollment"] = True
+                state["staged_id"] = staging_res.get("staged_id") or staging_res.get("profile_id")
+                state["awaiting_email_fulfillment"] = False
+                logger.info(
+                    f"[razorpay_service] ✅ Auto-staged payment enrollment for {phone} ({customer_email}) -> {staging_res.get('action')}"
+                )
+            else:
+                state["staged_enrollment"] = False
+                state["awaiting_email_fulfillment"] = False
+                logger.warning(
+                    f"[razorpay_service] Staging returned unsuccessful: {staging_res.get('error')}"
+                )
+        except Exception as exc:
+            state["staged_enrollment"] = False
+            state["awaiting_email_fulfillment"] = False
+            logger.error(f"[razorpay_service] Failed to call stage_ai_enrollment_async: {exc}")
+    else:
+        state["staged_enrollment"] = False
+        state["awaiting_email_fulfillment"] = True
+        logger.info(
+            f"[razorpay_service] ⚠️ No email found in payment {payment_id} for {phone}. Marked awaiting_email_fulfillment=True."
+        )
+
     # Save session state
     await save_user_state_async(phone, state)
 
@@ -512,6 +604,7 @@ async def fulfill_razorpay_payment_async(
         amount_inr=amount_inr,
         payment_id=payment_id,
         language=lang,
+        student_email=customer_email if state.get("staged_enrollment") else None,
     )
 
     # Deliver confirmation message via WhatsApp
@@ -543,6 +636,9 @@ async def fulfill_razorpay_payment_async(
         "amount_inr": amount_inr,
         "stage": state.get("stage"),
         "payment_status": "PAID",
+        "staged_enrollment": state.get("staged_enrollment", False),
+        "student_email": state.get("student_email"),
+        "awaiting_email_fulfillment": state.get("awaiting_email_fulfillment", False),
     }
 
 

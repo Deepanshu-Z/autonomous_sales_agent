@@ -106,6 +106,7 @@ def get_teachers_for_slot(course_id: Optional[str] = None, slot_or_timing: str =
 
     query = slot_or_timing.lower().strip()
     cleaned_query = re.sub(r"[\s\-_–:]+", " ", query)
+    q_hr, q_merid = extract_time_tokens(slot_or_timing)
 
     available_batches = get_available_timings(course_id)
     matched_teachers: List[str] = []
@@ -117,17 +118,14 @@ def get_teachers_for_slot(course_id: Optional[str] = None, slot_or_timing: str =
         cleaned_time = re.sub(r"[\s\-_–:]+", " ", time_str)
 
         is_match = False
-        if query in time_str or query in days_str or query in slot_str:
+        if q_hr is not None and q_merid is not None:
+            b_hr, b_merid = extract_time_tokens(time_str)
+            if b_hr == q_hr and b_merid == q_merid:
+                is_match = True
+        elif query in time_str or query == slot_str or query in days_str:
             is_match = True
         elif cleaned_query in cleaned_time:
             is_match = True
-        else:
-            hour_match = re.search(r"\b(\d{1,2})\s*(am|pm)\b", query)
-            if hour_match:
-                hr_token = f"{hour_match.group(1)} 00 {hour_match.group(2)}"
-                alt_token = f"{hour_match.group(1)} {hour_match.group(2)}"
-                if hr_token in cleaned_time or alt_token in cleaned_time:
-                    is_match = True
 
         if is_match:
             for instructor in batch.get("instructors", []):
@@ -355,6 +353,309 @@ def resolve_canonical_teacher(teacher_query: str, course_id: Optional[str] = Non
     if not matched and course_id:
         matched = find_in(all_candidates)
     return matched
+
+
+# ── DAY CODES & CANONICAL NAMES ──
+DAY_MAP_DISPLAY_TO_CODE = {
+    # Tuesday / Thursday
+    "tuesday/thursday": "TT",
+    "tuesday & thursday": "TT",
+    "tuesday and thursday": "TT",
+    "tue/thu": "TT",
+    "tue-thu": "TT",
+    "tues thurs": "TT",
+    "tue thu": "TT",
+    "tue and thu": "TT",
+    "tuesday thursday": "TT",
+    "tues/thurs": "TT",
+    "tt": "TT",
+    "mangalvaar guruvaar": "TT",
+    "mangalwar guruwar": "TT",
+    "mangal aur guruwar": "TT",
+    "mangalvaar": "TT",
+    "mangalwar": "TT",
+    "guruvaar": "TT",
+    "guruwar": "TT",
+    "tuesday": "TT",
+    "thursday": "TT",
+    "tue": "TT",
+    "tues": "TT",
+    "thu": "TT",
+    "thur": "TT",
+    "thurs": "TT",
+    "t-t": "TT",
+
+    # Wednesday / Friday
+    "wednesday/friday": "WF",
+    "wednesday & friday": "WF",
+    "wednesday and friday": "WF",
+    "wed/fri": "WF",
+    "wed-fri": "WF",
+    "wed fri": "WF",
+    "wed and fri": "WF",
+    "wednesday friday": "WF",
+    "wf": "WF",
+    "w-f": "WF",
+    "budhvaar shukravaar": "WF",
+    "budhwar shukrawar": "WF",
+    "budh aur shukrawar": "WF",
+    "budhvaar": "WF",
+    "budhwar": "WF",
+    "shukravaar": "WF",
+    "shukrawar": "WF",
+    "wednesday": "WF",
+    "friday": "WF",
+    "wed": "WF",
+    "fri": "WF",
+
+    # Saturday / Sunday
+    "saturday/sunday": "SS",
+    "saturday & sunday": "SS",
+    "saturday and sunday": "SS",
+    "sat/sun": "SS",
+    "sat-sun": "SS",
+    "sat sun": "SS",
+    "sat and sun": "SS",
+    "saturday sunday": "SS",
+    "weekend": "SS",
+    "weekends": "SS",
+    "weekend batch": "SS",
+    "ss": "SS",
+    "s-s": "SS",
+    "shanivaar ravivaar": "SS",
+    "shaniwar raviwar": "SS",
+    "shanivar ravivar": "SS",
+    "shani aur raviwar": "SS",
+    "shanivaar": "SS",
+    "shaniwar": "SS",
+    "shanivar": "SS",
+    "ravivaar": "SS",
+    "raviwar": "SS",
+    "saturday": "SS",
+    "sunday": "SS",
+    "sat": "SS",
+    "sun": "SS",
+
+    # Monday to Friday
+    "monday to friday": "MTWTF",
+    "monday - friday": "MTWTF",
+    "monday-friday": "MTWTF",
+    "mon-fri": "MTWTF",
+    "mon to fri": "MTWTF",
+    "mon fri": "MTWTF",
+    "monday through friday": "MTWTF",
+    "daily": "MTWTF",
+    "weekdays": "MTWTF",
+    "weekday": "MTWTF",
+    "weekday batch": "MTWTF",
+    "mtwtf": "MTWTF",
+    "m-f": "MTWTF",
+    "mf": "MTWTF",
+    "mon": "MTWTF",
+    "monday": "MTWTF",
+    "somvaar se shukravaar": "MTWTF",
+    "somwar se shukrawar": "MTWTF",
+    "som se shukra": "MTWTF",
+    "somvaar": "MTWTF",
+    "somwar": "MTWTF",
+
+    # Tuesday / Thursday / Saturday
+    "tuesday/thursday/saturday": "TTS",
+    "tuesday & thursday & saturday": "TTS",
+    "tts": "TTS",
+
+    # Monday / Wednesday / Friday
+    "monday/wednesday/friday": "MWF",
+    "monday & wednesday & friday": "MWF",
+    "mwf": "MWF",
+}
+
+CODE_TO_CANONICAL_DISPLAY = {
+    "TT": "Tuesday/Thursday",
+    "WF": "Wednesday/Friday",
+    "SS": "Saturday/Sunday",
+    "MTWTF": "Monday to Friday",
+    "TTS": "Tuesday/Thursday/Saturday",
+    "MWF": "Monday/Wednesday/Friday",
+}
+
+
+def get_day_code(day_input: Optional[str]) -> Optional[str]:
+    """Returns the standardized 2-5 letter schedule code (e.g. 'TT', 'SS', 'WF', 'MTWTF') for any day string."""
+    if not day_input or not str(day_input).strip():
+        return None
+    raw = str(day_input).strip().lower()
+    if raw in DAY_MAP_DISPLAY_TO_CODE:
+        return DAY_MAP_DISPLAY_TO_CODE[raw]
+
+    # Clean punctuation and extra spaces
+    cleaned = re.sub(r"[^\w/&-]", " ", raw)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if cleaned in DAY_MAP_DISPLAY_TO_CODE:
+        return DAY_MAP_DISPLAY_TO_CODE[cleaned]
+
+    # Substring token heuristics
+    if ("sat" in raw or "shani" in raw) and ("sun" in raw or "ravi" in raw):
+        return "SS"
+    if ("tue" in raw or "mangal" in raw) and ("thu" in raw or "guru" in raw):
+        return "TT"
+    if ("wed" in raw or "budh" in raw) and ("fri" in raw or "shukra" in raw):
+        return "WF"
+    if "weekend" in raw:
+        return "SS"
+    if "weekday" in raw or "daily" in raw or ("mon" in raw and "fri" in raw):
+        return "MTWTF"
+    if raw in ("sat", "sun", "saturday", "sunday", "shani", "ravi"):
+        return "SS"
+    if raw in ("tue", "tues", "tuesday", "thu", "thur", "thurs", "thursday", "mangal", "guru"):
+        return "TT"
+    if raw in ("wed", "wednesday", "fri", "friday", "budh", "shukra"):
+        return "WF"
+    if raw in ("mon", "monday", "som", "somwar", "somvaar"):
+        return "MTWTF"
+    return None
+
+
+def normalize_day_string(day_input: Optional[str]) -> Optional[str]:
+    """Normalizes any user day input, quick reply, or abbreviation into canonical course display string
+    (e.g. 'Tue & Thu' -> 'Tuesday/Thursday', 'weekend' -> 'Saturday/Sunday', 'daily' -> 'Monday to Friday').
+    """
+    code = get_day_code(day_input)
+    if code and code in CODE_TO_CANONICAL_DISPLAY:
+        return CODE_TO_CANONICAL_DISPLAY[code]
+    return None
+
+
+def format_days_for_button(day_str: str) -> str:
+    """Formats day string for WhatsApp quick-reply button (<= 20 chars).
+    e.g. 'Tuesday/Thursday' -> 'Tue & Thu'
+         'Saturday/Sunday' -> 'Sat & Sun'
+         'Wednesday/Friday' -> 'Wed & Fri'
+         'Monday to Friday' -> 'Mon to Fri'
+    """
+    code = get_day_code(day_str)
+    if code == "TT":
+        return "Tue & Thu"
+    elif code == "SS":
+        return "Sat & Sun"
+    elif code == "WF":
+        return "Wed & Fri"
+    elif code == "MTWTF":
+        return "Mon to Fri"
+    elif code == "TTS":
+        return "Tue, Thu, Sat"
+    elif code == "MWF":
+        return "Mon, Wed, Fri"
+    return str(day_str).replace("/", " & ")[:20]
+
+
+def extract_time_tokens(time_str: Optional[str]):
+    """Extracts (hour_12h, meridiem) from the start time of a timing string
+    (e.g. '5:00 PM to 6:00 PM' -> (5, 'PM'), '17:00' -> (5, 'PM'), '06:03-07:00' -> (6, 'AM')).
+    """
+    if not time_str:
+        return None, None
+    m = re.search(r"(?:^|[^\d:])(\d{1,2})(?::(\d{2}))?\s*(am|pm)", str(time_str), re.IGNORECASE)
+    if m:
+        hr = int(m.group(1))
+        merid = m.group(3).upper()
+        return hr, merid
+    m24 = re.search(r"(?:^|[^\d:])(\d{1,2}):(\d{2})", str(time_str))
+    if m24:
+        hr24 = int(m24.group(1))
+        merid = "AM" if hr24 < 12 else "PM"
+        hr12 = hr24 if 1 <= hr24 <= 12 else (hr24 - 12 if hr24 > 12 else 12)
+        return hr12, merid
+    return None, None
+
+
+def get_available_days_for_batch(
+    course_id: Optional[str] = None,
+    timing: Optional[str] = None,
+    teacher: Optional[str] = None,
+) -> List[str]:
+    """Returns a deduplicated list of available canonical day strings (e.g. ['Tuesday/Thursday', 'Saturday/Sunday'])
+    for a given course, filtered by timing and/or instructor if provided.
+    """
+    if not course_id:
+        return []
+
+    batches = get_available_timings(course_id)
+    if not batches:
+        return []
+
+    timing_query = str(timing).strip().lower() if timing else None
+    t_clean = re.sub(r"[\s\-_–:]+", " ", timing_query) if timing_query else None
+    q_hr, q_merid = extract_time_tokens(timing) if timing else (None, None)
+
+    target_teacher = resolve_canonical_teacher(teacher, course_id=course_id) if teacher else None
+    target_teacher_lower = target_teacher.lower() if target_teacher else (str(teacher).lower().strip() if teacher else None)
+
+    matched_days: List[str] = []
+    for b in batches:
+        b_time = b.get("time_12h", "")
+        b_days = b.get("days", "") or b.get("slot", "")
+        b_insts = b.get("instructors", [])
+
+        # 1. Timing filter (if timing provided)
+        if timing:
+            b_hr, b_merid = extract_time_tokens(b_time)
+            b_time_clean = re.sub(r"[\s\-_–:]+", " ", b_time.lower())
+            time_matches = False
+
+            if q_hr is not None and q_merid is not None and b_hr is not None and b_merid is not None:
+                # Exact start hour + meridiem match (e.g. 5 PM matches 5:00 PM to 6:00 PM, 17:00 matches 5:00 PM)
+                if q_hr == b_hr and q_merid == b_merid:
+                    time_matches = True
+            elif timing_query and (timing_query in b_time.lower() or b_time.lower() in timing_query):
+                time_matches = True
+            elif t_clean and (t_clean in b_time_clean or b_time_clean in t_clean):
+                time_matches = True
+
+            if not time_matches:
+                continue
+
+        # 2. Teacher filter (if teacher provided)
+        if target_teacher_lower:
+            teacher_matches = False
+            for inst in b_insts:
+                inst_canonical = resolve_canonical_teacher(inst, course_id=course_id) or inst
+                if (
+                    target_teacher_lower == inst.lower()
+                    or target_teacher_lower == inst_canonical.lower()
+                    or target_teacher_lower in inst.lower()
+                    or inst.lower() in target_teacher_lower
+                ):
+                    teacher_matches = True
+                    break
+            if not teacher_matches:
+                continue
+
+        canonical_day = normalize_day_string(b_days) or b_days.strip()
+        if canonical_day and canonical_day not in matched_days:
+            matched_days.append(canonical_day)
+
+    # Robust fallback: If strict intersection of timing + teacher yielded no matches (due to slot clash),
+    # fall back to teacher's days, timing's days, or course-wide days!
+    if not matched_days:
+        if teacher:
+            fallback_teacher = get_available_days_for_batch(course_id=course_id, teacher=teacher)
+            if fallback_teacher:
+                return fallback_teacher
+        if timing:
+            fallback_timing = get_available_days_for_batch(course_id=course_id, timing=timing)
+            if fallback_timing:
+                return fallback_timing
+        all_course_days = []
+        for b in batches:
+            d = normalize_day_string(b.get("days", "") or b.get("slot", "")) or (b.get("days", "") or "").strip()
+            if d and d not in all_course_days:
+                all_course_days.append(d)
+        if len(all_course_days) == 1:
+            return all_course_days
+
+    return matched_days
+
 
 
 

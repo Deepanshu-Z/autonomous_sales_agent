@@ -166,9 +166,8 @@ def adapt_contextual_quick_replies(
         for b in cleaned_raw:
             b_norm = str(b).strip()
             # Guard: Block premature payment buttons before all 5 prerequisites are fulfilled
-            if any(w in b_norm.lower() for w in ["pay", "checkout", "scanner", "upi qr"]):
-                if not (timing_val and teacher_val and duration_val):
-                    continue
+            if any(w in b_norm.lower() for w in ["pay", "checkout", "scanner", "upi qr", "pay online", "upi"]):
+                continue
             # Guard: Block unoffered periods for this course (e.g. Morning for Kathak)
             if any(m.lower() in b_norm.lower() for m in missing_periods):
                 continue
@@ -228,7 +227,7 @@ def adapt_contextual_quick_replies(
 
         # ── 5. PAYMENT SUMMARY & CHECKOUT (UNPAID) ──
         else:
-            candidate_buttons = ["Pay Online", "UPI QR"]
+            candidate_buttons = []  # Strictly single button: Talk to Agent
 
     # Deduplicate, sanitize length <= 20 chars, max 2 contextual buttons
     final_contextual: List[str] = []
@@ -357,6 +356,7 @@ async def handle_incoming_message(
 
         lang = (new_state.get("language") or session_state.get("language") or "English").lower()
         is_hindi = "hindi" in lang and "hinglish" not in lang
+        is_hinglish = "hinglish" in lang or "roman" in lang
 
         is_paid_student = bool(
             new_state.get("payment_status") == "PAID"
@@ -432,6 +432,23 @@ async def handle_incoming_message(
                         f"क्लास में मिलते हैं! 🙏✨"
                     )
                     followup_text = "क्या आपको ऐप डाउनलोड करने या लॉगिन करने में कोई सहायता चाहिए? 😊"
+                elif is_hinglish:
+                    reply_text = (
+                        f"🎉 *Aapka Account Successfully Link Ho Gaya Hai!* 🎉\n\n"
+                        f"Namaste! Humne aapka *{course_display_name}* admission aapke Gmail (**{user_email}**) se connect kar diya hai. 🌟\n\n"
+                        f"📋 *Aapke Batch Ki Details:*\n"
+                        f"• *Course:* {course_display_name} ({pkg_val})\n"
+                        f"• *Batch Timing:* {timing_val or 'As per app schedule'}\n"
+                        f"• *Assigned Teacher:* {teacher_val or 'Assigned Instructor'}\n\n"
+                        f"🚀 *Live Class Access Karne Ke Steps:*\n"
+                        f"1. *Sensationz App Download Karein:*\n"
+                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                        f"2. App open karein aur **'Continue with Google'** par tap karke **{user_email}** se sign in karein.\n"
+                        f"3. Aapka batch sidhe \"My Classes\" section mein active milega.\n\n"
+                        f"Class mein milte hain! 🙏✨"
+                    )
+                    followup_text = "Kya aapko app download karne ya login karne mein koi help chahiye? 😊"
                 else:
                     reply_text = (
                         f"🎉 *Your Account is Successfully Linked!* 🎉\n\n"
@@ -1399,12 +1416,25 @@ async def handle_conversation_turn_async(
             new_state["refusal_stage"] = 0
             current_refusal_stage = 0
 
-    is_refusal_or_complaint = (
-        last_turn.get("is_disinterested")
-        or last_turn.get("is_complaint_or_refund")
-        or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
-        or current_refusal_stage > 0
+    # Slot selection guard: If user is actively selecting/changing a slot, it CANNOT be a refusal
+    is_active_selection = bool(
+        last_turn.get("intent") in ("TIMING_SELECTION", "TEACHER_SELECTION", "PACKAGE_SELECTION", "COURSE_SELECTION", "DAY_SELECTION")
+        or new_state.get("timing") != state.get("timing")
+        or new_state.get("teacher") != state.get("teacher")
+        or new_state.get("package") != state.get("package")
     )
+
+    if is_active_selection:
+        new_state["refusal_stage"] = 0
+        current_refusal_stage = 0
+        is_refusal_or_complaint = False
+    else:
+        is_refusal_or_complaint = (
+            last_turn.get("is_disinterested")
+            or last_turn.get("is_complaint_or_refund")
+            or last_turn.get("intent") in ("COMPLAINT", "DISINTEREST")
+            or current_refusal_stage > 0
+        )
 
     if is_refusal_or_complaint:
         eval_res = await evaluate_refusal_async(

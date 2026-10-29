@@ -97,6 +97,9 @@ ANALYSIS CRITERIA:
 
 DECISION OUTCOMES:
 - If NOT a refusal (and not awaiting reason) -> `resolution_type` = "NOT_A_REFUSAL".
+- CRITICAL GUARD FOR BATCH / TIMING / TEACHER / PACKAGE SELECTION:
+  If the customer is stating, changing, switching, or correcting their preferred timing, batch, instructor, or package duration (e.g. "no i want 5pm", "change to evening", "switch batch", "5pm wala", "subah nahi shaam ko", "no 1 month"), this is a NORMAL SLOT SELECTION / PREFERENCE UPDATE, NOT A REFUSAL!
+  Set `is_refusal` = false, `resolution_type` = "NOT_A_REFUSAL", `reply_message` = null, `escalation_reason` = null.
 
 1. HIGH RISK / LEGAL / HARASSMENT / ANGER (IMMEDIATE AGENT ESCALATION):
    - If the customer expresses legal threats, financial/chargeback disputes, harassment, scam allegations, or direct anger/accusations (e.g. "u r lier", "jhuth bola", "scam company", "police complaint", "fraud", "consumer court"):

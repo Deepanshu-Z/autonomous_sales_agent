@@ -150,7 +150,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 11. "is_disinterested":
     - boolean: true if the customer refuses, declines, rejects, or signals they will NOT enroll.
     - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
-      • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "no", "nahi lena", "rehne do".
+      • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "nahi lena", "rehne do" (standalone rejections only).
+       • CONTRASTIVE SELECTION GUARD (MANDATORY): If the customer says "no" as part of a correction, preference update, or slot selection (e.g. "no i want 5pm", "no 6pm", "no, evening please", "no 1 month", "no change to 5pm", "nahi shaam ko", "nahi dusra timing chahiye"), this is a TIMING/PACKAGE/TEACHER SELECTION, NOT disinterest! "is_disinterested" MUST be false, and "customer_intent" must be the corresponding selection intent (e.g. "TIMING_SELECTION")!
       • Contextual: Customer explicitly states that an unmet requirement is a dealbreaker preventing enrollment, ONLY AFTER having been informed of our policy (e.g. "then I won't join", "offline nahi hai to rehne do", "fixed schedule nahi ho payega mujhse, cancel karo").
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
@@ -408,7 +409,8 @@ async def extract_intent_and_state_changes(
         if matched_batch:
             clean["selected_timing"] = matched_batch
             clean["unoffered_timing_mentioned"] = None
-            if clean.get("customer_intent") in ("QUESTION", "COURSE_INQUIRY"):
+            clean["is_disinterested"] = False
+            if clean.get("customer_intent") in ("QUESTION", "COURSE_INQUIRY", "DISINTEREST", "OTHER", None):
                 clean["customer_intent"] = "TIMING_SELECTION"
         else:
             clean["selected_timing"] = None
@@ -419,6 +421,51 @@ async def extract_intent_and_state_changes(
             from src.core.coupons import normalize_package_name
             norm_pkg = normalize_package_name(raw_pkg, course_id=active_cid or "yoga")
             clean["selected_package"] = norm_pkg or (raw_pkg if raw_pkg in course_pkgs else None)
+
+        # Universal Semantic Overrides: Active slot selections strictly negate disinterest
+        raw_text_course = kb_loader.detect_course_from_text(text, default_course=None)
+        from src.core.coupons import detect_package_from_text
+        text_teacher = resolve_canonical_teacher(text, course_id=active_cid or None)
+        text_pkg = detect_package_from_text(text)
+        text_timing_mentioned = bool(
+            re.search(r"\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}\s*to\s*\d{1,2}|morning|subah|evening|shaam|sham|dopahar|afternoon|night|raat)\b", text, re.IGNORECASE)
+        )
+        has_contrastive_slot_in_text = bool(
+            (clean.get("selected_timing") and text_timing_mentioned)
+            or (clean.get("selected_teacher") and text_teacher)
+            or (clean.get("selected_package") and text_pkg)
+            or (clean.get("selected_course") and raw_text_course)
+        )
+
+        if data.get("is_disinterested") or data.get("customer_intent") == "DISINTEREST":
+            if has_contrastive_slot_in_text:
+                clean["is_disinterested"] = False
+                if clean.get("selected_timing"):
+                    clean["customer_intent"] = "TIMING_SELECTION"
+                elif clean.get("selected_package"):
+                    clean["customer_intent"] = "PACKAGE_SELECTION"
+                elif clean.get("selected_teacher"):
+                    clean["customer_intent"] = "TEACHER_SELECTION"
+                elif clean.get("selected_course"):
+                    clean["customer_intent"] = "COURSE_SELECTION"
+            else:
+                clean["is_disinterested"] = True
+                clean["customer_intent"] = "DISINTEREST"
+                clean["selected_timing"] = None
+                clean["selected_teacher"] = None
+                clean["selected_package"] = None
+        else:
+            if clean.get("selected_timing") or clean.get("selected_teacher") or clean.get("selected_package") or (clean.get("selected_course") and raw_text_course):
+                clean["is_disinterested"] = False
+                if clean.get("customer_intent") in ("OTHER", None):
+                    if clean.get("selected_timing"):
+                        clean["customer_intent"] = "TIMING_SELECTION"
+                    elif clean.get("selected_teacher"):
+                        clean["customer_intent"] = "TEACHER_SELECTION"
+                    elif clean.get("selected_package"):
+                        clean["customer_intent"] = "PACKAGE_SELECTION"
+                    elif clean.get("selected_course"):
+                        clean["customer_intent"] = "COURSE_SELECTION"
 
         # Strict canonical teacher normalization against allowed course teachers
         raw_teacher = clean.get("selected_teacher")
@@ -603,9 +650,35 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
     if flags.get("selected_timing") and is_selection_turn:
-        new_state["timing"] = flags["selected_timing"]
-        new_state["selected_timing"] = flags["selected_timing"]
-        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+        old_timing = new_state.get("timing") or new_state.get("selected_timing")
+        new_timing = flags["selected_timing"]
+        new_state["timing"] = new_timing
+        new_state["selected_timing"] = new_timing
+
+        # If timing changed to a different slot, check teacher compatibility
+        if old_timing and old_timing != new_timing:
+            curr_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
+            if curr_teacher and active_course:
+                from src.core.helpers.schedule_engine import get_slots_for_teacher, extract_time_tokens
+                t_slots = get_slots_for_teacher(active_course, curr_teacher)
+                c_hr, c_merid = extract_time_tokens(new_timing)
+                teaches_new = any(
+                    extract_time_tokens(s.get("time_12h")) == (c_hr, c_merid)
+                    for s in t_slots
+                    if c_hr is not None
+                )
+                if not teaches_new:
+                    # Invalidate teacher and dependent slots because previous teacher does not teach this new timing
+                    new_state["selected_teacher"] = None
+                    new_state["teacher"] = None
+                    new_state["days"] = None
+                    new_state["selected_days"] = None
+                    new_state["days_code"] = None
+                    new_state["stage"] = "TIMING_SELECTED"
+            else:
+                new_state["stage"] = "TIMING_SELECTED"
+        else:
+            new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
     elif flags.get("unoffered_timing_mentioned"):
         new_state["timing"] = None
         new_state["selected_timing"] = None

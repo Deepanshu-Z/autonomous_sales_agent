@@ -214,7 +214,7 @@ def is_disinterest_signal(text: str) -> bool:
     # 2. Check if user is specifying/correcting a slot or asking about trial (e.g. "no, evening please", "trial b book kr skte h na")
     has_no = bool(re.search(r"\b(?:no|nahi|nhi|nah|nope)\b", t))
     if has_no:
-        has_timing = any(w in t for w in ["morning", "evening", "afternoon", "subah", "shaam", "am", "pm", "batch", "slot"])
+        has_timing = any(w in t for w in ["morning", "evening", "afternoon", "subah", "shaam", "am", "pm", "batch", "slot"]) or bool(re.search(r"\b\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b", t))
         has_pkg = any(w in t for w in ["1 month", "3 month", "6 month", "1 year", "monthly", "quarterly"])
         has_trial = any(w in t for w in ["trial", "demo", "book"])
         if (has_timing or has_pkg or has_trial) and len(t.split()) >= 2 and not any(p in t for p in ["nahi chahiye", "not interested", "dont want", "nahi lena"]):

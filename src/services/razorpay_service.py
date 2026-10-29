@@ -301,6 +301,7 @@ def format_onboarding_confirmation(
     """
     lang = (language or "english").lower().strip()
     is_hindi = "hindi" in lang and "hinglish" not in lang
+    is_hinglish = "hinglish" in lang or "roman" in lang
 
     display_timing = timing or "To be scheduled via Sensationz App"
     display_teacher = teacher or "Dedicated Sensationz Instructor"
@@ -339,6 +340,43 @@ def format_onboarding_confirmation(
             f"• *अध्यापक / इंस्ट्रक्टर:* {display_teacher}\n"
             f"• *जमा की गई राशि:* ₹{amount_inr:,.2f}\n"
             f"• *ट्रांजेक्शन आईडी:* {payment_id}\n\n"
+            f"{login_instructions}"
+        )
+
+    if is_hinglish:
+        if student_email:
+            login_instructions = (
+                f"🚀 *Onboarding Steps:*\n"
+                f"1. *Sensationz App Download Karein:*\n"
+                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                f"2. *Login Karein:* App open karein aur **'Continue with Google'** par tap karke apni email (*{student_email}*) se login karein.\n"
+                f"3. *Live Classes Access Karein:* Aapka course aur batch is email se link ho chuka hai. \"My Classes\" section mein apni live class dekhein!\n"
+                f"4. *Class Reminder:* Class start hone se pehle aapko notification bhi milega.\n\n"
+                f"Kisi bhi help ke liye aap yahan message kar sakte hain. Class mein milte hain! 🙏✨"
+            )
+        else:
+            login_instructions = (
+                f"🚀 *Final Step — Apna Gmail Address Bhejein:*\n"
+                f"App mein aapka course turant activate karne ke liye, kripya apna **Gmail address** (jisse aap app mein Google Sign-In karenge) yahan chat mein bhejein! 📧👇\n\n"
+                f"1. *Sensationz App Download Karein:*\n"
+                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                f"2. Apna Gmail yahan share karte hi aapki class aapke Google account se link ho jayegi.\n"
+                f"3. App mein **'Continue with Google'** se login karein aur class start karein! 🌟"
+            )
+
+        return (
+            f"🎉 *Payment Successful & Enrollment Confirm Ho Gaya!* 🎉\n\n"
+            f"Namaste! *Sensationz Performing Arts* family mein aapka hardik swagat hai! "
+            f"Aapka payment receive ho gaya hai aur aapka admission confirm ho chuka hai. 🌟\n\n"
+            f"📋 *Aapke Course Aur Batch Ki Details:*\n"
+            f"• *Course:* {course_name}\n"
+            f"• *Plan / Duration:* {duration}\n"
+            f"• *Batch Timing:* {display_timing}\n"
+            f"• *Assigned Teacher:* {display_teacher}\n"
+            f"• *Amount Paid:* ₹{amount_inr:,.2f}\n"
+            f"• *Transaction ID:* {payment_id}\n\n"
             f"{login_instructions}"
         )
 

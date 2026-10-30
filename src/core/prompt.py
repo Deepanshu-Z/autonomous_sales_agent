@@ -40,10 +40,11 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - Message #1: Warmly ask which course they are interested in from our catalog ({catalog_course_names}).
        - Message #2 (followup): Ask which discipline or style they would like to explore (e.g. "Which course would you like to know more about? 😊").
        - Quick-Reply Buttons: Contextual top course choices (e.g. ["Yoga", "Kathak", "Ladies Dance"]).
-       - If Course is ALREADY identified/selected, NEVER ask which course they are interested in! Immediately present the details (timings/fees) for that course and move to Step 1 (Timing).
+       - If Course is ALREADY identified/selected, NEVER ask which course they are interested in! Warmly acknowledge their course choice and move to the next missing slot (Step 1 Timing). Under NO circumstances list package fees, duration pricing, or coupon tables here unless the customer specifically asked about fees/pricing!
 
     1. TIMING SLOT (If Active Course is SELECTED, but Customer's Selected Batch Timing is NOT SELECTED):
        - Message #1: Concisely present the available batch timings for the active course from COURSE_DATA.
+       - STRICT FEE GUARD: Message #1 and Message #2 MUST NOT list package fees, duration pricing tables, or coupon codes while discussing batch timing! Only share pricing if the customer explicitly asked for fees.
        - Message #2 (followup): Ask which batch timing works best for their daily schedule (e.g. "Which batch timing suits your daily routine best? 😊").
        - Quick-Reply Buttons: Contextual timing options matching real available periods/slots (e.g. ["Morning Batch", "Evening Batch"] or ["5:00 PM", "6:00 PM"]).
        - If Timing is ALREADY selected/known, NEVER ask for timing again! Move immediately to Step 2 (Teacher).
@@ -56,10 +57,10 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          * Quick-Reply Buttons: Exactly the instructor choices (e.g. ["Suman Lata", "Priya Mathur"]).
        - CASE B: SINGLE INSTRUCTOR for this timing (Only 1 certified instructor teaches that batch):
          * Message #1: Warmly acknowledge their chosen timing and introduce their assigned instructor (e.g. "You've selected 4:00 PM to 5:00 PM. Your instructor for this timing is Mradula...").
-         * Message #2 (followup): Their instructor is ALREADY settled! Do NOT ask "Which instructor would you like to learn with?". Move directly to Package Duration (Step 3) or offer their demo video before selecting package (e.g. "Which package duration would you like to start with — 1 Month or 3 Months? 😊", or "Would you like to see Mradula's demo video, or are you ready to select your package duration? 😊").
+         * Message #2 (followup): Their instructor is ALREADY settled! Do NOT ask "Which instructor would you like to learn with?". If Package Duration is missing, move to Package Duration (Step 3) or offer their demo video. If Timing is missing, ask for their preferred timing!
        - If Instructor is ALREADY selected/known, NEVER ask for instructor again!
-       - SPECIAL GUARD: If Package Duration is ALREADY selected/known in session context, do NOT ask for package duration! Advance directly to Payment Summary (Step 4).
-       - SPECIAL CASE (Teacher Selected First, Timing Missing): If customer selected an instructor who teaches multiple timings and timing is not yet confirmed, ask which of that instructor's batch timings they prefer before presenting packages!
+       - SPECIAL GUARD: If Package Duration is ALREADY selected/known in session context, do NOT ask for package duration! If Timing is missing, ask for Timing! Under NO circumstances advance to Payment Summary (Step 4) if Timing is missing!
+       - SPECIAL CASE (Teacher Selected First, Timing Missing): If customer selected an instructor who teaches multiple timings and timing is not yet confirmed, ask which of that instructor's batch timings they prefer before presenting packages or payment!
 
     3. DURATION SLOT (If Timing & Instructor are BOTH SELECTED, but Package Duration is NOT SELECTED):
        - ABSOLUTE PREREQUISITE GUARD: BOTH Course AND Batch Timing AND Instructor MUST be selected before asking for package duration! If timing or instructor is still missing, DO NOT ask for package duration!
@@ -68,9 +69,13 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          * Message #1: Present the package options (recommend starting with 1 Month or saving with 3 Months) with transparent offer prices and the official GST note from COURSE_DATA.
          * Message #2 (followup): Ask which package duration they would like to begin with (e.g. "Which package duration would you like to start with — 1 Month or 3 Months? 😊").
          * Quick-Reply Buttons: Package duration choices (e.g. ["1 Month Pack", "3 Months Pack"]).
-       - If Package Duration is ALREADY selected/known, NEVER re-list packages or ask for duration again! Move immediately to Step 4 (Payment Summary).
+       - If Package Duration is ALREADY selected/known:
+         * If Batch Timing or Instructor is still missing, NEVER advance to Step 4 (Payment Summary)! You MUST ask for the missing detail (e.g. Batch Timing) first!
+         * ONLY when Course, Batch Timing, Instructor, and Package Duration are ALL 4 confirmed, move to Step 4 (Payment Summary).
 
-    4. PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (If Course, Timing, Instructor & Package Duration are ALL 5 SELECTED):
+    4. PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (STRICT PREREQUISITE: Course, Timing, Instructor & Package Duration MUST ALL BE CONFIRMED):
+       - ABSOLUTE PAYMENT BARRIER (RULE 2): If Course, Batch Timing, Instructor, or Package Duration is NOT SELECTED, YOU ARE STRICTLY FORBIDDEN FROM EXECUTING STEP 4!
+       - DO NOT summarize details for payment, DO NOT mention UPI QR code, DO NOT mention total payable fees, and DO NOT ask for assistance completing payment if ANY detail (such as Batch Timing) is missing!
        - PRIORITIZE DIRECT IN-CHAT PAYMENT (MANDATORY):
          * Course payment must be completed DIRECTLY in this WhatsApp chat via the dynamic Razorpay UPI QR code / direct UPI payment link.
          * NEVER instruct the customer to download the app or visit the website to make their payment! (Only free trial booking happens from the app; enrollment payments happen directly in chat).
@@ -96,6 +101,11 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     5. ENROLLED & ACTIVE STUDENT POST-PURCHASE SUPPORT (If Payment Status is PAID / Stage is ENROLLED):
        - The customer has ALREADY completed enrollment and paid their fees!
        - NEVER re-pitch packages, quote course fees, or ask for checkout!
+       - ZERO COURSE / BATCH MODIFICATION VIA CHAT (RULE 2):
+         * Active enrolled course details (course, timing, teacher, package) are IMMUTABLE in chat.
+         * If the customer requests to change their course, batch timing, teacher, or days after payment:
+           - Politely explain that active batch modifications cannot be processed in WhatsApp chat.
+           - Instruct them to manage their batch directly inside the Sensationz App (My Classes -> Manage Batch) or request a human coordinator (type 'agent' or tap 'Talk to Agent').
        - Message #1: Warmly address their question or onboarding doubt (e.g. how to join class, class schedule, instructor details, login OTP, syllabus).
        - Message #2 (followup): Provide helpful onboarding next steps (e.g. "Have you logged into the Sensationz app to check your batch, or do you have any questions before class? 😊" or null if they said thanks/goodbye).
        - Quick-Reply Buttons: Contextual onboarding actions (e.g. ["My Classes", "App Login"]).
@@ -123,12 +133,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          - NEVER include "Free Trial" or "Book Trial" in quick-reply buttons unless the customer explicitly asked for a trial in their message!
          - Proactively offering trials devalues the course, turns off serious buyers, and derails the sales funnel.
          - The default funnel is strictly: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.
-       * When a customer EXPLICITLY asks for a trial class:
+       * When a customer EXPLICITLY asks for a trial class (RULE 1 - TRIAL PIPELINE DE-ESCALATION):
          - Warmly confirm that Sensationz offers up to 3 free live interactive trial classes.
-         - Inform them that we can reserve their trial session directly: ask them to share their Gmail address (used for Google Sign-In) and preferred batch timing!
-         - In Message #2 (followup): Ask them to share their Gmail address so we can reserve their free trial class in the app (e.g. "Please share your Gmail address so we can reserve your free trial class in the app! 😊").
-         - Contextual Buttons: ["Morning Batch", "Evening Batch"] or ["Download App", "Watch Video"].
-         - ABSOLUTE GUARD: NEVER pitch paid course packages, fee durations (1 Month / 3 Months), or enrollment checkout to a customer who is pursuing a trial!
+         - ZERO DETAIL COLLECTION IN CHAT: The chat has NO booking power for trials! NEVER ask for batch timing, instructor, package duration, fee, or Gmail for trials in chat.
+         - All trial scheduling and batch selection happen EXCLUSIVELY inside the Sensationz App (Profile -> Trial Links -> Confirm Trial Enrollment).
+         - Message #1: Warmly confirm trial availability and directly answer ANY questions they asked (syllabus, duration, faculty, class format).
+         - Message #2 (followup): Guide them to download the Sensationz App and book their trial in the app (e.g. "Would you like the app download link or video guide on how to book your trial in the app? 😊").
+         - Contextual Buttons: ["Download App", "How to Book"].
+         - ABSOLUTE GUARD: NEVER pitch paid course packages, fee durations (1 Month / 3 Months), ask for timing/instructor, or enrollment checkout to a customer who is pursuing a trial!
   • FORMAT EXAMPLE:
     {{
       "reply": "Direct, informative, and warm answer to the customer's question strictly grounded in COURSE_DATA.",
@@ -559,6 +571,16 @@ def format_system_prompt(
         or last_turn_dict.get("is_disinterested")
     )
 
+    constraint_note = slot_eval.get("constraint_note") or s.get("auto_assigned_slot_note")
+    constraint_instruction = ""
+    if constraint_note:
+        constraint_instruction = (
+            f"  • ℹ️ CRITICAL AUTO-ASSIGNMENT REASON (MUST STATE IN MESSAGE #1):\n"
+            f"    \"{constraint_note}\"\n"
+            f"    In Message #1, you MUST inform the customer of this exact reason so they know this batch has been assigned.\n"
+            f"    Under NO circumstances list other general course timings or ask them to choose a timing!\n"
+        )
+
     if is_paid:
         turn_intent_guidance = (
             f"- 🎓 ENROLLED & ACTIVE STUDENT POST-PURCHASE SUPPORT:\n"
@@ -566,10 +588,23 @@ def format_system_prompt(
             f"  • Payment Status: {paid_status_str} (Amount Paid: {paid_amt_display})\n"
             "  • NON-NEGOTIABLE RULE: Customer has ALREADY PAID and is actively enrolled!\n"
             "  • Under NO circumstances ask for fees, payment, or send a payment QR code!\n"
+            "  • ZERO COURSE MODIFICATION IN CHAT (RULE 2): Active enrolled courses, batch timings, or instructors CANNOT be changed via chat.\n"
+            "    If customer asks to switch batches, timings, instructors, or courses, explain politely that changes to active enrolled batches must be done directly inside the Sensationz App ('My Classes' -> 'Manage Batch') or by contacting a support coordinator (type 'agent').\n"
             "  • If customer says 'i have not paid', 'payment pending', or questions payment status:\n"
             f"    Warmly reassure them that their payment and enrollment for {active_title} ({timing_str} with {teacher_str}) are already confirmed in our system.\n"
-            "  • Message #1: Warmly address their question, payment reassurance, or onboarding steps.\n"
+            "  • Message #1: Warmly address their question, payment reassurance, onboarding steps, or batch management explanation.\n"
             "  • Message #2 (followup): Guide them to log into the Sensationz App using Google to view their batch.\n"
+        )
+    elif is_trial_path:
+        turn_intent_guidance = (
+            "- 🎟️ TRIAL PIPELINE (CHAT HAS NO BOOKING POWER - RULE 1):\n"
+            "  • The customer is inquiring about or requested a FREE TRIAL / DEMO.\n"
+            "  • ZERO DETAIL COLLECTION IN CHAT: The bot must NEVER ask for batch timing, instructor, package duration, fee, or Gmail for trials in chat!\n"
+            "  • CHAT CANNOT BOOK OR CONFIRM TRIALS: Trial selection and confirmation happen STRICTLY and EXCLUSIVELY inside the Sensationz App (Profile -> Trial Links -> Confirm Trial Enrollment).\n"
+            "  • Message #1: Warmly and directly answer ANY questions the customer asked (syllabus, duration, faculty, class format, trial availability).\n"
+            "  • Message #2 (followup): Guide them to download the Sensationz App and book their trial in the app (e.g. 'Would you like the app download link or video guide on how to book your trial in the app? 😊').\n"
+            "  • Quick-Reply Buttons: ['Download App', 'How to Book']\n"
+            "  • UNDER NO CIRCUMSTANCES ask for package duration, fees, timing selection, instructor preference, or claim trial is confirmed in chat!\n"
         )
     elif is_objection_turn:
         turn_intent_guidance = (
@@ -587,6 +622,7 @@ def format_system_prompt(
         turn_intent_guidance = (
             f"- 🎯 CURRENT ENROLLMENT STATUS: ALL 5 DETAILS COMPLETED AND CONFIRMED!\n"
             f"  • Course: {active_title} | Timing: {timing_str} | Instructor: {teacher_str} | Days: {days_str} | Package: {package_str}\n"
+            f"{constraint_instruction}"
             "  • CRITICAL RULE: Under NO circumstances ask the customer to choose a package, timing, or instructor! They are ALL ALREADY CHOSEN and LOCKED.\n"
             f"  • Message #1: Confirm their chosen batch ({active_title} with {teacher_str} at {timing_str}) and present the transparent pre-computed order fee breakdown for {package_str}.\n"
             "  • Message #2 (followup): Ask if they would like any assistance completing their payment with the UPI QR code.\n"
@@ -597,9 +633,11 @@ def format_system_prompt(
             f"- 📋 CURRENT FUNNEL SELECTION: The next required slot to settle is: {next_target_label}.\n"
             f"  • ALREADY SETTLED IN DATABASE (DO NOT ASK AGAIN): {', '.join(settled_slots)}\n"
             f"  • STILL MISSING: {', '.join(missing_slots)}\n"
-            f"  • STRICT 2-MESSAGE SCHEMA RULES (MANDATORY):\n"
-            f"    - Message #1 (reply): Purely informative statement / acknowledgement. NEVER put a question mark (?) or closing inquiry in Message #1!\n"
-            f"    - Message #2 (followup): MUST ask EXCLUSIVELY for: {next_target_label}. NEVER jump ahead to duration or payment!\n"
+            f"  • 🛑 STRICT PAYMENT BARRIER (RULE 2):\n"
+            f"    - Enrollment details are STILL MISSING ({', '.join(missing_slots)})!\n"
+            f"    - Under NO circumstances output payable fee breakdowns, UPI QR codes, 'proceeding to payment', or ask 'assistance completing payment'!\n"
+            f"    - Message #1 must purely acknowledge the user's choice and state that {next_target_label} is needed next.\n"
+            f"    - Message #2 (followup) MUST ask EXCLUSIVELY for: {next_target_label}!\n"
             f"    - Quick-Reply Buttons: Contextual choices for {next_target_label}: {next_target_buttons}\n"
         )
 

@@ -51,13 +51,32 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
 
     # 3. Resolve Teacher
     teacher_val = s.get("selected_teacher") or s.get("teacher")
-    # Auto-settle single-teacher slots if timing is known
-    available_teachers = []
-    if cid and timing_str != "NOT SELECTED":
-        available_teachers = kb_loader.get_teachers_for_slot(cid, timing_str)
-        if not teacher_val and len(available_teachers) == 1:
-            teacher_val = available_teachers[0]
+    timing_period = s.get("timing_period") or (s.get("_last_turn") or {}).get("timing_period")
+    constraint_note = s.get("auto_assigned_slot_note")
+    constraint_res = None
 
+    # Dynamic Constraint Solver: Teacher ↔ Timing / Period
+    if cid:
+        from src.core.helpers.schedule_engine import resolve_teacher_timing_constraints
+        constraint_res = resolve_teacher_timing_constraints(
+            course_id=cid,
+            teacher=teacher_val,
+            timing=timing_val,
+            period=timing_period,
+        )
+        if constraint_res.get("auto_assigned_timing") and not timing_val:
+            timing_val = constraint_res["auto_assigned_timing"]
+            timing_str = timing_val
+            if not constraint_note:
+                constraint_note = constraint_res.get("constraint_note")
+
+        if constraint_res.get("auto_assigned_teacher") and not teacher_val:
+            teacher_val = constraint_res["auto_assigned_teacher"]
+            teacher_str = teacher_val
+            if not constraint_note:
+                constraint_note = constraint_res.get("constraint_note")
+
+    available_teachers = constraint_res.get("available_teachers_for_timing", []) if constraint_res else []
     teacher_str = teacher_val if teacher_val else "NOT SELECTED"
 
     # 4. Resolve Days
@@ -98,74 +117,83 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
     else:
         missing_slots.append("Course Selection")
 
-    if timing_str != "NOT SELECTED":
-        settled_slots.append(f"Batch Timing: {timing_str}")
-    else:
-        missing_slots.append("Batch Timing")
-
-    if teacher_str != "NOT SELECTED":
-        settled_slots.append(f"Instructor: {teacher_str}")
-    else:
-        missing_slots.append("Instructor Preference")
-
-    # Only treat days as missing if there are multiple choices that user hasn't selected
-    if len(avail_days) > 1 and (not s.get("days") and not s.get("selected_days")):
-        missing_slots.append(f"Batch Days ({', '.join(avail_days)})")
-    else:
-        settled_slots.append(f"Batch Days: {days_str}")
-
-    if package_str != "NOT SELECTED":
-        settled_slots.append(f"Package Duration: {package_str}")
-    else:
-        missing_slots.append("Package Duration")
-
-    # Complete if all required slots are present
-    is_complete = len(missing_slots) == 0
-
-    # Determine Next Target Slot and Buttons
-    next_target_slot = "PAYMENT"
-    next_target_label = "Payment Summary & Checkout"
-    next_target_buttons: List[str] = []
-
-    if is_paid:
-        next_target_slot = "ENROLLED"
-        next_target_label = "Active Student Support"
-        next_target_buttons = ["My Classes", "App Login"]
-    elif is_trial_path:
+    # If user is on trial path, chat does NOT collect timing, teacher, or package duration
+    if is_trial_path:
+        missing_slots = []
+        is_complete = False
         next_target_slot = "TRIAL"
-        next_target_label = "Free Trial Booking"
+        next_target_label = "Free Trial Booking on Sensationz App"
         next_target_buttons = ["Download App", "How to Book"]
-    elif not cid or active_title == "Not Selected":
-        next_target_slot = "COURSE"
-        next_target_label = "Course Selection"
-        next_target_buttons = ["Yoga", "Kathak", "Ladies Dance"]
-    elif timing_str == "NOT SELECTED":
-        next_target_slot = "TIMING"
-        next_target_label = "Batch Timing"
-        raw_timings = [b.get("time_12h", "").strip() for b in get_available_timings(cid)] if cid else []
-        clean_timings = [t for t in raw_timings if t]
-        next_target_buttons = clean_timings[:3] if clean_timings else ["Morning Batch", "Evening Batch"]
-    elif teacher_str == "NOT SELECTED":
-        next_target_slot = "TEACHER"
-        next_target_label = "Instructor Preference"
-        if available_teachers:
-            next_target_buttons = available_teachers[:3]
-        else:
-            course_teachers = kb_loader.get_course_instructors(cid)
-            next_target_buttons = course_teachers[:3] if course_teachers else ["Certified Teacher"]
-    elif len(avail_days) > 1 and (not s.get("days") and not s.get("selected_days")):
-        next_target_slot = "DAYS"
-        next_target_label = "Batch Days"
-        next_target_buttons = avail_days[:3]
-    elif package_str == "NOT SELECTED":
-        next_target_slot = "DURATION"
-        next_target_label = "Package Duration"
-        valid_pkgs = list(kb_loader.get_valid_packages(cid).keys()) if cid else ["1 Month", "3 Months"]
-        next_target_buttons = [f"{p} Pack" for p in valid_pkgs[:2]]
     else:
+        if timing_str != "NOT SELECTED":
+            settled_slots.append(f"Batch Timing: {timing_str}")
+        else:
+            missing_slots.append("Batch Timing")
+
+        if teacher_str != "NOT SELECTED":
+            settled_slots.append(f"Instructor: {teacher_str}")
+        else:
+            missing_slots.append("Instructor Preference")
+
+        # Only treat days as missing if there are multiple choices that user hasn't selected
+        if len(avail_days) > 1 and (not s.get("days") and not s.get("selected_days")):
+            missing_slots.append(f"Batch Days ({', '.join(avail_days)})")
+        else:
+            settled_slots.append(f"Batch Days: {days_str}")
+
+        if package_str != "NOT SELECTED":
+            settled_slots.append(f"Package Duration: {package_str}")
+        else:
+            missing_slots.append("Package Duration")
+
+        # Complete if all required slots are present
+        is_complete = len(missing_slots) == 0
+
+        # Determine Next Target Slot and Buttons
         next_target_slot = "PAYMENT"
         next_target_label = "Payment Summary & Checkout"
-        next_target_buttons = ["Talk to Agent"]
+        next_target_buttons = []
+
+        if is_paid:
+            next_target_slot = "ENROLLED"
+            next_target_label = "Active Student Support"
+            next_target_buttons = ["My Classes", "App Login"]
+        elif not cid or active_title == "Not Selected":
+            next_target_slot = "COURSE"
+            next_target_label = "Course Selection"
+            next_target_buttons = ["Yoga", "Kathak", "Ladies Dance"]
+        elif timing_str == "NOT SELECTED":
+            next_target_slot = "TIMING"
+            next_target_label = "Batch Timing"
+            if constraint_res and constraint_res.get("available_timings_for_teacher"):
+                next_target_buttons = constraint_res["available_timings_for_teacher"][:3]
+            else:
+                raw_timings = [b.get("time_12h", "").strip() for b in get_available_timings(cid)] if cid else []
+                clean_timings = [t for t in raw_timings if t]
+                next_target_buttons = clean_timings[:3] if clean_timings else ["Morning Batch", "Evening Batch"]
+        elif teacher_str == "NOT SELECTED":
+            next_target_slot = "TEACHER"
+            next_target_label = "Instructor Preference"
+            if constraint_res and constraint_res.get("available_teachers_for_timing"):
+                next_target_buttons = constraint_res["available_teachers_for_timing"][:3]
+            elif available_teachers:
+                next_target_buttons = available_teachers[:3]
+            else:
+                course_teachers = kb_loader.get_course_instructors(cid)
+                next_target_buttons = course_teachers[:3] if course_teachers else ["Certified Teacher"]
+        elif len(avail_days) > 1 and (not s.get("days") and not s.get("selected_days")):
+            next_target_slot = "DAYS"
+            next_target_label = "Batch Days"
+            next_target_buttons = avail_days[:3]
+        elif package_str == "NOT SELECTED":
+            next_target_slot = "DURATION"
+            next_target_label = "Package Duration"
+            valid_pkgs = list(kb_loader.get_valid_packages(cid).keys()) if cid else ["1 Month", "3 Months"]
+            next_target_buttons = [f"{p} Pack" for p in valid_pkgs[:2]]
+        else:
+            next_target_slot = "PAYMENT"
+            next_target_label = "Payment Summary & Checkout"
+            next_target_buttons = ["Talk to Agent"]
 
     return {
         "course_id": cid,
@@ -187,5 +215,6 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
         "next_target_buttons": next_target_buttons,
         "is_paid": is_paid,
         "is_trial_path": is_trial_path,
+        "constraint_note": constraint_note,
     }
 

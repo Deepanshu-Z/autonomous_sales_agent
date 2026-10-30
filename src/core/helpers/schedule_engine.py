@@ -161,6 +161,96 @@ def get_slots_for_teacher(course_id: Optional[str] = None, teacher_name: str = "
     return matching_slots
 
 
+def resolve_teacher_timing_constraints(
+    course_id: Optional[str] = None,
+    teacher: Optional[str] = None,
+    timing: Optional[str] = None,
+    period: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Dynamically analyzes the intersection between Teacher, Timing, and Period for any course.
+    Catalog-driven, course-agnostic, zero hardcoding.
+    """
+    result = {
+        "auto_assigned_timing": None,
+        "auto_assigned_teacher": None,
+        "available_timings_for_teacher": [],
+        "available_teachers_for_timing": [],
+        "is_conflict": False,
+        "constraint_note": None,
+    }
+    if not course_id:
+        return result
+
+    cid = course_id.lower().strip()
+    from src.core.helpers.schedule_engine import resolve_canonical_teacher, classify_time_period
+    norm_teacher = resolve_canonical_teacher(teacher, course_id=cid) if teacher else None
+    active_teacher = norm_teacher or teacher
+
+    # 1. Resolve by Teacher
+    if active_teacher:
+        t_slots = get_slots_for_teacher(cid, active_teacher)
+        all_t_timings = [s.get("time_12h") for s in t_slots if s.get("time_12h")]
+        result["available_timings_for_teacher"] = all_t_timings
+
+        # Conflict check if timing is already known
+        if timing:
+            from src.core.helpers.schedule_engine import extract_time_tokens
+            c_hr, c_merid = extract_time_tokens(timing)
+            teaches_it = any(extract_time_tokens(t) == (c_hr, c_merid) for t in all_t_timings if c_hr is not None)
+            if not teaches_it:
+                result["is_conflict"] = True
+                result["constraint_note"] = (
+                    f"{active_teacher} does not teach at {timing}. "
+                    f"Her available timings are: {', '.join(all_t_timings)}."
+                )
+                return result
+
+        # If timing is NOT known, check if period or single slot resolves it
+        if not timing:
+            norm_period = (period or "").strip().title()
+            if norm_period:
+                p_slots = [
+                    s.get("time_12h") for s in t_slots
+                    if classify_time_period(s.get("time_12h")) == norm_period or norm_period.lower() in (s.get("slot") or "").lower()
+                ]
+                if len(p_slots) == 1:
+                    result["auto_assigned_timing"] = p_slots[0]
+                    result["constraint_note"] = (
+                        f"According to your chosen instructor ({active_teacher}) and preferred {norm_period.lower()} timing, "
+                        f"{active_teacher} conducts classes at {p_slots[0]}, which has been assigned for you."
+                    )
+                elif len(p_slots) > 1:
+                    result["available_timings_for_teacher"] = p_slots
+                    result["constraint_note"] = (
+                        f"For your selected instructor ({active_teacher}) in the {norm_period.lower()}, "
+                        f"available batches are: {', '.join(p_slots)}."
+                    )
+                elif len(p_slots) == 0:
+                    result["constraint_note"] = (
+                        f"{active_teacher} does not teach in the {norm_period.lower()}. "
+                        f"Her available timings are: {', '.join(all_t_timings)}."
+                    )
+            elif len(all_t_timings) == 1:
+                result["auto_assigned_timing"] = all_t_timings[0]
+                result["constraint_note"] = (
+                    f"Instructor {active_teacher} conducts classes exclusively at {all_t_timings[0]}, "
+                    f"so this batch has been assigned for you."
+                )
+
+    # 2. Resolve by Timing
+    if timing and not active_teacher:
+        slot_teachers = get_teachers_for_slot(cid, timing)
+        result["available_teachers_for_timing"] = slot_teachers
+        if len(slot_teachers) == 1:
+            result["auto_assigned_teacher"] = slot_teachers[0]
+            result["constraint_note"] = (
+                f"For the {timing} batch, your classes are conducted by {slot_teachers[0]}."
+            )
+
+    return result
+
+
 def get_course_time_periods(course_id: Optional[str] = None) -> Dict[str, Any]:
     """Dynamically parses and categorizes all batches for a course into time periods:
     'Morning', 'Afternoon', and 'Evening'. Zero hardcoding.

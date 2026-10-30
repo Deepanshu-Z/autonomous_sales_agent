@@ -415,6 +415,21 @@ async def extract_intent_and_state_changes(
         else:
             clean["selected_timing"] = None
 
+        # Period Detection (e.g. "Morning Batch", "Evening Batch", "Subah", "Shaam")
+        detected_period = None
+        if re.search(r"\b(morning|subah|early morning)\b", text, re.IGNORECASE):
+            detected_period = "Morning"
+        elif re.search(r"\b(evening|shaam|sham|night|raat)\b", text, re.IGNORECASE):
+            detected_period = "Evening"
+        elif re.search(r"\b(afternoon|dopahar)\b", text, re.IGNORECASE):
+            detected_period = "Afternoon"
+
+        if detected_period:
+            clean["timing_period"] = detected_period
+            clean["is_disinterested"] = False
+            if clean.get("customer_intent") in ("QUESTION", "COURSE_INQUIRY", "DISINTEREST", "OTHER", None):
+                clean["customer_intent"] = "TIMING_SELECTION"
+
         # Strict canonical package normalization against allowed course packages
         raw_pkg = clean.get("selected_package")
         if raw_pkg and isinstance(raw_pkg, str):
@@ -616,6 +631,24 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     intent = flags.get("customer_intent") or "QUESTION"
     is_selection_turn = intent not in ("QUESTION", "OTHER", "DISINTEREST", "COMPLAINT", "GREETING", "AGENT_REQUEST")
 
+    # RULE 2 (POST-PAYMENT IMMUTABILITY):
+    # Pre-Payment (payment_status != 'PAID' and stage != 'ENROLLED'): Unlimited modifications allowed.
+    # Post-Payment (payment_status == 'PAID' or stage == 'ENROLLED'): Zero course modification via chat.
+    # Course, timing, teacher, days, and package slots are strictly immutable in the database session.
+    is_paid = bool(
+        new_state.get("payment_status") == "PAID"
+        or new_state.get("stage") == "ENROLLED"
+        or new_state.get("is_enrolled")
+    )
+    if is_paid:
+        flags = dict(flags)
+        flags["selected_course"] = None
+        flags["selected_timing"] = None
+        flags["unoffered_timing_mentioned"] = None
+        flags["selected_teacher"] = None
+        flags["selected_days"] = None
+        flags["selected_package"] = None
+
     # 1. Course Selection / Switching
     if flags.get("selected_course"):
         raw_c = flags["selected_course"]
@@ -649,6 +682,21 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     active_course = new_state.get("course")
 
     # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
+    if flags.get("timing_period"):
+        new_state["timing_period"] = flags["timing_period"]
+        # If teacher is already known, evaluate dynamic constraints immediately
+        curr_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
+        if active_course and curr_teacher and not new_state.get("timing") and not is_paid:
+            from src.core.helpers.schedule_engine import resolve_teacher_timing_constraints
+            c_res = resolve_teacher_timing_constraints(
+                active_course, teacher=curr_teacher, period=flags["timing_period"]
+            )
+            if c_res.get("auto_assigned_timing"):
+                new_state["timing"] = c_res["auto_assigned_timing"]
+                new_state["selected_timing"] = c_res["auto_assigned_timing"]
+                new_state["auto_assigned_slot_note"] = c_res.get("constraint_note")
+                new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+
     if flags.get("selected_timing") and is_selection_turn:
         old_timing = new_state.get("timing") or new_state.get("selected_timing")
         new_timing = flags["selected_timing"]
@@ -692,58 +740,37 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["teacher"] = teacher_val
         new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
 
-        # Deterministic Auto-Binding of Timing: If timing missing OR teacher doesn't teach current timing
-        if active_course and teacher_val:
-            from src.core.helpers.schedule_engine import get_slots_for_teacher, extract_time_tokens
-            t_slots = get_slots_for_teacher(active_course, teacher_val)
-            current_timing = new_state.get("timing")
-
-            teacher_teaches_current = False
-            if current_timing and t_slots:
-                c_hr, c_merid = extract_time_tokens(current_timing)
-                for s in t_slots:
-                    s_hr, s_merid = extract_time_tokens(s.get("time_12h"))
-                    if c_hr is not None and s_hr is not None and c_hr == s_hr and c_merid == s_merid:
-                        teacher_teaches_current = True
-                        break
-
-            if not current_timing or not teacher_teaches_current:
-                # Filter by period if user already picked a timing period (e.g. morning/evening in session)
-                period_context = (new_state.get("timing_period") or "").lower()
-                if not period_context and current_timing:
-                    _, c_merid = extract_time_tokens(current_timing)
-                    if c_merid:
-                        period_context = "evening" if c_merid == "PM" else "morning"
-
-                if len(t_slots) == 1:
-                    auto_slot = t_slots[0].get("time_12h")
-                    if auto_slot:
-                        new_state["timing"] = auto_slot
-                        new_state["selected_timing"] = auto_slot
-                        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
-                elif len(t_slots) > 1 and period_context:
-                    matching_period_slots = [
-                        s.get("time_12h") for s in t_slots
-                        if period_context in s.get("time_12h", "").lower() or (
-                            period_context == "morning" and "am" in s.get("time_12h", "").lower()
-                        ) or (
-                            period_context in ("evening", "afternoon") and "pm" in s.get("time_12h", "").lower()
-                        )
-                    ]
-                    if len(matching_period_slots) == 1:
-                        new_state["timing"] = matching_period_slots[0]
-                        new_state["selected_timing"] = matching_period_slots[0]
-                        new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
+        # Deterministic Auto-Binding of Timing & Reverse Conflict Check
+        if active_course and teacher_val and not is_paid:
+            current_timing = new_state.get("timing") or new_state.get("selected_timing")
+            from src.core.helpers.schedule_engine import resolve_teacher_timing_constraints
+            c_res = resolve_teacher_timing_constraints(
+                active_course, teacher=teacher_val, timing=current_timing, period=new_state.get("timing_period")
+            )
+            if c_res.get("is_conflict"):
+                # New teacher does not teach current timing! Invalidate timing and dependent slots
+                new_state["timing"] = None
+                new_state["selected_timing"] = None
+                new_state["days"] = None
+                new_state["selected_days"] = None
+                new_state["days_code"] = None
+                new_state["auto_assigned_slot_note"] = c_res.get("constraint_note")
+            elif c_res.get("auto_assigned_timing") and not current_timing:
+                new_state["timing"] = c_res["auto_assigned_timing"]
+                new_state["selected_timing"] = c_res["auto_assigned_timing"]
+                new_state["auto_assigned_slot_note"] = c_res.get("constraint_note")
+                new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
 
     # Deterministic Auto-Binding of Single Teacher from Timing:
     active_timing = new_state.get("timing") or new_state.get("selected_timing")
-    if active_course and active_timing and not new_state.get("selected_teacher"):
-        from src.core.helpers.schedule_engine import get_teachers_for_slot
-        slot_teachers = get_teachers_for_slot(active_course, active_timing)
-        if len(slot_teachers) == 1:
-            auto_t = slot_teachers[0]
+    if active_course and active_timing and not new_state.get("selected_teacher") and not is_paid:
+        from src.core.helpers.schedule_engine import resolve_teacher_timing_constraints
+        t_res = resolve_teacher_timing_constraints(active_course, timing=active_timing)
+        if t_res.get("auto_assigned_teacher"):
+            auto_t = t_res["auto_assigned_teacher"]
             new_state["selected_teacher"] = auto_t
             new_state["teacher"] = auto_t
+            new_state["auto_assigned_slot_note"] = t_res.get("constraint_note")
             new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TEACHER_SELECTED")
 
     # 3.5 Days Slot Merge & Deterministic Auto-Binding
@@ -761,7 +788,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     active_timing = new_state.get("timing") or new_state.get("selected_timing")
     active_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
 
-    if active_course:
+    if active_course and not is_paid:
         from src.core.helpers.schedule_engine import (
             get_available_days_for_batch,
             get_day_code,

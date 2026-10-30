@@ -174,6 +174,12 @@ def adapt_contextual_quick_replies(
             # Guard: Block proactive trial buttons if customer never asked for trial
             if not is_trial_customer and any(w in b_norm.lower() for w in ["free trial", "book trial", "trial class"]):
                 continue
+            # Guard: If timing is missing, block duration buttons
+            if not timing_val and any(w in b_norm.lower() for w in ["month", "pack", "duration"]):
+                continue
+            # Guard: If teacher is missing, block duration buttons
+            if not teacher_val and any(w in b_norm.lower() for w in ["month", "pack", "duration"]):
+                continue
             safe_raw.append(b_norm)
 
         if safe_raw:
@@ -516,7 +522,7 @@ async def handle_incoming_message(
                         amount=0.0,
                         currency="INR",
                     )
-                    new_state["stage"] = "TRIAL_CONFIRMED"
+                    new_state["stage"] = "TRIAL_STEPS_SENT"
                     new_state["wants_trial"] = True
                     new_state["awaiting_trial_email"] = False
                     if staging_res.get("success"):
@@ -533,69 +539,35 @@ async def handle_incoming_message(
                 except Exception as exc:
                     logger.error(f"[conversation_handler] Staging error for trial student: {exc}")
 
-            if trial_staged_successful:
-                if is_hindi:
-                    reply_text = (
-                        f"🎉 *आपकी फ्री ट्रायल क्लास कन्फर्म हो गई है!* 🎉\n\n"
-                        f"नमस्ते! हमने आपके *{course_display_name}* की फ्री ट्रायल क्लास आपके Gmail (**{user_email}**) से लिंक कर दी है। 🌟\n\n"
-                        f"📋 *ट्रायल क्लास का विवरण:*\n"
-                        f"• *कोर्स:* {course_display_name}\n"
-                        f"• *बैच टाइमिंग:* {timing_val or 'As per app schedule'}\n"
-                        f"• *टीचर:* {teacher_val or 'Assigned Instructor'}\n\n"
-                        f"🚀 *ट्रायल क्लास जॉइन करने के स्टेप्स:*\n"
-                        f"1. *Sensationz ऐप डाउनलोड करें:*\n"
-                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                        f"2. ऐप में **'Continue with Google'** पर टैप करके **{user_email}** से साइन इन करें।\n"
-                        f"3. आपकी फ्री ट्रायल क्लास सीधे डैशबोर्ड पर तैयार मिलेगी!\n\n"
-                        f"क्लास में मिलते हैं! 🙏✨"
-                    )
-                    followup_text = "क्या आपको ऐप डाउनलोड करने या क्लास में शामिल होने में कोई सहायता चाहिए? 😊"
-                else:
-                    reply_text = (
-                        f"🎉 *Your Free Trial Class is Confirmed!* 🎉\n\n"
-                        f"We have successfully reserved your free trial for *{course_display_name}* linked to your Gmail: **{user_email}**. 🌟\n\n"
-                        f"📋 *Trial Session Details:*\n"
-                        f"• *Course:* {course_display_name}\n"
-                        f"• *Batch Timing:* {timing_val or 'As per app schedule'}\n"
-                        f"• *Assigned Teacher:* {teacher_val or 'Assigned Instructor'}\n\n"
-                        f"🚀 *How to Join Your Free Trial:*\n"
-                        f"1. *Download the Sensationz App:*\n"
-                        f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                        f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                        f"2. Tap **'Continue with Google'** and sign in using **{user_email}**.\n"
-                        f"3. Your trial session is ready on your dashboard!\n\n"
-                        f"We look forward to seeing you in class! 🙏✨"
-                    )
-                    followup_text = "Would you like any assistance downloading the app or joining the session? 😊"
+            if is_hindi:
+                reply_text = (
+                    f"हमने आपका Gmail (**{user_email}**) नोट कर लिया है! 🌟\n\n"
+                    f"अपनी *{course_display_name}* की फ्री ट्रायल क्लास का बैच चुनने और क्लास एक्टिवेट करने के लिए:\n"
+                    f"1. *Sensationz ऐप डाउनलोड करें:*\n"
+                    f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                    f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                    f"2. ऐप में **'Continue with Google'** पर टैप करके **{user_email}** से साइन इन करें।\n"
+                    f"3. **Profile → Trial Links** पर जाएं और **Confirm Trial Enrollment** पर टैप करें।\n\n"
+                    f"लाइव ट्रायल बुकिंग पूरी तरह ऐप के अंदर से ही पूरी होती है! 🙏✨"
+                )
+                followup_text = "क्या आपको ऐप डाउनलोड करने या ट्रायल स्लॉट कन्फर्म करने में कोई सहायता चाहिए? 😊"
             else:
-                if is_hindi:
-                    reply_text = (
-                        f"✅ *आपकी फ्री ट्रायल रिक्वेस्ट दर्ज कर ली गई है!* 🌟\n\n"
-                        f"हमने आपका Gmail (**{user_email}**) नोट कर लिया है।\n"
-                        f"हमारी टीम आपका *{course_display_name}* का ट्रायल स्लॉट तैयार कर रही है।\n\n"
-                        f"📱 *कृपया Sensationz ऐप डाउनलोड कर लें:*\n"
-                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
-                        f"Google से लॉगिन करने पर आपका ट्रायल सेशन डैशबोर्ड पर लाइव दिखेगा!"
-                    )
-                    followup_text = "क्या आपको ऐप डाउनलोड करने में कोई सहायता चाहिए? 😊"
-                else:
-                    reply_text = (
-                        f"✅ *Your Free Trial Request is Registered!* 🌟\n\n"
-                        f"We have noted your Gmail (**{user_email}**).\n"
-                        f"Our support desk is currently scheduling your trial session for *{course_display_name}*.\n\n"
-                        f"📱 *Please download the Sensationz App:*\n"
-                        f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                        f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
-                        f"Once logged in via Google, your trial will appear on your dashboard!"
-                    )
-                    followup_text = "Would you like any assistance downloading the app? 😊"
+                reply_text = (
+                    f"We have noted your Gmail (**{user_email}**)! 🌟\n\n"
+                    f"To pick your preferred batch timing and activate your free trial for *{course_display_name}*:\n"
+                    f"1. *Download the Sensationz App:*\n"
+                    f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
+                    f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
+                    f"2. Tap **'Continue with Google'** and sign in using **{user_email}**.\n"
+                    f"3. Go to **Profile → Trial Links** and tap **Confirm Trial Enrollment**.\n\n"
+                    f"Live trial batch selection and booking are exclusively completed inside the app! 🙏✨"
+                )
+                followup_text = "Would you like the app download link or any assistance? 😊"
 
             return {
                 "reply": reply_text,
                 "followup": followup_text,
-                "buttons": ["Download App", "Talk to Agent"],
+                "buttons": ["Download App", "How to Book", "Talk to Agent"],
                 "new_state": new_state,
             }
 
@@ -1104,14 +1076,15 @@ def _sanitize_state_grounded_replies(
 
     # 3. ALL SLOTS SETTLED GUARD: When Course + Timing + Teacher + Package are all complete
     if has_course and has_timing and has_teacher and has_package and not is_question and not is_objection:
-        PACKAGE_ASK_PATTERNS = [
+        SLOT_REASK_PATTERNS = [
             r"\b(which package|kaunsa package|package duration|choose a package|select a package|select package duration|preferred duration|preferred package)\b",
             r"\b(start with\s*—\s*1 Month|1 Month ya 3 Months|1 Month or 3 Months)\b",
             r"\b(move on to the package duration|package duration.*available options)\b",
+            r"\b(which specific timing|which timing|which batch timing|which batch|available timings for the morning|available timings for the evening|which instructor|which teacher)\b",
         ]
-        has_hallucinated_package_ask = any(re.search(p, reply, re.IGNORECASE) for p in PACKAGE_ASK_PATTERNS) or (followup and any(re.search(p, followup, re.IGNORECASE) for p in PACKAGE_ASK_PATTERNS))
+        has_hallucinated_slot_ask = any(re.search(p, reply, re.IGNORECASE) for p in SLOT_REASK_PATTERNS) or (followup and any(re.search(p, followup, re.IGNORECASE) for p in SLOT_REASK_PATTERNS))
 
-        if has_hallucinated_package_ask:
+        if has_hallucinated_slot_ask:
             from src.core.pricing_engine import calculate_exact_fee
             cid_curr = (active_cid or state.get("course") or "").lower().strip()
             pkg_curr = state.get("package") or state.get("selected_duration")
@@ -1120,9 +1093,11 @@ def _sanitize_state_grounded_replies(
                 t_name = state.get("teacher") or state.get("selected_teacher") or "your instructor"
                 t_slot = state.get("timing") or state.get("selected_timing") or ""
                 course_title = kb_loader.get_catalog_entry(cid_curr).get("name", cid_curr.title()) if kb_loader.get_catalog_entry(cid_curr) else cid_curr.title()
+                auto_note = state.get("auto_assigned_slot_note")
+                auto_lead = f"{auto_note}\n\n" if auto_note else ""
 
                 reply = (
-                    f"Great! You have selected *{t_name}* for the *{t_slot}* batch of *{course_title}*.\n\n"
+                    f"{auto_lead}Great! You have selected *{t_name}* for the *{t_slot}* batch of *{course_title}*.\n\n"
                     f"Here is your order summary for the *{pkg_curr}* package:\n"
                     f"• *Base Price:* ₹{bill['base_price']:,}\n"
                     f"• *Discount:* -₹{bill['discount']:,} (Coupon: {bill.get('coupon_code') or 'None'})\n"
@@ -1132,6 +1107,38 @@ def _sanitize_state_grounded_replies(
                     f"Please complete your payment via the UPI QR code below to confirm your seat!"
                 )
                 followup = "Would you like any assistance completing your payment with the UPI QR code? 😊"
+
+    # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero payment talk until all slots confirmed)
+    if not (has_course and has_timing and has_teacher and has_package) and not is_objection:
+        PAYMENT_LEAK_REGEX = r"\b(upi qr|qr code|scanner|proceeding to payment|completing your payment|assistance completing your payment|order summary|total payable|fee breakdown|please complete your payment)\b"
+        reply_leaks = bool(re.search(PAYMENT_LEAK_REGEX, reply, re.IGNORECASE))
+        followup_leaks = bool(followup and re.search(PAYMENT_LEAK_REGEX, followup, re.IGNORECASE))
+
+        if reply_leaks or followup_leaks:
+            from src.core.helpers.slot_engine import evaluate_enrollment_slots
+            slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
+            next_slot = slot_eval.get("next_target_slot")
+            cid_curr = (active_cid or state.get("course") or "").lower().strip()
+            course_title = kb_loader.get_catalog_entry(cid_curr).get("name", cid_curr.title()) if kb_loader.get_catalog_entry(cid_curr) else cid_curr.title()
+            pkg_val = state.get("package") or state.get("selected_duration")
+            timing_val = state.get("timing") or state.get("selected_timing")
+            teacher_val = state.get("selected_teacher") or state.get("teacher")
+
+            if next_slot == "TIMING":
+                if pkg_val:
+                    reply = f"You've selected the *{pkg_val}* package for *{course_title}*. Next, let's select your preferred batch timing."
+                else:
+                    reply = f"Great choice for *{course_title}*! Next, let's select your preferred batch timing."
+                followup = "Which batch timing works best for your daily schedule? 😊"
+            elif next_slot == "TEACHER":
+                reply = f"You've selected the *{timing_val}* batch for *{course_title}*. Next, let's select your instructor."
+                followup = "Which instructor would you prefer to learn with? 😊"
+            elif next_slot == "DURATION":
+                reply = f"Great! Your batch and instructor for *{course_title}* are confirmed. Next, let's select your package duration."
+                followup = "Which package duration would you like to start with — 1 Month or 3 Months? 😊"
+            elif next_slot == "COURSE":
+                reply = "Before we proceed, could you please let me know which course you would like to join?"
+                followup = "Which course would you like to know more about? 😊"
 
     return reply, followup
 
@@ -1763,9 +1770,20 @@ async def handle_conversation_turn_async(
         or new_state.get("stage") == "ENROLLED"
     )
 
+    # QR Code Dispatch Synchronization Guard:
+    # NEVER dispatch payment QR code if Message #2 is actively asking the user to choose a timing, teacher, or package!
+    is_asking_slot = bool(
+        clean_followup and re.search(
+            r"\b(which timing|which batch|which specific timing|which instructor|which package duration|choose a package|select a package|kisme se|kaunsa batch|kaunsi timing)\b",
+            clean_followup,
+            re.IGNORECASE,
+        )
+    )
+
     is_payment_step = bool(
         not is_client_paid
         and all_prerequisites_met
+        and (user_asked_qr or not is_asking_slot)
         and (
             user_asked_qr
             or (not new_state.get("payment_claimed") and (

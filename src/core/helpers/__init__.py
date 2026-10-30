@@ -19,6 +19,8 @@ from src.core.helpers.schedule_engine import (
     format_days_for_button,
 )
 
+from src.core.helpers.slot_engine import evaluate_enrollment_slots
+
 from src.core.pricing_engine import (
     get_course_gst_percentage,
     calculate_gst_breakdown,
@@ -45,6 +47,7 @@ from src.core.pricing_engine import (
 
 __all__ = [
     # Schedule & Timings
+    "evaluate_enrollment_slots",
     "classify_time_period",
     "get_available_timings",
     "get_valid_timings",

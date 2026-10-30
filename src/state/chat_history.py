@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from src.services.supabase_client import supabase
 from src.services.redis_client import get_redis_connection
+from src.state.chat_state import get_phone_variants
 
 load_dotenv()
 
@@ -74,7 +75,7 @@ def get_recent_history(phone: str, limit: int = HISTORY_CACHE_LIMIT):
         result = (
             supabase.table("chat_history")
             .select("role, message")
-            .eq("phone", phone)
+            .in_("phone", get_phone_variants(phone))
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

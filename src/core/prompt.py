@@ -50,8 +50,10 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 
     2. TEACHER SLOT (If Timing is SELECTED, but Customer's Selected Instructor is NOT SELECTED):
        - CASE A: MULTIPLE INSTRUCTORS for this timing (e.g. 2+ instructors available for that slot):
-         * Message #1: Warmly acknowledge their chosen timing. Introduce the instructors assigned to that specific timing from COURSE_DATA.
+         * Message #1: Warmly acknowledge their chosen timing. Introduce the instructors assigned to that specific timing from COURSE_DATA. Message #1 must NOT contain any question mark (?) or closing question!
          * Message #2 (followup): Ask which of these instructors they would prefer for their classes, or if they would like to explore their demo videos (e.g. "Which instructor would you like to learn with, or would you like to explore their demo video? 😊").
+         * STRICT GUARD: Message #2 MUST ask for the instructor! Under NO circumstances may Message #2 ask for package duration, fees, or mention payments!
+         * Quick-Reply Buttons: Exactly the instructor choices (e.g. ["Suman Lata", "Priya Mathur"]).
        - CASE B: SINGLE INSTRUCTOR for this timing (Only 1 certified instructor teaches that batch):
          * Message #1: Warmly acknowledge their chosen timing and introduce their assigned instructor (e.g. "You've selected 4:00 PM to 5:00 PM. Your instructor for this timing is Mradula...").
          * Message #2 (followup): Their instructor is ALREADY settled! Do NOT ask "Which instructor would you like to learn with?". Move directly to Package Duration (Step 3) or offer their demo video before selecting package (e.g. "Which package duration would you like to start with — 1 Month or 3 Months? 😊", or "Would you like to see Mradula's demo video, or are you ready to select your package duration? 😊").
@@ -514,6 +516,9 @@ def format_system_prompt(
         or s.get("is_enrolled")
         or s.get("stage") == "ENROLLED"
     )
+    paid_status_str = "PAID (Enrollment Confirmed)" if is_paid else (s.get("payment_status") or "UNPAID")
+    paid_amt_val = s.get("paid_amount")
+    paid_amt_display = f"₹{paid_amt_val}" if paid_amt_val is not None else "₹0.00"
 
     is_trial_path = bool(
         s.get("wants_trial")
@@ -521,39 +526,20 @@ def format_system_prompt(
         or (s.get("_last_turn") or {}).get("wants_trial")
     )
 
-    # ── Database State Calculation (State is Highest Authority) ──
-    settled_slots = []
-    missing_slots = []
-
-    if cid and active_title != "Not Selected":
-        settled_slots.append(f"Course: {active_title}")
-    else:
-        missing_slots.append("Course Selection")
-
-    if timing_str != "NOT SELECTED":
-        settled_slots.append(f"Batch Timing: {timing_str}")
-    else:
-        missing_slots.append("Batch Timing")
-
-    if teacher_str != "NOT SELECTED":
-        settled_slots.append(f"Instructor: {teacher_str}")
-    else:
-        missing_slots.append("Instructor Preference")
-
-    days_val = s.get("days") or s.get("selected_days")
-    from src.core.helpers.schedule_engine import get_available_days_for_batch
-    avail_days = (
-        get_available_days_for_batch(cid, timing=timing_str, teacher=teacher_str)
-        if (cid and timing_str != "NOT SELECTED" and teacher_str != "NOT SELECTED")
-        else []
-    )
-
-    if package_str != "NOT SELECTED":
-        settled_slots.append(f"Package Duration: {package_str}")
-    else:
-        if len(avail_days) > 1 and not days_val:
-            missing_slots.append(f"Batch Days ({', '.join(avail_days)})")
-        missing_slots.append("Package Duration")
+    # ── Deterministic Slot State Engine (Order-Independent & Centralized) ──
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots
+    slot_eval = evaluate_enrollment_slots(s, course_id=cid)
+    settled_slots = slot_eval["settled_slots"]
+    missing_slots = slot_eval["missing_slots"]
+    is_complete = slot_eval["is_complete"]
+    next_target_slot = slot_eval["next_target_slot"]
+    next_target_label = slot_eval["next_target_label"]
+    next_target_buttons = slot_eval["next_target_buttons"]
+    timing_str = slot_eval["timing_str"]
+    teacher_str = slot_eval["teacher_str"]
+    days_val = slot_eval["days"]
+    days_str = slot_eval["days_str"]
+    package_str = slot_eval["package_str"]
 
     last_turn_dict = s.get("_last_turn") or {}
     last_intent = (last_turn_dict.get("intent") or "").upper()
@@ -573,7 +559,19 @@ def format_system_prompt(
         or last_turn_dict.get("is_disinterested")
     )
 
-    if is_objection_turn:
+    if is_paid:
+        turn_intent_guidance = (
+            f"- 🎓 ENROLLED & ACTIVE STUDENT POST-PURCHASE SUPPORT:\n"
+            f"  • Course: {active_title} | Timing: {timing_str} | Instructor: {teacher_str} | Package: {package_str}\n"
+            f"  • Payment Status: {paid_status_str} (Amount Paid: {paid_amt_display})\n"
+            "  • NON-NEGOTIABLE RULE: Customer has ALREADY PAID and is actively enrolled!\n"
+            "  • Under NO circumstances ask for fees, payment, or send a payment QR code!\n"
+            "  • If customer says 'i have not paid', 'payment pending', or questions payment status:\n"
+            f"    Warmly reassure them that their payment and enrollment for {active_title} ({timing_str} with {teacher_str}) are already confirmed in our system.\n"
+            "  • Message #1: Warmly address their question, payment reassurance, or onboarding steps.\n"
+            "  • Message #2 (followup): Guide them to log into the Sensationz App using Google to view their batch.\n"
+        )
+    elif is_objection_turn:
         turn_intent_guidance = (
             "- ⚠️ CURRENT TURN CONVERSATIONAL MODE: OBJECTION / COMPLAINT / HESITATION\n"
             "  • Message #1: Warmly and empathetically acknowledge their concern without being pushy or arguing.\n"
@@ -585,17 +583,24 @@ def format_system_prompt(
             "  • Message #1: Directly, thoroughly, and warmly address their specific question FIRST.\n"
             "  • Message #2 (followup): Your follow-up question MUST be directly relevant to their question (e.g. asking for their thoughts on the demo/instructor/topic). DO NOT force payment assistance, and DO NOT badger them to select missing funnel slots while they are actively exploring/asking questions!\n"
         )
-    elif not missing_slots:
+    elif is_complete:
         turn_intent_guidance = (
-            f"- 🎯 CURRENT ENROLLMENT STATUS: ALL 4 DETAILS COMPLETED (Course: {active_title}, Timing: {timing_str}, Instructor: {teacher_str}, Package: {package_str})\n"
-            "  • CRITICAL RULE: Under NO circumstances ask the customer to choose a package, timing, or instructor! They are ALL ALREADY CHOSEN and LOCKED in database.\n"
-            f"  • Message #1: Confirm their selected class ({teacher_str} for {timing_str} batch) and present the transparent pre-computed order fee breakdown for {package_str}.\n"
+            f"- 🎯 CURRENT ENROLLMENT STATUS: ALL 5 DETAILS COMPLETED AND CONFIRMED!\n"
+            f"  • Course: {active_title} | Timing: {timing_str} | Instructor: {teacher_str} | Days: {days_str} | Package: {package_str}\n"
+            "  • CRITICAL RULE: Under NO circumstances ask the customer to choose a package, timing, or instructor! They are ALL ALREADY CHOSEN and LOCKED.\n"
+            f"  • Message #1: Confirm their chosen batch ({active_title} with {teacher_str} at {timing_str}) and present the transparent pre-computed order fee breakdown for {package_str}.\n"
             "  • Message #2 (followup): Ask if they would like any assistance completing their payment with the UPI QR code.\n"
+            "  • Quick-Reply Buttons: ['Talk to Agent']\n"
         )
     else:
         turn_intent_guidance = (
-            f"- 📋 CURRENT FUNNEL SELECTION: The next incomplete detail to guide is: {missing_slots[0]}.\n"
-            f"  • DO NOT ask for already settled items ({', '.join(settled_slots)}).\n"
+            f"- 📋 CURRENT FUNNEL SELECTION: The next required slot to settle is: {next_target_label}.\n"
+            f"  • ALREADY SETTLED IN DATABASE (DO NOT ASK AGAIN): {', '.join(settled_slots)}\n"
+            f"  • STILL MISSING: {', '.join(missing_slots)}\n"
+            f"  • STRICT 2-MESSAGE SCHEMA RULES (MANDATORY):\n"
+            f"    - Message #1 (reply): Purely informative statement / acknowledgement. NEVER put a question mark (?) or closing inquiry in Message #1!\n"
+            f"    - Message #2 (followup): MUST ask EXCLUSIVELY for: {next_target_label}. NEVER jump ahead to duration or payment!\n"
+            f"    - Quick-Reply Buttons: Contextual choices for {next_target_label}: {next_target_buttons}\n"
         )
 
     # Identify the next missing slot in the funnel sequence: Course -> Timing -> Teacher -> Duration -> Payment Summary -> Enrolled
@@ -617,14 +622,12 @@ def format_system_prompt(
             "DO NOT collect trial timing or teacher in chat! "
             "DO NOT pitch paid package durations or enrollment checkout!)"
         )
-    elif not missing_slots:
+    elif is_complete:
         next_funnel_slot = "PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (All 5 prerequisites complete: Course, Timing, Teacher, Package, Fee. Present transparent order fee breakdown and guide direct in-chat UPI QR payment)"
     else:
-        next_funnel_slot = f"NEXT MISSING SLOT: {missing_slots[0]} (Settled: {', '.join(settled_slots)})"
+        next_funnel_slot = f"NEXT MISSING SLOT: {next_target_label} (Settled: {', '.join(settled_slots)} | Still Missing: {', '.join(missing_slots)})"
 
-    paid_status_str = "PAID (Enrollment Confirmed)" if is_paid else (s.get("payment_status") or "UNPAID")
-    paid_amt_val = s.get("paid_amount")
-    paid_amt_display = f"₹{paid_amt_val}" if paid_amt_val is not None else "₹0.00"
+
 
     state_context += (
         f"- DATABASE ENROLLMENT FACTS (STATE IS HIGHEST AUTHORITY):\n"
@@ -673,7 +676,7 @@ def format_system_prompt(
         if slot_teachers:
             state_context += f"- Assigned Instructors for Selected Timing ({timing_str}): {', '.join(slot_teachers)}\n"
 
-    if not is_paid and package_str != "NOT SELECTED" and cid:
+    if not is_paid and is_complete and cid:
         from src.core.pricing_engine import calculate_exact_fee
         exact_bill = calculate_exact_fee(cid, package_str)
         if exact_bill:
@@ -685,6 +688,13 @@ def format_system_prompt(
                 f"  • GST ({exact_bill['gst_percentage']}%): +₹{exact_bill['gst_amount']:,}\n"
                 f"  • FINAL TOTAL PAYABLE AMOUNT: ₹{exact_bill['final_payable_amount']:,}\n"
             )
+    elif not is_paid and not is_complete:
+        state_context += (
+            f"- 🛑 STRICT PAYMENT & FEE BLOCKER (NON-NEGOTIABLE RULE 2):\n"
+            f"  • The customer has NOT completed all enrollment details yet! Missing: {', '.join(missing_slots)}.\n"
+            f"  • Under NO circumstances output payable fee breakdowns, total prices, GST calculations, or payment links/QR codes!\n"
+            f"  • Payment talks are strictly prohibited until ALL details ({', '.join(missing_slots)}) are confirmed!\n"
+        )
     elif is_paid:
         state_context += (
             f"- PAYMENT & ENROLLMENT COMPLETED: Customer is ALREADY PAID and ENROLLED for {active_title} ({timing_str}, {teacher_str}, {package_str}).\n"

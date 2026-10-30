@@ -72,18 +72,20 @@ def mark_escalated(phone: str):
 def is_escalated(phone: str) -> bool:
     """
     Checks whether a specific phone number has been escalated to a human agent.
+    Checks across all phone variants (+91, wa_91, 91, 10-digit).
     """
+    variants = get_phone_variants(phone)
     if supabase:
         try:
-            # Query Supabase table for escalation status
+            # Query Supabase table for escalation status across all variants
             result = (
                 supabase.table("escalated_chats")
                 .select("phone")
-                .eq("phone", phone)
+                .in_("phone", variants)
                 .limit(1)
                 .execute()
             )
-            if len(result.data) > 0:
+            if result.data and len(result.data) > 0:
                 return True
         except Exception as e:
             print(f"[chat_state] is_escalated DB error: {e}")
@@ -95,12 +97,13 @@ def is_escalated(phone: str) -> bool:
 
 def clear_escalation(phone: str):
     """
-    Removes human agent escalation for a phone number so the bot can resume automated replies.
+    Removes human agent escalation for a phone number across all variants so the bot can resume automated replies.
     """
+    variants = get_phone_variants(phone)
     if supabase:
         try:
-            # Remove row from Supabase escalated_chats table
-            supabase.table("escalated_chats").delete().eq("phone", phone).execute()
+            for v in variants:
+                supabase.table("escalated_chats").delete().eq("phone", v).execute()
         except Exception as e:
             print(f"[chat_state] clear_escalation DB error: {e}")
     state = get_user_state(phone)
@@ -231,52 +234,72 @@ def get_user_state(phone: str) -> dict:
     """
     Retrieves active session state dictionary for a phone number.
     Checks memory cache (5s TTL) -> Redis -> Supabase -> Default.
+    Guarantees cross-format phone resolution (+91, wa_91, 91, 10-digit).
     """
     MEMORY_TTL = 5  # seconds — prevents stale reads in multi-worker mode
+    variants = get_phone_variants(phone)
 
-    # 1. Check in-memory cache (with TTL)
+    # 1. Check in-memory cache across all variants (with TTL)
     cached_to_check = None
     with _memory_lock:
-        if phone in _memory_sessions:
-            entry = _memory_sessions[phone]
-            if isinstance(entry, tuple):
-                cached_state, cached_at = entry
-                if (time.time() - cached_at) < MEMORY_TTL:
-                    cached_to_check = dict(cached_state)
-            elif isinstance(entry, dict):
-                cached_to_check = dict(entry)
+        for v in variants:
+            if v in _memory_sessions:
+                entry = _memory_sessions[v]
+                if isinstance(entry, tuple):
+                    cached_state, cached_at = entry
+                    if (time.time() - cached_at) < MEMORY_TTL:
+                        cached_to_check = dict(cached_state)
+                        break
+                elif isinstance(entry, dict):
+                    cached_to_check = dict(entry)
+                    break
 
     if cached_to_check is not None:
-        return _check_sync_paid_status(phone, cached_to_check)
+        state = _check_sync_paid_status(phone, cached_to_check)
+        with _memory_lock:
+            for v in variants:
+                _memory_sessions[v] = (state, time.time())
+        return state
 
-    # 2. Check Redis cache (persists across server restarts)
+    # 2. Check Redis cache across all variants
     state = get_default_state(phone)
-    redis_key = f"user_state:{phone}"
+    redis_keys = [f"user_state:{v}" for v in variants]
     try:
-        raw_state = redis_conn.get(redis_key)
-        if raw_state:
-            cached_dict = json.loads(raw_state)
-            state.update(cached_dict)
-            # Bidirectional slot synchronization
-            if state.get("selected_timing") and not state.get("timing"):
-                state["timing"] = state["selected_timing"]
-            elif state.get("timing") and not state.get("selected_timing"):
-                state["selected_timing"] = state["timing"]
-            if state.get("selected_duration") and not state.get("package"):
-                state["package"] = state["selected_duration"]
-            elif state.get("package") and not state.get("selected_duration"):
-                state["selected_duration"] = state["package"]
-            state = _check_sync_paid_status(phone, state)
-            with _memory_lock:
-                _memory_sessions[phone] = (state, time.time())
-            return state
+        raw_list = redis_conn.mget(redis_keys)
+        for raw in raw_list:
+            if not raw:
+                continue
+            cached_dict = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+            if isinstance(cached_dict, dict) and any(cached_dict.get(k) for k in ("course", "stage", "timing", "package", "fee", "payment_status")):
+                state.update(cached_dict)
+                # Bidirectional slot synchronization
+                if state.get("selected_timing") and not state.get("timing"):
+                    state["timing"] = state["selected_timing"]
+                elif state.get("timing") and not state.get("selected_timing"):
+                    state["selected_timing"] = state["timing"]
+                if state.get("selected_duration") and not state.get("package"):
+                    state["package"] = state["selected_duration"]
+                elif state.get("package") and not state.get("selected_duration"):
+                    state["selected_duration"] = state["package"]
+                state = _check_sync_paid_status(phone, state)
+                with _memory_lock:
+                    for v in variants:
+                        _memory_sessions[v] = (state, time.time())
+                return state
     except Exception as e:
         print(f"[chat_state] Redis get_user_state read failed (non-fatal): {e}")
 
-    # 3. Fallback to Supabase database lookup
+    # 3. Fallback to Supabase database lookup across all variants
     if supabase:
         try:
-            res = supabase.table("user_session_state").select("*").eq("phone", phone).limit(1).execute()
+            res = (
+                supabase.table("user_session_state")
+                .select("*")
+                .in_("phone", variants)
+                .order("updated_at", desc=True)
+                .limit(1)
+                .execute()
+            )
             if res.data and len(res.data) > 0:
                 row = dict(res.data[0])
                 raw_topic = row.get("last_topic") or ""
@@ -319,11 +342,15 @@ def get_user_state(phone: str) -> dict:
 
     state = _check_sync_paid_status(phone, state)
 
-    # Save to Redis & memory cache for future fast reads
+    # Save to Redis & memory cache for all variants for future fast reads
     with _memory_lock:
-        _memory_sessions[phone] = (state, time.time())
+        for v in variants:
+            _memory_sessions[v] = (state, time.time())
     try:
-        redis_conn.setex(redis_key, STATE_CACHE_TTL, json.dumps(state))
+        pipe = redis_conn.pipeline()
+        for v in variants:
+            pipe.setex(f"user_state:{v}", STATE_CACHE_TTL, json.dumps(state))
+        pipe.execute()
     except Exception:
         pass
 
@@ -333,7 +360,10 @@ def get_user_state(phone: str) -> dict:
 def save_user_state(phone: str, state: dict):
     """
     Persists updated session state dictionary across Memory, Redis, and Supabase.
+    Maintains synchronization across all phone variants (+91, wa_91, 91, 10-digit).
     """
+    variants = get_phone_variants(phone)
+
     # Bidirectional slot synchronization before saving
     if state.get("selected_timing") and not state.get("timing"):
         state["timing"] = state["selected_timing"]
@@ -345,18 +375,15 @@ def save_user_state(phone: str, state: dict):
         state["selected_duration"] = state["package"]
 
     with _memory_lock:
-        _memory_sessions[phone] = (state, time.time())
-    redis_key = f"user_state:{phone}"
+        for v in variants:
+            _memory_sessions[v] = (state, time.time())
 
-    # Persist in Redis across restarts (stores all keys natively in JSON)
+    # Persist in Redis across restarts across all variants
     try:
-        redis_conn.setex(redis_key, STATE_CACHE_TTL, json.dumps(state))
-        if state.get("payment_status") == "PAID":
-            for alt_phone in get_phone_variants(phone):
-                if alt_phone != phone:
-                    redis_conn.setex(f"user_state:{alt_phone}", STATE_CACHE_TTL, json.dumps(state))
-                    with _memory_lock:
-                        _memory_sessions[alt_phone] = (state, time.time())
+        pipe = redis_conn.pipeline()
+        for v in variants:
+            pipe.setex(f"user_state:{v}", STATE_CACHE_TTL, json.dumps(state))
+        pipe.execute()
     except Exception as e:
         print(f"[chat_state] Redis save_user_state failed (non-fatal): {e}")
 
@@ -370,7 +397,23 @@ def save_user_state(phone: str, state: dict):
                 "follow_up_count", "next_followup_due_at", "last_topic"
             }
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
-            db_state["phone"] = phone
+
+            # If row exists under any variant, preserve its canonical database key to avoid duplicates
+            target_phone = phone
+            try:
+                chk = (
+                    supabase.table("user_session_state")
+                    .select("phone")
+                    .in_("phone", variants)
+                    .limit(1)
+                    .execute()
+                )
+                if chk.data and len(chk.data) > 0:
+                    target_phone = chk.data[0]["phone"]
+            except Exception:
+                pass
+
+            db_state["phone"] = target_phone
             db_state["timing"] = state.get("selected_timing") or state.get("timing")
             db_state["package"] = state.get("selected_duration") or state.get("package")
 

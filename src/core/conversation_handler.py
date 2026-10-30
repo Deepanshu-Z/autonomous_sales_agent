@@ -1579,18 +1579,49 @@ async def handle_conversation_turn_async(
         user_wants_app_guide = False
         user_wants_trial_guide = False
 
+    # App links are allowed when customer explicitly asked for links, clicked platform button, or after enrollment/trial staging
+    unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
+    is_client_paid = bool(
+        new_state.get("payment_status") == "PAID"
+        or new_state.get("is_enrolled")
+        or new_state.get("stage") == "ENROLLED"
+        or new_state.get("staged_enrollment")
+        or state.get("payment_status") == "PAID"
+        or state.get("is_enrolled")
+        or state.get("stage") == "ENROLLED"
+        or state.get("staged_enrollment")
+        or state.get("awaiting_email_fulfillment")
+        or new_state.get("awaiting_email_fulfillment")
+    )
+    if is_client_paid:
+        new_state["payment_claimed"] = False
+
     is_trial_booking_guide = bool(
         re.search(r"\b(step|download the sensationz app|profile then tap|trial links|confirm trial)\b", main_reply, re.IGNORECASE)
     )
+    # STRICT GUARD: Only send trial video if customer specifically wants a trial AND is not a paid student
+    customer_wants_trial = bool(
+        last_turn.get("wants_trial")
+        or user_wants_trial_guide
+        or new_state.get("wants_trial")
+    )
     is_trial_turn = bool(
-        user_wants_trial_guide
-        or (last_turn.get("wants_trial") and (is_trial_booking_guide or not user_asked_demo) and not new_state.get("package"))
-        or (new_state.get("stage") == "TRIAL_REQUESTED" and not new_state.get("trial_video_sent"))
-        or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book\s+trial|book\s+a\s+trial)\b", main_reply, re.IGNORECASE)
+        not is_client_paid
+        and customer_wants_trial
+        and (
+            user_wants_trial_guide
+            or (is_trial_booking_guide or not user_asked_demo)
+            or (new_state.get("stage") == "TRIAL_REQUESTED" and not new_state.get("trial_video_sent"))
+            or re.search(r"\b(trial links|confirm trial|trial enrollment|how to book\s+trial|book\s+a\s+trial)\b", main_reply, re.IGNORECASE)
+        )
     )
 
     will_send_trial_video = bool(
-        not user_wants_app_guide and not user_asked_demo and (
+        not is_client_paid
+        and customer_wants_trial
+        and not user_wants_app_guide
+        and not user_asked_demo
+        and (
             user_wants_trial_guide
             or (is_trial_turn and (is_trial_booking_guide or wants_resend) and (wants_resend or not new_state.get("trial_video_sent")))
         )
@@ -1616,17 +1647,6 @@ async def handle_conversation_turn_async(
         yt_link = trial_cfg.get("how_to_book_video_url") or trial_cfg.get("video_url")
         if yt_link and yt_link not in main_reply:
             main_reply = f"{main_reply.rstrip()}\n\n🎬 *Video Link:* {yt_link}"
-
-    # App links are allowed when customer explicitly asked for links, clicked platform button, or after enrollment/trial staging
-    unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
-    is_client_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("is_enrolled")
-        or new_state.get("stage") == "ENROLLED"
-        or new_state.get("staged_enrollment")
-    )
-    if is_client_paid:
-        new_state["payment_claimed"] = False
 
     allow_app_links = bool(
         user_asked_links

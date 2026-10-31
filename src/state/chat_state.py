@@ -9,6 +9,7 @@ import re
 from dotenv import load_dotenv
 from supabase import create_client
 import asyncio
+from contextlib import asynccontextmanager
 from rapidfuzz import fuzz
 # Load environment variables (.env file)
 load_dotenv()
@@ -473,6 +474,89 @@ async def is_escalated_async(phone: str) -> bool:
 async def clear_escalation_async(phone: str):
     """Non-blocking async wrapper to clear escalation."""
     return await asyncio.to_thread(clear_escalation, phone)
+
+
+class AsyncPhoneRLock:
+    """
+    Re-entrant asynchronous lock with optional Redis distributed locking.
+    Prevents deadlocks when a coroutine calls nested functions for the same phone.
+    """
+    def __init__(self, key: str):
+        self.key = key
+        self._lock = asyncio.Lock()
+        self._owner = None
+        self._count = 0
+        self._redis_locked = False
+        self._redis_lock_obj = None
+
+    async def acquire(self, timeout_seconds: float = 30.0, use_redis: bool = False):
+        current_task = asyncio.current_task()
+        if self._owner == current_task:
+            self._count += 1
+            return True
+
+        await self._lock.acquire()
+        self._owner = current_task
+        self._count = 1
+
+        if use_redis and redis_conn and hasattr(redis_conn, "lock"):
+            try:
+                self._redis_lock_obj = redis_conn.lock(
+                    f"phone-lock:{self.key}",
+                    timeout=int(timeout_seconds),
+                    blocking_timeout=2,
+                )
+                self._redis_locked = await asyncio.to_thread(self._redis_lock_obj.acquire, False)
+            except Exception:
+                self._redis_locked = False
+        return True
+
+    def release(self):
+        current_task = asyncio.current_task()
+        if self._owner != current_task:
+            return
+
+        self._count -= 1
+        if self._count == 0:
+            if self._redis_locked and self._redis_lock_obj:
+                try:
+                    self._redis_lock_obj.release()
+                except Exception:
+                    pass
+                self._redis_locked = False
+                self._redis_lock_obj = None
+            self._owner = None
+            self._lock.release()
+
+
+_phone_async_locks: dict[str, AsyncPhoneRLock] = {}
+_phone_async_locks_mutex = threading.Lock()
+
+
+def get_phone_async_lock(phone: str) -> AsyncPhoneRLock:
+    """Returns an in-process re-entrant AsyncPhoneRLock specific to the canonical phone number."""
+    digits = re.sub(r"\D", "", str(phone or ""))
+    canonical = digits[-10:] if len(digits) >= 10 else str(phone or "")
+    with _phone_async_locks_mutex:
+        if canonical not in _phone_async_locks:
+            _phone_async_locks[canonical] = AsyncPhoneRLock(canonical)
+        return _phone_async_locks[canonical]
+
+
+@asynccontextmanager
+async def phone_concurrency_lock(phone: str, timeout_seconds: float = 30.0):
+    """
+    Guarantees serialized, re-entrant execution per customer phone number.
+    Acquires an in-process AsyncPhoneRLock, and optionally a Redis distributed lock
+    if Redis is operational, preventing race conditions between incoming messages
+    and asynchronous webhook fulfillments.
+    """
+    rlock = get_phone_async_lock(phone)
+    await rlock.acquire(timeout_seconds=timeout_seconds)
+    try:
+        yield
+    finally:
+        rlock.release()
 
 
 def reset_user_state(phone: str) -> dict:

@@ -61,6 +61,7 @@ from src.state.chat_state import (
     clear_escalation_async,
     arm_followup_timer,
     reset_follow_up_timer,
+    phone_concurrency_lock,
 )
 
 _reply_llm = None
@@ -1242,7 +1243,7 @@ async def dispatch_payment_qr_async(
 
     display_amount = f"₹{final_amount:.2f}" if (isinstance(final_amount, float) and final_amount < 1) else f"₹{int(final_amount):,}"
 
-    from src.services.razorpay_service import create_dynamic_qr_code, RazorpayServiceError
+    from src.services.razorpay_service import create_dynamic_qr_code_async, RazorpayServiceError
 
     timing_val = state.get("timing") or state.get("selected_timing")
     teacher_val = state.get("selected_teacher") or state.get("teacher")
@@ -1251,7 +1252,7 @@ async def dispatch_payment_qr_async(
     course_name = catalog_entry.get("name", cid.title()) if catalog_entry else cid.title()
 
     try:
-        qr_data = create_dynamic_qr_code(
+        qr_data = await create_dynamic_qr_code_async(
             amount=final_amount,
             amount_in_paise=final_amount_paise,
             course_id=cid,
@@ -1318,7 +1319,7 @@ async def dispatch_payment_qr_async(
     return None
 
 
-async def handle_conversation_turn_async(
+async def _handle_conversation_turn_unlocked(
     phone: str,
     text: str,
     history: Optional[List[dict]] = None,
@@ -1867,3 +1868,22 @@ async def handle_conversation_turn_async(
 
     final_buttons_ret = [] if new_state.get("payment_claimed") else (final_buttons or result.get("buttons", []))
     return {"status": "answered", "reply": clean_reply, "followup": clean_followup, "buttons": final_buttons_ret}
+
+
+async def handle_conversation_turn_async(
+    phone: str,
+    text: str,
+    history: Optional[List[dict]] = None,
+    start_time: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Coordinates an entire conversational turn from tasks.py / routes.py:
+    Guarantees serialized execution per customer phone number via phone_concurrency_lock.
+    """
+    async with phone_concurrency_lock(phone):
+        return await _handle_conversation_turn_unlocked(
+            phone=phone,
+            text=text,
+            history=history,
+            start_time=start_time,
+        )

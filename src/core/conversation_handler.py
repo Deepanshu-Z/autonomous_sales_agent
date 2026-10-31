@@ -379,7 +379,6 @@ async def handle_incoming_message(
                 or flags.get("wants_trial")
                 or new_state.get("stage") in ("TRIAL_REQUESTED", "TRIAL_STEPS_SENT")
                 or session_state.get("awaiting_trial_email")
-                or re.search(r"\b(trial|demo)\b", user_message, re.IGNORECASE)
             )
         )
 
@@ -1045,9 +1044,10 @@ def _sanitize_state_grounded_replies(
     has_teacher = bool(state.get("teacher") or state.get("selected_teacher"))
     has_package = bool(state.get("package") or state.get("selected_duration"))
 
-    intent = (last_turn.get("intent") or "").upper()
+    intent = (last_turn.get("intent") or last_turn.get("customer_intent") or "").upper()
     is_question = bool(
-        intent == "QUESTION"
+        intent in ("QUESTION", "COURSE_INQUIRY", "FEE_INQUIRY", "PAYMENT_REQUEST")
+        or last_turn.get("question_summary")
         or last_turn.get("wants_demo")
         or last_turn.get("wants_trial_guide")
         or last_turn.get("wants_app_guide")
@@ -1108,11 +1108,12 @@ def _sanitize_state_grounded_replies(
                 )
                 followup = "Would you like any assistance completing your payment with the UPI QR code? 😊"
 
-    # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero payment talk until all slots confirmed)
-    if not (has_course and has_timing and has_teacher and has_package) and not is_objection:
-        PAYMENT_LEAK_REGEX = r"\b(upi qr|qr code|scanner|proceeding to payment|completing your payment|assistance completing your payment|order summary|total payable|fee breakdown|please complete your payment)\b"
+    # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero unprompted payment checkout until all slots confirmed)
+    # Never wipe replies if the user specifically asked a question (e.g. "payment sirf app pr hoti h?")
+    if not (has_course and has_timing and has_teacher and has_package) and not is_objection and not is_question:
+        PAYMENT_LEAK_REGEX = r"\b(order summary|total payable|final payable|fee breakdown|please complete your payment via the upi qr|scan the upi qr code below to confirm)\b"
         reply_leaks = bool(re.search(PAYMENT_LEAK_REGEX, reply, re.IGNORECASE))
-        followup_leaks = bool(followup and re.search(PAYMENT_LEAK_REGEX, followup, re.IGNORECASE))
+        followup_leaks = bool(followup and re.search(r"\b(assistance completing your payment with the upi qr|complete your payment via the upi qr)\b", followup, re.IGNORECASE))
 
         if reply_leaks or followup_leaks:
             from src.core.helpers.slot_engine import evaluate_enrollment_slots
@@ -1663,8 +1664,8 @@ async def handle_conversation_turn_async(
         or new_state.get("stage") in ("ENROLLED", "TRIAL_CONFIRMED")
         or last_turn.get("intent") == "APP_LINK_REQUEST"
         or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
+        or last_turn.get("wants_app_link")
         or "lock my seat" in unquoted_text
-        or re.search(r"\b(android|ios|play\s*store|app\s*store|app\s*link|download\s*link|download\s*app|link\s*bhejo|link\s*do|send\s*link)\b", unquoted_text, re.IGNORECASE)
     )
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
@@ -1686,7 +1687,7 @@ async def handle_conversation_turn_async(
     is_asking_to_pay = bool(
         last_turn.get("intent") == "PAYMENT_REQUEST"
         or last_turn.get("customer_intent") == "PAYMENT_REQUEST"
-        or re.search(r"\b(pay online|qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|how to pay|where to pay)\b", text_clean, re.IGNORECASE)
+        or last_turn.get("requests_qr")
     )
     is_payment_claim = bool(
         last_turn.get("claims_payment_or_enrollment")
@@ -1706,11 +1707,11 @@ async def handle_conversation_turn_async(
             r"\b(links?.{0,25}(download|app|website)\b.*\?)",
         )
         if any(re.search(p, clean_followup, re.IGNORECASE) for p in REDUNDANT_LINK_QUESTIONS):
-            is_trial = bool(last_turn.get("wants_trial") or re.search(r"\b(trial)\b", clean_reply, re.IGNORECASE))
+            is_trial = bool(last_turn.get("wants_trial") or new_state.get("wants_trial"))
             clean_followup = (
-                "Which batch timing works best for your trial class? 😊"
+                "Would you like any help downloading the app or booking your free trial inside the app? 😊"
                 if is_trial
-                else "Which batch timing or package would you like to explore? 😊"
+                else "Which package duration would you like to start with — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
             )
 
     # Deliver main reply to customer on WhatsApp (Message 1)

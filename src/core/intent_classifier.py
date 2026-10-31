@@ -65,6 +65,9 @@ def _empty_flags() -> Dict[str, Any]:
         "selected_package": None,
         "selected_course": None,
         "wants_trial": False,
+        "wants_demo_video": False,
+        "wants_app_link": False,
+        "requests_qr": False,
         "requests_human_agent": False,
         "is_coupon_requested": False,
         "is_disinterested": False,
@@ -72,6 +75,7 @@ def _empty_flags() -> Dict[str, Any]:
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
+        "explicit_language_request": None,
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
         "wants_demo": False,
@@ -138,7 +142,16 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
 
 8. "wants_trial":
-   - boolean: true if customer asks for demo, trial class, free trial, or wanting to try before enrolling.
+   - boolean: true if customer asks for demo class, trial class, free trial, or wanting to try a live class before enrolling.
+
+8a. "wants_demo_video":
+   - boolean: true if customer asks to see an instructor demo, dance/yoga sample video, teacher performance preview, or wants to see how a teacher teaches before enrolling (e.g. "demo video", "madhuri mam video dikhao", "dance video", "sample video", "teacher preview", "demo dikhao", "teaching video"). Otherwise false.
+
+8b. "wants_app_link":
+   - boolean: true if customer asks to receive or resend the app download link or website link, OR chooses/taps an app store platform button (e.g. "android app", "ios app", "app link", "download link", "play store", "app store", "send link", "link bhejo", "link do", "konsi app", "which app"). Otherwise false.
+
+8c. "requests_qr":
+   - boolean: true if customer wants to pay online, asks how to pay, asks for UPI QR code, payment scanner, or payment link (e.g. "pay online", "payment qr", "send qr", "scanner bhejo", "payment link", "how to pay", "kahan pay karein", "upi id bhejo"). Otherwise false.
 
 9. "requests_human_agent":
    - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
@@ -219,6 +232,9 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "selected_package": string | null,
   "selected_course": string | null,
   "wants_trial": boolean,
+  "wants_demo_video": boolean,
+  "wants_app_link": boolean,
+  "requests_qr": boolean,
   "requests_human_agent": boolean,
   "is_coupon_requested": boolean,
   "is_disinterested": boolean,
@@ -326,27 +342,44 @@ async def extract_intent_and_state_changes(
             if k in data:
                 clean[k] = data[k]
 
+        # Ensure strict typing on boolean flags
+        for bool_key in [
+            "wants_trial", "wants_demo_video", "wants_app_link", "requests_qr",
+            "requests_human_agent", "is_coupon_requested", "is_disinterested",
+            "is_complaint_or_refund", "wants_resend_video", "claims_payment_or_enrollment",
+            "wants_demo", "wants_app_guide", "wants_app_video_guide",
+            "wants_trial_guide", "wants_trial_video_guide"
+        ]:
+            val = clean.get(bool_key)
+            if isinstance(val, str):
+                clean[bool_key] = val.lower() in ("true", "1", "yes")
+            else:
+                clean[bool_key] = bool(val)
+
         clean["wants_app_guide"] = bool(clean.get("wants_app_guide") or data.get("wants_app_video_guide"))
         clean["wants_app_video_guide"] = clean["wants_app_guide"]
         clean["wants_trial_guide"] = bool(clean.get("wants_trial_guide") or data.get("wants_trial_video_guide"))
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
+        # Sync semantic request flags with customer_intent without raw-text regex overrides
+        if clean.get("customer_intent") == "PAYMENT_REQUEST":
+            clean["requests_qr"] = True
+        elif clean.get("requests_qr") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+            clean["customer_intent"] = "PAYMENT_REQUEST"
+
+        if clean.get("customer_intent") == "APP_LINK_REQUEST":
+            clean["wants_app_link"] = True
+        elif clean.get("wants_app_link") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+            clean["customer_intent"] = "APP_LINK_REQUEST"
+
         # Teacher demo inquiries must never trigger tutorial or install video guides
-        if any(w in text.lower() for w in ["demo", "sample", "preview", "teaching style"]):
+        if clean.get("wants_demo_video") or any(w in text.lower() for w in ["demo", "sample", "preview", "teaching style"]):
             clean["wants_demo"] = True
             clean["wants_resend_video"] = False
             clean["wants_app_guide"] = False
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False
             clean["wants_trial_video_guide"] = False
-
-        # Centralized check for payment request intent if user asked how to pay / QR
-        if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
-            unquoted_user_text = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text, flags=re.IGNORECASE).strip()
-            if re.search(r"\b(qr|qr code|scanner|scan|upi id|payment link|pay link|send link|bhejo qr|scanner bhejo|pay online|payment qr|how to pay|where to pay)\b", unquoted_user_text, re.IGNORECASE):
-                clean["customer_intent"] = "PAYMENT_REQUEST"
-            elif re.search(r"\b(android|android app|ios|ios app|play store|playstore|app store|appstore|app link|download link|download app|link bhejo|link do|send link|send app|app ka link|app download link)\b", unquoted_user_text, re.IGNORECASE):
-                clean["customer_intent"] = "APP_LINK_REQUEST"
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
         raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")

@@ -422,13 +422,13 @@ def save_user_state(phone: str, state: dict):
             course_val = state.get("course") or ""
             if course_val:
                 meta_parts.append(f"COURSE:{course_val}")
-            teacher_val = state.get("selected_teacher") or ""
+            teacher_val = state.get("selected_teacher") or state.get("teacher") or ""
             if teacher_val:
                 meta_parts.append(f"TEACHER:{teacher_val}")
-            pay_val = state.get("payment_status") or ""
+            pay_val = state.get("payment_status") or ("PAID" if state.get("stage") == "ENROLLED" or state.get("is_enrolled") else "")
             if pay_val and pay_val != "NONE":
                 meta_parts.append(f"PAY:{pay_val}")
-            order_val = state.get("order_id") or ""
+            order_val = state.get("order_id") or state.get("payment_id") or ""
             if order_val:
                 meta_parts.append(f"ORDER:{order_val}")
             email_val = state.get("student_email") or ""

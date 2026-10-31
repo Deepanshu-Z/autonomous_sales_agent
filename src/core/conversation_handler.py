@@ -1135,7 +1135,7 @@ def _sanitize_state_grounded_replies(
                 followup = "Which instructor would you prefer to learn with? 😊"
             elif next_slot == "DURATION":
                 reply = f"Great! Your batch and instructor for *{course_title}* are confirmed. Next, let's select your package duration."
-                followup = "Which package duration would you like to start with — 1 Month or 3 Months? 😊"
+                followup = "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
             elif next_slot == "COURSE":
                 reply = "Before we proceed, could you please let me know which course you would like to join?"
                 followup = "Which course would you like to know more about? 😊"

@@ -118,6 +118,68 @@ async def health_check():
     return {"status": "healthy", "service": "sensationz-whatsapp-ai"}
 
 
+from pydantic import BaseModel
+
+class SyncEmailPayload(BaseModel):
+    phone: str
+    email: str
+
+@router.post("/api/sync-email")
+async def sync_customer_email_endpoint(payload: SyncEmailPayload):
+    """
+    Direct sync endpoint for CRM Sales Agent and manual coordinators.
+    Updates customer's Gmail in state across Memory, Redis, and Supabase,
+    and automatically stages the enrollment to sensationz-hono if payment is complete.
+    """
+    from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
+    from src.state.chat_state import phone_concurrency_lock, get_user_state_async, save_user_state_async
+
+    normalized_email = clean_email(payload.email)
+    if not normalized_email:
+        return {"success": False, "error": f"Invalid email format: {payload.email}"}
+
+    phone = str(payload.phone or "").strip()
+    if not phone:
+        return {"success": False, "error": "Phone number is required"}
+
+    async with phone_concurrency_lock(phone):
+        state = await get_user_state_async(phone)
+        state["student_email"] = normalized_email
+        state["awaiting_email_fulfillment"] = False
+        await save_user_state_async(phone, state)
+
+        staged_res = None
+        # If student already paid or is enrolled, auto-stage to Hono backend
+        if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED" or state.get("is_enrolled"):
+            try:
+                staged_res = await stage_ai_enrollment_async(
+                    email=normalized_email,
+                    contact=phone,
+                    course=state.get("course") or "yoga",
+                    timing=state.get("selected_timing") or state.get("timing"),
+                    teacher=state.get("selected_teacher") or state.get("teacher"),
+                    days=state.get("days") or state.get("selected_days"),
+                    days_code=state.get("days_code"),
+                    package_duration=state.get("package") or state.get("selected_duration"),
+                    payment_id=state.get("payment_id") or state.get("order_id"),
+                    amount=state.get("paid_amount") or 0.0,
+                )
+                if staged_res and staged_res.get("success"):
+                    state["staged_enrollment"] = True
+                    state["staged_id"] = staged_res.get("staged_id") or staged_res.get("profile_id")
+                    await save_user_state_async(phone, state)
+            except Exception as e:
+                print(f"[routes] Error staging enrollment on sync-email: {e}")
+
+    return {
+        "success": True,
+        "phone": phone,
+        "email": normalized_email,
+        "staged": bool(state.get("staged_enrollment")),
+        "staging_details": staged_res,
+    }
+
+
 @router.get("/chat-history/{phone}")
 async def view_chat_history(phone: str):
     return await get_full_history_for_agent_async(phone)

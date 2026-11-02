@@ -1046,8 +1046,13 @@ def _sanitize_state_grounded_replies(
     has_package = bool(state.get("package") or state.get("selected_duration"))
 
     intent = (last_turn.get("intent") or last_turn.get("customer_intent") or "").upper()
+    user_asked_qr = bool(
+        intent == "PAYMENT_REQUEST"
+        or last_turn.get("requests_qr")
+        or re.search(r"\b(send\s*qr|qr\s*code|payment\s*link|scanner|pay\s*online)\b", str(state.get("_last_user_message", "")), re.IGNORECASE)
+    )
     is_question = bool(
-        intent in ("QUESTION", "COURSE_INQUIRY", "FEE_INQUIRY", "PAYMENT_REQUEST")
+        (intent in ("QUESTION", "COURSE_INQUIRY", "FEE_INQUIRY") and not user_asked_qr)
         or last_turn.get("question_summary")
         or last_turn.get("wants_demo")
         or last_turn.get("wants_trial_guide")
@@ -1077,6 +1082,15 @@ def _sanitize_state_grounded_replies(
 
     # 3. ALL SLOTS SETTLED GUARD: When Course + Timing + Teacher + Package are all complete
     if has_course and has_timing and has_teacher and has_package and not is_question and not is_objection:
+        # Strip hesitant confirmation patterns ("Before I can generate... I need to confirm that all details are in place")
+        HESITANT_CONFIRMATION_PATTERNS = [
+            r"Before I can generate your (customized )?payment QR code,?\s*(I need to confirm that all details are in place\.?)?",
+            r"Before we can generate your (customized )?payment QR code,?\s*(please confirm if all details are in place\.?)?",
+            r"I need to confirm that all details are in place\.?",
+        ]
+        for hp in HESITANT_CONFIRMATION_PATTERNS:
+            reply = re.sub(hp, "", reply, flags=re.IGNORECASE).strip()
+
         SLOT_REASK_PATTERNS = [
             r"\b(which package|kaunsa package|package duration|choose a package|select a package|select package duration|preferred duration|preferred package)\b",
             r"\b(start with\s*—\s*1 Month|1 Month ya 3 Months|1 Month or 3 Months)\b",
@@ -1108,15 +1122,17 @@ def _sanitize_state_grounded_replies(
                     f"Please complete your payment via the UPI QR code below to confirm your seat!"
                 )
                 followup = "Would you like any assistance completing your payment with the UPI QR code? 😊"
+        elif user_asked_qr and not re.search(r"^(great|here is|here are|yeh raha|aapka|sure|congratulations|namaste)", reply.strip(), re.IGNORECASE):
+            reply = f"Here is your customized UPI payment QR code for your enrollment:\n\n{reply}".strip()
 
     # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero unprompted payment checkout until all slots confirmed)
-    # Never wipe replies if the user specifically asked a question (e.g. "payment sirf app pr hoti h?")
+    # If any slot is missing, QR is strictly blocked and user must be guided to choose the missing detail
     if not (has_course and has_timing and has_teacher and has_package) and not is_objection and not is_question:
         PAYMENT_LEAK_REGEX = r"\b(order summary|total payable|final payable|fee breakdown|please complete your payment via the upi qr|scan the upi qr code below to confirm)\b"
         reply_leaks = bool(re.search(PAYMENT_LEAK_REGEX, reply, re.IGNORECASE))
         followup_leaks = bool(followup and re.search(r"\b(assistance completing your payment with the upi qr|complete your payment via the upi qr)\b", followup, re.IGNORECASE))
 
-        if reply_leaks or followup_leaks:
+        if user_asked_qr or reply_leaks or followup_leaks:
             from src.core.helpers.slot_engine import evaluate_enrollment_slots
             slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
             next_slot = slot_eval.get("next_target_slot")
@@ -1126,20 +1142,22 @@ def _sanitize_state_grounded_replies(
             timing_val = state.get("timing") or state.get("selected_timing")
             teacher_val = state.get("selected_teacher") or state.get("teacher")
 
+            prefix = "To generate your customized payment QR code, " if user_asked_qr else ""
+
             if next_slot == "TIMING":
                 if pkg_val:
-                    reply = f"You've selected the *{pkg_val}* package for *{course_title}*. Next, let's select your preferred batch timing."
+                    reply = f"{prefix}Please select your preferred batch timing for *{course_title}* (*{pkg_val}* package) first."
                 else:
-                    reply = f"Great choice for *{course_title}*! Next, let's select your preferred batch timing."
+                    reply = f"{prefix}Please select your preferred batch timing for *{course_title}* first."
                 followup = "Which batch timing works best for your daily schedule? 😊"
             elif next_slot == "TEACHER":
-                reply = f"You've selected the *{timing_val}* batch for *{course_title}*. Next, let's select your instructor."
+                reply = f"{prefix}Please select your preferred instructor for the *{timing_val}* batch of *{course_title}* first."
                 followup = "Which instructor would you prefer to learn with? 😊"
             elif next_slot == "DURATION":
-                reply = f"Great! Your batch and instructor for *{course_title}* are confirmed. Next, let's select your package duration."
+                reply = f"{prefix}Please select your package duration for *{course_title}* (*{timing_val}* batch with {teacher_val}) first."
                 followup = "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
             elif next_slot == "COURSE":
-                reply = "Before we proceed, could you please let me know which course you would like to join?"
+                reply = f"{prefix}Please let me know which course you would like to join first."
                 followup = "Which course would you like to know more about? 😊"
 
     return reply, followup
@@ -1738,7 +1756,11 @@ async def _handle_conversation_turn_unlocked(
         await dispatch_media_guide_async(phone, new_state, enroll_cfg, "app_download_video_sent", force_resend=bool(user_wants_app_guide or wants_resend))
 
     # Subtask 5.3: Dispatch dynamic Razorpay UPI QR code when every detail is selected or user requests payment
-    user_asked_qr = bool(last_turn.get("intent") == "PAYMENT_REQUEST")
+    user_asked_qr = bool(
+        last_turn.get("intent") == "PAYMENT_REQUEST"
+        or last_turn.get("requests_qr")
+        or re.search(r"\b(send\s*qr|qr\s*code|payment\s*link|scanner|pay\s*online)\b", text_clean, re.IGNORECASE)
+    )
     has_course_selected = bool(active_cid or new_state.get("course"))
     is_package_selected = bool(new_state.get("package") or new_state.get("selected_duration"))
     has_timing_selected = bool(new_state.get("timing") or new_state.get("selected_timing"))

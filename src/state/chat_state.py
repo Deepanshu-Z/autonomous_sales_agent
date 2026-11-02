@@ -432,6 +432,9 @@ def save_user_state(phone: str, state: dict):
             order_val = state.get("order_id") or state.get("payment_id") or ""
             if order_val:
                 meta_parts.append(f"ORDER:{order_val}")
+            amt_val = state.get("paid_amount") or state.get("amount") or ""
+            if amt_val:
+                meta_parts.append(f"AMOUNT:{amt_val}")
             email_val = state.get("student_email") or ""
             if email_val:
                 meta_parts.append(f"EMAIL:{email_val}")

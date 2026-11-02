@@ -634,7 +634,7 @@ async def fulfill_razorpay_payment_async(
             state["days_code"] = days_code
 
         # Extract customer email and auto-stage to backend API if available
-        from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
+        from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async, trigger_async_staging
         raw_email = (
             payment_entity.get("email")
             or notes.get("email")
@@ -646,38 +646,26 @@ async def fulfill_razorpay_payment_async(
 
         if customer_email:
             state["student_email"] = customer_email
-            try:
-                staging_res = await stage_ai_enrollment_async(
-                    email=customer_email,
-                    contact=phone,
-                    course=course_name or course_id,
-                    timing=timing if timing != "Flexible / To be confirmed" else None,
-                    teacher=teacher if teacher != "Assigned Instructor" else None,
-                    days=days,
-                    days_code=days_code,
-                    enrollment_type="COURSE",
-                    package_duration=duration,
-                    payment_id=payment_id,
-                    amount=amount_inr,
-                    currency="INR",
-                )
-                if staging_res.get("success"):
-                    state["staged_enrollment"] = True
-                    state["staged_id"] = staging_res.get("staged_id") or staging_res.get("profile_id")
-                    state["awaiting_email_fulfillment"] = False
-                    logger.info(
-                        f"[razorpay_service] ✅ Auto-staged payment enrollment for {phone} ({customer_email}) -> {staging_res.get('action')}"
-                    )
-                else:
-                    state["staged_enrollment"] = False
-                    state["awaiting_email_fulfillment"] = False
-                    logger.warning(
-                        f"[razorpay_service] Staging returned unsuccessful: {staging_res.get('error')}"
-                    )
-            except Exception as exc:
-                state["staged_enrollment"] = False
-                state["awaiting_email_fulfillment"] = False
-                logger.error(f"[razorpay_service] Failed to call stage_ai_enrollment_async: {exc}")
+            stage_payload = {
+                "email": customer_email,
+                "contact": phone,
+                "course": course_name or course_id,
+                "timing": timing if timing != "Flexible / To be confirmed" else None,
+                "teacher": teacher if teacher != "Assigned Instructor" else None,
+                "days": days,
+                "days_code": days_code,
+                "enrollment_type": "COURSE",
+                "package_duration": duration,
+                "payment_id": payment_id,
+                "amount": amount_inr,
+                "currency": "INR",
+            }
+            # Non-blocking async background dispatch with 3x retry
+            trigger_async_staging(stage_payload, phone)
+            state["awaiting_email_fulfillment"] = False
+            logger.info(
+                f"[razorpay_service] ✅ Dispatched non-blocking auto-staging for {phone} ({customer_email})"
+            )
         else:
             state["staged_enrollment"] = False
             state["awaiting_email_fulfillment"] = True

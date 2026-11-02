@@ -10,6 +10,7 @@ Supports both:
 
 import os
 import re
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
@@ -22,6 +23,19 @@ logger = logging.getLogger("hono_staging_client")
 
 HONO_API_URL = os.getenv("HONO_API_URL", "http://localhost:5000").rstrip("/")
 AUTOMATION_SECRET = os.getenv("AUTOMATION_SECRET", "")
+
+# ── Shared Connection Pool (Keep-Alive) ──────────────────────────────────────
+_HTTP_CLIENT: Optional[httpx.AsyncClient] = None
+
+def get_hono_client() -> httpx.AsyncClient:
+    """Returns a shared, pooled AsyncClient with persistent Keep-Alive connections."""
+    global _HTTP_CLIENT
+    if _HTTP_CLIENT is None or _HTTP_CLIENT.is_closed:
+        _HTTP_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(12.0, connect=3.0),
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
+        )
+    return _HTTP_CLIENT
 
 CANONICAL_DB_COURSE_MAP = {
     "yoga": "Yoga",
@@ -189,46 +203,46 @@ async def stage_ai_enrollment_async(
         payload["amount"] = float(amount)
 
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            resp = await client.post(endpoint, headers=headers, json=payload)
+        client = get_hono_client()
+        resp = await client.post(endpoint, headers=headers, json=payload, timeout=timeout_seconds)
 
-            if resp.status_code in (200, 201):
-                res_data = resp.json()
-                inner = res_data.get("data") or {}
-                action = inner.get("action", "STAGED")
-                staged_id = inner.get("staged_id")
-                profile_id = inner.get("profile_id")
+        if resp.status_code in (200, 201):
+            res_data = resp.json()
+            inner = res_data.get("data") or {}
+            action = inner.get("action", "STAGED")
+            staged_id = inner.get("staged_id")
+            profile_id = inner.get("profile_id")
 
-                logger.info(
-                    f"[hono_staging_client] ✅ Successfully staged/enrolled {normalized_email} "
-                    f"({action}, ID: {staged_id or profile_id})"
-                )
-                return {
-                    "success": True,
-                    "action": action,
-                    "staged_id": staged_id,
-                    "profile_id": profile_id,
-                    "message": res_data.get("message", "Success"),
-                    "error": None,
-                }
-            else:
-                try:
-                    res_json = resp.json()
-                    err_msg = res_json.get("error") or res_json.get("message") or resp.text[:300]
-                except Exception:
-                    err_msg = resp.text[:300]
+            logger.info(
+                f"[hono_staging_client] ✅ Successfully staged/enrolled {normalized_email} "
+                f"({action}, ID: {staged_id or profile_id})"
+            )
+            return {
+                "success": True,
+                "action": action,
+                "staged_id": staged_id,
+                "profile_id": profile_id,
+                "message": res_data.get("message", "Success"),
+                "error": None,
+            }
+        else:
+            try:
+                res_json = resp.json()
+                err_msg = res_json.get("error") or res_json.get("message") or resp.text[:300]
+            except Exception:
+                err_msg = resp.text[:300]
 
-                logger.error(
-                    f"[hono_staging_client] ❌ Staging failed HTTP {resp.status_code}: {err_msg}"
-                )
-                return {
-                    "success": False,
-                    "action": "ERROR",
-                    "staged_id": None,
-                    "profile_id": None,
-                    "message": f"Server returned HTTP {resp.status_code}: {err_msg}",
-                    "error": err_msg,
-                }
+            logger.error(
+                f"[hono_staging_client] ❌ Staging failed HTTP {resp.status_code}: {err_msg}"
+            )
+            return {
+                "success": False,
+                "action": "ERROR",
+                "staged_id": None,
+                "profile_id": None,
+                "message": f"Server returned HTTP {resp.status_code}: {err_msg}",
+                "error": err_msg,
+            }
     except httpx.ConnectError as conn_err:
         logger.warning(
             f"[hono_staging_client] Connection error reaching {endpoint}: {conn_err}"
@@ -251,4 +265,60 @@ async def stage_ai_enrollment_async(
             "message": "Unexpected error occurred.",
             "error": str(exc),
         }
+
+
+# ── Non-Blocking Async Background Runner with Exponential Backoff ─────────────
+async def _execute_staging_with_retry(payload: Dict[str, Any], phone: str, max_retries: int = 3):
+    """
+    Executes stage_ai_enrollment_async in the background with exponential retries.
+    Updates in-memory and Redis state on success so the user turn is never blocked.
+    """
+    from src.state.chat_state import get_user_state_async, save_user_state_async
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[staging_worker] Attempt {attempt}/{max_retries} for {payload.get('email')} ({phone})")
+            res = await stage_ai_enrollment_async(**payload)
+            if res.get("success"):
+                logger.info(
+                    f"[staging_worker] ✅ Staged successfully on attempt {attempt}: "
+                    f"{payload.get('email')} -> ID: {res.get('staged_id') or res.get('profile_id')}"
+                )
+                try:
+                    state = await get_user_state_async(phone)
+                    state["staged_enrollment"] = True
+                    state["staged_id"] = res.get("staged_id") or res.get("profile_id")
+                    state["awaiting_email_fulfillment"] = False
+                    await save_user_state_async(phone, state)
+                except Exception as state_err:
+                    logger.warning(f"[staging_worker] Could not update local state after success: {state_err}")
+                return res
+            else:
+                logger.warning(
+                    f"[staging_worker] Staging attempt {attempt} returned non-success: {res.get('error') or res.get('message')}"
+                )
+        except Exception as attempt_err:
+            logger.error(f"[staging_worker] Staging attempt {attempt} threw exception: {attempt_err}")
+
+        if attempt < max_retries:
+            backoff = attempt * 1.5
+            logger.info(f"[staging_worker] Retrying staging for {phone} in {backoff}s...")
+            await asyncio.sleep(backoff)
+
+    logger.critical(f"[staging_worker] ❌ All {max_retries} staging attempts failed for {payload.get('email')} ({phone})")
+    return {"success": False, "error": f"Failed after {max_retries} retries"}
+
+
+def trigger_async_staging(payload: Dict[str, Any], phone: str):
+    """
+    Fire-and-forget non-blocking staging runner.
+    Immediately dispatches an async background task so WhatsApp webhooks respond in <30ms.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_execute_staging_with_retry(payload, phone))
+        logger.info(f"[staging_worker] Dispatched background staging task for {payload.get('email')} ({phone})")
+    except RuntimeError:
+        # Fallback if called outside an active event loop
+        asyncio.create_task(_execute_staging_with_retry(payload, phone))
 

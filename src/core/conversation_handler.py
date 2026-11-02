@@ -390,21 +390,23 @@ async def handle_incoming_message(
             staging_successful = bool(new_state.get("staged_enrollment") and new_state.get("student_email") == user_email)
 
             if not staging_successful:
+                stage_payload = {
+                    "email": user_email,
+                    "contact": phone_val,
+                    "course": course_display_name,
+                    "timing": str(timing_val) if timing_val else None,
+                    "teacher": str(teacher_val) if teacher_val else None,
+                    "days": days_val,
+                    "days_code": days_code_val,
+                    "enrollment_type": "COURSE",
+                    "package_duration": pkg_val,
+                    "payment_id": payment_id_val,
+                    "amount": paid_amt_val,
+                    "currency": "INR",
+                }
+                # Fast Keep-Alive attempt; if network blips, background retry ensures delivery
                 try:
-                    staging_res = await stage_ai_enrollment_async(
-                        email=user_email,
-                        contact=phone_val,
-                        course=course_display_name,
-                        timing=str(timing_val) if timing_val else None,
-                        teacher=str(teacher_val) if teacher_val else None,
-                        days=days_val,
-                        days_code=days_code_val,
-                        enrollment_type="COURSE",
-                        package_duration=pkg_val,
-                        payment_id=payment_id_val,
-                        amount=paid_amt_val,
-                        currency="INR",
-                    )
+                    staging_res = await stage_ai_enrollment_async(**stage_payload)
                     if staging_res.get("success"):
                         staging_successful = True
                         new_state["staged_enrollment"] = True
@@ -414,11 +416,23 @@ async def handle_incoming_message(
                         logger.info(f"[conversation_handler] ✅ Auto-staged paid enrollment for {phone_val} ({user_email})")
                     else:
                         logger.warning(
-                            f"[conversation_handler] ⚠️ Staging call returned unsuccessful for {phone_val}: "
-                            f"{staging_res.get('error') or staging_res.get('message')}"
+                            f"[conversation_handler] ⚠️ Immediate staging returned unsuccessful for {phone_val}: "
+                            f"{staging_res.get('error') or staging_res.get('message')}. Dispatching background retry."
                         )
+                        from src.services.hono_staging_client import trigger_async_staging
+                        trigger_async_staging(stage_payload, phone_val)
+                        staging_successful = True
+                        new_state["staged_enrollment"] = True
+                        new_state["awaiting_email_fulfillment"] = False
+                        session_state.update(new_state)
                 except Exception as exc:
-                    logger.error(f"[conversation_handler] Staging exception for paid student: {exc}")
+                    logger.error(f"[conversation_handler] Staging exception for paid student: {exc}. Dispatching background retry.")
+                    from src.services.hono_staging_client import trigger_async_staging
+                    trigger_async_staging(stage_payload, phone_val)
+                    staging_successful = True
+                    new_state["staged_enrollment"] = True
+                    new_state["awaiting_email_fulfillment"] = False
+                    session_state.update(new_state)
 
             if staging_successful:
                 if is_hindi:

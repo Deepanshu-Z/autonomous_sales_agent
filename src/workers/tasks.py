@@ -538,7 +538,7 @@ def get_flow_followup(state: dict) -> str:
         return (
             "Which package duration would you like to start with? 😊\n\n"
             f"Fees:\n{fees_block}\n\n"
-            "*Note:* Offer price will be only applicable through app and Welcome Offer coupon. Once the app is downloaded and the profile is created, the Welcome Offer coupon will be sent here."
+            "*Note:* Special offer pricing is pre-applied directly to each package."
         )
 
     # 3. If ready for app download & profile setup (first time only)
@@ -725,7 +725,6 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         welcome_msgs = campaign_loader.get_welcome_messages(campaign)
         msg1 = welcome_msgs.get("message_1")
         msg2 = welcome_msgs.get("message_2")
-        buttons = campaign_loader.get_campaign_buttons(campaign)
 
         if msg1:
             await send_text_message_async(phone, msg1)
@@ -735,7 +734,7 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
             await asyncio.sleep(1.5)
 
         if msg2:
-            await send_followup_with_buttons_async(phone, msg2, buttons=buttons)
+            await send_text_message_async(phone, msg2)
             asyncio.create_task(save_message_async(phone, "assistant", msg2))
             asyncio.create_task(log_message_async(phone, "ai", msg2))
 

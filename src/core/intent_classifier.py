@@ -78,6 +78,7 @@ def _empty_flags() -> Dict[str, Any]:
         "explicit_language_request": None,
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
+        "cannot_access_classes": False,
         "wants_demo": False,
         "wants_app_guide": False,
         "wants_app_video_guide": False,
@@ -188,6 +189,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "COMPLAINT": Refund dispute or legal grievance.
     - "PAYMENT_REQUEST": Customer wants to pay online, asks how to pay, asks for UPI QR code, payment scanner, or payment link (e.g. "pay online", "payment qr", "send qr", "scanner bhejo", "payment link", "how to pay", "kahan pay karein", "upi id bhejo").
     - "PAYMENT_CLAIM": Customer states they completed payment, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment ("paid", "payment done", "maine pay kar diya", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo").
+    - "CLASSES_NOT_SHOWING": Customer states that their enrolled/purchased class, batch, or course is not visible in the app, classes not showing, cannot access class, blank app screen, or asks why course is not showing after login/payment ("show nhi hori", "classes nahi dikh rahi", "batch not showing", "not able to access classes", "kaha se join kare", "cannot see my class", "krlia lkn show nahi hori").
     - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
 
 13. "question_summary":
@@ -222,6 +224,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 20. "unoffered_timing_mentioned":
     - string or null: If customer requested, proposed, or selected a timing that does NOT exist in the Allowed Canonical Batch Timings (e.g. "11-12", "3 pm", "2 to 3"), extract that timing string here. Otherwise null.
 
+21. "cannot_access_classes":
+    - boolean: true if customer states that their course/batch/class is not showing or not visible in the app, or they are unable to see or access their enrolled classes after login or payment ("show nhi hori", "krlia lkn classes show nhi hori", "classes nahi dikh rahi", "batch not showing", "not able to access classes", "kaha se join kare", "cannot see my class"). Otherwise false.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -245,6 +250,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "explicit_language_request": string | null,
   "wants_resend_video": boolean,
   "claims_payment_or_enrollment": boolean,
+  "cannot_access_classes": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
   "unoffered_timing_mentioned": string | null
@@ -347,7 +353,7 @@ async def extract_intent_and_state_changes(
             "wants_trial", "wants_demo_video", "wants_app_link", "requests_qr",
             "requests_human_agent", "is_coupon_requested", "is_disinterested",
             "is_complaint_or_refund", "wants_resend_video", "claims_payment_or_enrollment",
-            "wants_demo", "wants_app_guide", "wants_app_video_guide",
+            "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
             "wants_trial_guide", "wants_trial_video_guide"
         ]:
             val = clean.get(bool_key)
@@ -631,6 +637,9 @@ async def extract_intent_and_state_changes(
             if re.search(r"\b(paid|already paid|payment done|pay kar diya|payment ho gaya|transfer kar diya|paise bhej diye|fees de di)\b", text, re.IGNORECASE):
                 flags["customer_intent"] = "PAYMENT_CLAIM"
                 flags["claims_payment_or_enrollment"] = True
+            if re.search(r"\b(show\s*n[hi]h?[i]?\s*ho|n[hi]h?[i]?\s*dikh|not\s*showing|classes?\s*(?:n[hi]h?[i]?|show)|batch\s*(?:n[hi]h?[i]?|show)|cannot\s*see|not\s*able\s*to\s*access|class\s*kahan|kaha\s*se\s*join)\b", text, re.IGNORECASE):
+                flags["customer_intent"] = "CLASSES_NOT_SHOWING"
+                flags["cannot_access_classes"] = True
             if any(w in text.lower() for w in ["demo", "sample", "preview"]):
                 flags["wants_demo"] = True
         except Exception:
@@ -681,6 +690,11 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         flags["selected_teacher"] = None
         flags["selected_days"] = None
         flags["selected_package"] = None
+
+        if flags.get("cannot_access_classes") or flags.get("customer_intent") == "CLASSES_NOT_SHOWING":
+            new_state["classes_not_showing"] = True
+            if not new_state.get("student_email"):
+                new_state["awaiting_email_fulfillment"] = True
 
     # 1. Course Selection / Switching
     if flags.get("selected_course"):
@@ -736,27 +750,24 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["timing"] = new_timing
         new_state["selected_timing"] = new_timing
 
-        # If timing changed to a different slot, check teacher compatibility
-        if old_timing and old_timing != new_timing:
-            curr_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
-            if curr_teacher and active_course:
-                from src.core.helpers.schedule_engine import get_slots_for_teacher, extract_time_tokens
-                t_slots = get_slots_for_teacher(active_course, curr_teacher)
-                c_hr, c_merid = extract_time_tokens(new_timing)
-                teaches_new = any(
-                    extract_time_tokens(s.get("time_12h")) == (c_hr, c_merid)
-                    for s in t_slots
-                    if c_hr is not None
-                )
-                if not teaches_new:
-                    # Invalidate teacher and dependent slots because previous teacher does not teach this new timing
-                    new_state["selected_teacher"] = None
-                    new_state["teacher"] = None
-                    new_state["days"] = None
-                    new_state["selected_days"] = None
-                    new_state["days_code"] = None
-                    new_state["stage"] = "TIMING_SELECTED"
-            else:
+        # Check teacher compatibility against the newly selected timing
+        curr_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
+        if curr_teacher and active_course:
+            from src.core.helpers.schedule_engine import get_slots_for_teacher, extract_time_tokens
+            t_slots = get_slots_for_teacher(active_course, curr_teacher)
+            c_hr, c_merid = extract_time_tokens(new_timing)
+            teaches_new = any(
+                extract_time_tokens(s.get("time_12h")) == (c_hr, c_merid)
+                for s in t_slots
+                if c_hr is not None
+            )
+            if not teaches_new:
+                # Invalidate teacher and dependent slots because teacher does not teach this new timing
+                new_state["selected_teacher"] = None
+                new_state["teacher"] = None
+                new_state["days"] = None
+                new_state["selected_days"] = None
+                new_state["days_code"] = None
                 new_state["stage"] = "TIMING_SELECTED"
         else:
             new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
@@ -993,6 +1004,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
+        "cannot_access_classes": flags.get("cannot_access_classes", False),
         "unoffered_timing_mentioned": flags.get("unoffered_timing_mentioned"),
     }
 

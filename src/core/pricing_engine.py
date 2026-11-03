@@ -102,10 +102,11 @@ def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
         offer = p.get("offer_price")
         coupon = p.get("coupon_code")
         if base is not None and offer is not None:
-            coupon_str = f" with coupon *{coupon}*" if coupon else ""
-            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,}{coupon_str})"
+            # coupon_str = f" with coupon *{coupon}*" if coupon else ""
+            valid_pkgs[duration] = f"₹{base:,} (Offer Price: ₹{offer:,})"
         elif base is not None and coupon:
-            valid_pkgs[duration] = f"₹{base:,} (Coupon: {coupon})"
+            # valid_pkgs[duration] = f"₹{base:,} (Coupon: {coupon})"
+            valid_pkgs[duration] = f"₹{base:,}"
         elif base is not None:
             valid_pkgs[duration] = f"₹{base:,}"
         elif offer is not None:
@@ -262,8 +263,8 @@ def format_fee_breakdown(course_id: str, duration: str) -> Optional[str]:
         f"• Base Price: ₹{fee['base_price']:,}",
     ]
     if fee["discount"] > 0:
-        coupon_str = f" (Coupon: *{fee['coupon_code']}*)" if fee.get("coupon_code") else ""
-        lines.append(f"• Special Discount: -₹{fee['discount']:,}{coupon_str}")
+        # coupon_str = f" (Coupon: *{fee['coupon_code']}*)" if fee.get("coupon_code") else ""
+        lines.append(f"• Special Discount: -₹{fee['discount']:,}")
         lines.append(f"• Offer Price: ₹{fee['offer_price']:,}")
     lines.append(f"• GST ({fee['gst_percentage']}%): +₹{fee['gst_amount']:,}")
     lines.append(f"• *Final Payable Amount: ₹{fee['final_payable_amount']:,}*")

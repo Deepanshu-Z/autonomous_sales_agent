@@ -17,6 +17,8 @@ from typing import Dict, Any, Optional
 import httpx
 from dotenv import load_dotenv
 
+from src.core.helpers.email_sanitizer import sanitize_email
+
 load_dotenv()
 
 logger = logging.getLogger("hono_staging_client")
@@ -75,51 +77,12 @@ def clean_phone_for_contact(phone: str) -> str:
 
 
 def clean_email(email_str: str, is_awaiting_email: bool = False) -> Optional[str]:
-    """Extracts and normalizes email string (lowercased, stripped of surrounding punctuation)."""
-    if not email_str:
-        return None
-    s = str(email_str).strip()
-    
-    # 1. Standard email pattern
-    m = re.search(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)", s)
-    if m:
-        extracted = m.group(1).lower().strip().rstrip(".")
-        if extracted.endswith("@razorpay.com") or "void@" in extracted or "example.com" in extracted:
-            return None
-        return extracted
-    
-    # Conversational non-email statements: e.g. "yhi h mra complete gmail"
-    s_low = s.lower()
-    if any(phrase in s_low for phrase in ["yhi h", "yahi h", "mera complete", "mra complete", "complete gmail"]):
-        return None
-
-    # 2. Conversational handle with 'gmail': e.g. "this is my gmail: xyz", "gmail id: test1234"
-    m_handle = re.search(r"(?:gmail(?:\s*id|\s*address)?\s*(?:is|h|hai|:|=|\s)\s*)([a-zA-Z0-9_.+-]{3,35})", s, re.IGNORECASE)
-    if m_handle:
-        handle = m_handle.group(1).lower().strip().rstrip(".")
-        if handle not in ("is", "h", "hai", "id", "address", "mera", "meri", "yhi", "yahi"):
-            if not handle.endswith("@gmail.com"):
-                return f"{handle}@gmail.com"
-            return handle
-        
-    # 3. Bare alphanumeric username when awaiting email: e.g. "xyz"
-    if is_awaiting_email:
-        words = s.split()
-        if len(words) == 1:
-            clean_handle = re.sub(r"[^a-zA-Z0-9_.+-]", "", words[0])
-            if 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle) and any(c.isdigit() for c in clean_handle):
-                return f"{clean_handle.lower()}@gmail.com"
-            elif 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle):
-                non_emails = {"okay", "ok", "theek", "accha", "sure", "thanks", "done", "yes", "ha", "nahi", "no", "hello", "hi", "help"}
-                if clean_handle.lower() not in non_emails:
-                    return f"{clean_handle.lower()}@gmail.com"
-        else:
-            candidates = [re.sub(r"[^a-zA-Z0-9_.+-]", "", w) for w in words]
-            for cand in candidates:
-                if 4 <= len(cand) <= 35 and any(c.isdigit() for cand_c in cand for c in [cand_c]) and any(c.isalpha() for cand_c in cand for c in [cand_c]):
-                    return f"{cand.lower()}@gmail.com"
-                
-    return None
+    """
+    Modular email sanitizer interface:
+    Delegates to src.core.helpers.email_sanitizer for fast-path O(1) domain lookup
+    and algorithmic Levenshtein string distance repair.
+    """
+    return sanitize_email(email_str, is_awaiting_email=is_awaiting_email)
 
 
 async def stage_ai_enrollment_async(

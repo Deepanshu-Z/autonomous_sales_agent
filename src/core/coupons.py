@@ -103,9 +103,9 @@ def detect_package_from_text(text: Optional[str], course_id: str = "yoga") -> Op
             # Guard against clock times for 1 Month (e.g. '1:00 pm', '1 pm', '10:00 am')
             if num == "1" and re.search(r"\b1(?::00)?\s*(?:pm|am)\b", t):
                 continue
-            if re.search(rf"\b{num}\s*(?:months?|month|m|mahina|mahine)\b", t):
+            if re.search(rf"\b(?:{num}\s*(?:months?|month|m|mo|mahina|mahine)|(?:months?|month|m|mo)\s*{num})\b", t):
                 return canonical_name
-            if re.match(rf"^(?:{num}|{num}m|{num}\s*months?)$", t):
+            if re.match(rf"^(?:{num}m|m{num}|{num}mo|mo{num}|{num}\s*months?|months?\s*{num})$", t):
                 return canonical_name
 
         elif "week" in name_lower and num:
@@ -116,6 +116,39 @@ def detect_package_from_text(text: Optional[str], course_id: str = "yoga") -> Op
             if re.search(rf"\b{num}\s*(?:days?|day|d|din)\b", t):
                 return canonical_name
 
+    return None
+
+
+def detect_unoffered_duration(text: Optional[str], course_id: str = "yoga", allowed_packages: Optional[list] = None) -> Optional[str]:
+    """
+    Detects if the user requested a specific package duration that is NOT offered in our catalog
+    (e.g. '2 years', '2 yearly', '5 years', '2 months', '15 days', '6 weeks').
+    Returns the normalized unoffered duration string (e.g. '2 Years', '2 Months') or None.
+    """
+    if not text:
+        return None
+    pkgs = allowed_packages or list(get_coupon_registry(course_id).keys())
+    m = re.search(
+        r"\b(?:(\d+)\s+)?(\d+)\s*(years?|yearly|yr|yrs|y|saal|months?|mahina|mahine|weeks?|hafte|hafta|w|days?|din|d)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        num = int(m.group(2))
+        unit = m.group(3).lower()
+        if any(unit.startswith(x) for x in ["y", "saal"]):
+            u_norm = "Year" if num == 1 else "Years"
+        elif any(unit.startswith(x) for x in ["month", "mah"]):
+            u_norm = "Month" if num == 1 else "Months"
+        elif any(unit.startswith(x) for x in ["w", "haf"]):
+            u_norm = "Week" if num == 1 else "Weeks"
+        elif any(unit.startswith(x) for x in ["d", "din"]):
+            u_norm = "Day" if num == 1 else "Days"
+        else:
+            return None
+        cand = f"{num} {u_norm}"
+        if cand not in pkgs:
+            return cand
     return None
 
 

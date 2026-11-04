@@ -312,13 +312,28 @@ def get_course_time_periods(course_id: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-def format_batch_timings_display(course_id: Optional[str] = None) -> str:
-    """Formats available batches cleanly for WhatsApp messages and system prompt display."""
+def format_batch_timings_display(course_id: Optional[str] = None, teacher: Optional[str] = None) -> str:
+    """Formats available batches cleanly for WhatsApp messages and system prompt display.
+    If a teacher is provided, filters to ONLY the batches taught by that specific teacher."""
     if not course_id:
         return ""
     from src.core.kb_loader import get_course_data
     data = get_course_data(course_id)
     batches = data.get("batch_timings", {}).get("batches", [])
+    
+    # Filter by teacher if specified and not 'NOT SELECTED'
+    if teacher and str(teacher).strip().upper() not in ("NOT SELECTED", "NONE", ""):
+        target_t = str(teacher).lower().strip()
+        filtered = []
+        for b in batches:
+            for inst in b.get("instructors", []):
+                inst_low = inst.lower()
+                if target_t in inst_low or inst_low in target_t:
+                    filtered.append(b)
+                    break
+        if filtered:
+            batches = filtered
+
     slots: Dict[str, List[str]] = {}
     for b in batches:
         slot_name = b.get("slot") or b.get("days") or "Available"

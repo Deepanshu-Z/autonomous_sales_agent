@@ -24,6 +24,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from src.core import kb_loader
 
 load_dotenv()
+_local_env = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+load_dotenv(_local_env)
 
 _refusal_llm = None
 

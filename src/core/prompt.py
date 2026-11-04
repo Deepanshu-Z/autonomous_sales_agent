@@ -24,6 +24,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       "followup": "<Message 2 text: Exactly ONE short, friendly, low-pressure question or next step that gently advances the sales funnel, OR null if declining/suppressed>"
     }}
   • The system delivers "reply" first, and if "followup" is present, sends it as a whole separate WhatsApp message!
+  • DYNAMIC CURIOSITY & ANTI-REPETITION FOR "followup" (Message #2):
+    - ZERO REPETITIVE FOLLOWUPS: If previous assistant messages already asked for the missing slot (e.g. asking which batch timing they prefer), NEVER repeat the same phrasing or question again!
+    - DYNAMIC ROTATION ANGLES:
+      1. ROUTINE / LIFESTYLE ANGLE (A/B Micro-choice): Instead of asking to choose from 10 slots, make it effortless: e.g. "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+      2. PERSONAL GOAL / BENEFIT ANGLE: e.g. "Waise aap ye classes fitness/weight management ke liye start kar rahe hain ya mental peace & flexibility ke liye? 😊"
+      3. VISUAL DEMO PREVIEW ANGLE: e.g. "Kya aap hamare certified instructor ka 1-minute live practice demo video dekhna chahenge pehle? 😊"
+      4. CROSS-COURSE INQUIRY (when customer asks "or classes hoti h?"): Answer all other disciplines (Bollywood Dance, Kathak, Face Yoga, Music, Guitar) in Message #1, and ask in Message #2: "Kya aap inme se koi specific form explore karna chahte hain, ya [Active Course] ki hi timings dekh rahe the? 😊"
+    - CASUAL "ok" / "theek hai" HANDLING: If customer just says "ok" or "sure", do NOT sternly demand "Please choose timing first". Warmly say "Superb!" and offer an effortless Morning vs. Evening micro-choice.
   • DYNAMIC FUNNEL PROGRESSION FOR "followup" (Message #2) (SUBTASK 4.1):
     Guide the customer proactively, warmly, and naturally toward enrollment along this exact slot sequence:
     TIMING → TEACHER → DURATION → PAYMENT SUMMARY
@@ -161,8 +169,8 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     - NEVER suppress followup or close conversation on casual acknowledgements like "ok", "okay", "theek hai", "accha", "sure", "alright", "got it", "noted"!
     - NEVER say "Enjoy your classes" or pretend the user is enrolled when they have not yet paid!
     - If the customer says "ok", "sure", "theek hai" after receiving pricing, fee breakdown, or QR code:
-      * In Message #1: Warmly acknowledge that their enrollment is ready for payment (e.g. "Great! Once you complete the payment via the UPI QR code above, your classes will be activated.").
-      * In Message #2 (followup): Ask if they would like any assistance completing payment with the QR code (e.g. "Would you like any assistance completing your payment with the UPI QR code? 😊").
+      * If the payment QR code was already sent in this chat (check session context: qr_code_sent is True), warmly remind them that their classes will be activated once they complete the payment via the UPI QR code sent above.
+      * If the payment QR code has NOT been sent yet (or package duration is still incomplete/missing in session context), NEVER mention "UPI QR code above"! Instead, guide them to confirm their package duration or ask if they would like to proceed with payment!
 - DIRECT QUESTION-FIRST RULE (NEVER ROBOTICALLY SKIP THE USER'S QUESTION):
   • If the customer asks ANY question, doubt, conditional arrangement, or quotes a message (e.g. "[Replying to: \"1 week morning and 1 week evening\"]\nBut this is ok?", "can I switch batches?", "subah aur shaam dono chalega?"):
     - Message #1 MUST directly and specifically address their exact question FIRST!
@@ -496,7 +504,12 @@ def format_system_prompt(
     timing_periods_summary = periods_info.get("summary", "")
     teacher_schedule = kb_loader.format_teacher_batch_schedule(cid)
     demo_videos_summary = kb_loader.format_demo_videos_display(cid)
-    batch_timings_summary = kb_loader.format_batch_timings_display(cid)
+    teacher_val = s.get("selected_teacher") or s.get("teacher")
+    batch_timings_summary = kb_loader.format_batch_timings_display(cid, teacher=teacher_val)
+    course_pkgs = list(kb_loader.get_valid_packages(cid).keys()) if cid else ["1 Month", "3 Months", "6 Months", "1 Year"]
+    from src.core.helpers import get_course_instructors
+    course_teachers = get_course_instructors(cid if cid else None)
+    teachers_str = ", ".join(course_teachers) if course_teachers else "Check Course Schedule"
 
     state_context = (
         f"- Active Course Session: {active_title} (MANDATORY: You must refer ONLY to {active_title} in your reply — NEVER use any previous course name from chat history!)\n"
@@ -512,9 +525,41 @@ def format_system_prompt(
         state_context += (
             f"- TEACHER ↔ BATCH TIMINGS MAP (Use this EXACT mapping when answering teacher-specific queries — do NOT infer from raw JSON):\n{teacher_schedule}\n"
         )
+    if teacher_val and str(teacher_val).strip().upper() not in ("NOT SELECTED", "NONE", ""):
+        state_context += (
+            f"- 🎯 INSTRUCTOR ALREADY SELECTED ({teacher_val}): Customer specifically selected {teacher_val}!\n"
+            f"  • When presenting available batch timings, you MUST ONLY list the batches taught by {teacher_val} from CLEAN GROUPED BATCH TIMINGS above.\n"
+            f"  • Under NO circumstances list timings taught by other instructors!\n"
+        )
+    conflict = s.get("teacher_timing_conflict")
+    if conflict:
+        req_timing = conflict.get("requested_timing")
+        prev_t = conflict.get("current_teacher")
+        t_teachers = ", ".join(conflict.get("timing_teachers") or [])
+        from src.core.helpers.schedule_engine import get_slots_for_teacher
+        prev_t_slots = [sl.get("time_12h") for sl in get_slots_for_teacher(cid, prev_t) if sl.get("time_12h")]
+        prev_t_str = ", ".join(prev_t_slots)
+        state_context += (
+            f"- ⚠️ TEACHER-TIMING CONFLICT & BATCH SWITCH PROPOSAL (MANDATORY INSTRUCTION FOR THIS TURN):\n"
+            f"  • Customer previously selected instructor: {prev_t}\n"
+            f"  • Customer just requested batch timing: {req_timing}\n"
+            f"  • CRITICAL REALITY: The {req_timing} batch IS AVAILABLE in {active_title}, but it is taught by {t_teachers} (NOT {prev_t})!\n"
+            f"  • DO NOT claim '{req_timing} classes are not held'! They ARE held, but by {t_teachers}.\n"
+            f"  • {prev_t}'s available timings are: {prev_t_str}\n"
+            f"  • REQUIRED ACTION:\n"
+            f"    - Message #1: Warmly confirm that the {req_timing} batch IS available for {active_title}, but it is conducted by {t_teachers} (not {prev_t}). State {prev_t}'s available slots ({prev_t_str}).\n"
+            f"    - Message #2 (followup): Ask whether they would like to switch to {req_timing} with {t_teachers}, or stick with {prev_t} at one of her available timings! (e.g. 'Kya aap {req_timing} batch ke liye {t_teachers} ke saath switch karna chahenge, ya {prev_t} ke available slots me se choose karna prefer karenge? 😊')\n"
+        )
     if demo_videos_summary:
         state_context += (
             f"- ACTIVE COURSE INSTRUCTOR DEMO VIDEOS (Use ONLY this demo video information for this active course):\n{demo_videos_summary}\n"
+        )
+    conv_summary = s.get("conversation_summary") or (s.get("_last_turn") or {}).get("conversation_summary")
+    if conv_summary:
+        state_context += (
+            f"- CONVERSATION CONTEXT AND SUMMARY (CURRENT INTERACTION STANCE):\n"
+            f"  • {conv_summary}\n"
+            f"  • CRITICAL CONTINUITY GUARD: If the conversation indicates the customer rejected the available batch timings or has a timing conflict, NEVER re-dump or re-list the full available batch timings! Warmly acknowledge their timing conflict, mention that session recordings are available in the app so they can practice at their own pace, or ask what custom timing would work best for them.\n"
         )
     teacher_val = s.get("selected_teacher") or s.get("teacher")
     teacher_str = teacher_val if teacher_val else "NOT SELECTED"
@@ -551,6 +596,9 @@ def format_system_prompt(
     last_turn_dict = s.get("_last_turn") or {}
     last_intent = (last_turn_dict.get("intent") or "").upper()
     q_summary = last_turn_dict.get("question_summary") or ""
+    unoffered_type = last_turn_dict.get("unoffered_type")
+    unoffered_val = last_turn_dict.get("unoffered_value") or last_turn_dict.get("unoffered_timing_mentioned")
+    is_unoffered_turn = bool(unoffered_type or unoffered_val)
 
     is_question_turn = bool(
         last_intent == "QUESTION"
@@ -603,6 +651,10 @@ def format_system_prompt(
                 "      * NEVER say 'login with your phone number' (phone login doesn't sync the batch)!\n"
                 "      * NEVER tell them to check profile or type agent!\n"
                 "      * NEVER ask them to pay or confirm package!\n"
+                "      * 🛑 STRICT PROHIBITION AGAINST FAKE GMAIL LINKING (NON-NEGOTIABLE):\n"
+                "        - NEVER claim or tell the customer: 'Aapka Gmail link kar diya gaya hai', 'Aapka Gmail ID link ho gaya', or 'Your account is linked' UNLESS student_email is verified in state!\n"
+                "        - If student_email is None or staged_enrollment is False, their account has NOT been linked!\n"
+                "        - If the customer says 'yhi h mra complete gmail' or provides text without @gmail.com, explain: 'Google Sign-In ke liye complete Gmail ID zaroori hota hai jisme @gmail.com laga ho (jaise xyz@gmail.com). Kripya apna pura Gmail address yahan chat mein likhein taaki system aapka course link kar sake.'\n"
             )
         elif is_classes_missing and has_email:
             linked_email = s.get("student_email") or s.get("email")
@@ -668,6 +720,53 @@ def format_system_prompt(
                 f"  • Under NO circumstances output payable fee breakdowns, UPI QR codes, or payment links!\n"
                 f"  • Message #1: Explain warmly and clearly that to generate their customized payment QR code, we first need to select their {next_target_label}!\n"
                 f"  • Message #2 (followup) MUST ask EXCLUSIVELY for: {next_target_label}!\n"
+            )
+    elif is_unoffered_turn:
+        if unoffered_type == "PACKAGE":
+            turn_intent_guidance = (
+                f"- 🚨 CUSTOMER REQUESTED UNOFFERED PACKAGE / DURATION ('{unoffered_val}'):\n"
+                f"  • Customer requested a duration of '{unoffered_val}', which is NOT an official package tier for {active_title}.\n"
+                f"  • Official available packages in COURSE_DATA are: {', '.join(course_pkgs)}.\n"
+                f"  • REQUIRED ACTION (INTELLIGENT RESPONSE):\n"
+                f"    - Message #1: Warmly and clearly explain that {active_title} does NOT have a '{unoffered_val}' package. "
+                f"If they requested a multi-year duration (e.g. 2 Years), explain that our longest single package is 1 Year, but they can easily purchase the 1 Year package and renew it / buy it twice to continue their classes. Present the available packages from COURSE_DATA ({', '.join(course_pkgs)}).\n"
+                f"    - Message #2 (followup): Ask which of the available packages ({', '.join(course_pkgs)}) they prefer to start with. 😊\n"
+                f"  • CRITICAL ANTI-ASSUMPTION GUARD: Package duration is NOT SELECTED! Under NO circumstances say 'Aapne [package] choose kiya hai' or assume any package!\n"
+            )
+        elif unoffered_type == "TIMING" or last_turn_dict.get("unoffered_timing_mentioned"):
+            timing_target = unoffered_val or last_turn_dict.get("unoffered_timing_mentioned")
+            turn_intent_guidance = (
+                f"- 🚨 CUSTOMER REQUESTED UNOFFERED BATCH TIMING ('{timing_target}'):\n"
+                f"  • Customer asked for timing '{timing_target}', which is NOT held for {active_title}.\n"
+                f"  • Real available batch timings from COURSE_DATA are:\n{batch_timings_summary}\n"
+                f"  • REQUIRED ACTION (INTELLIGENT RESPONSE):\n"
+                f"    - Message #1: Warmly and clearly explain that {active_title} classes are NOT held at {timing_target}. Suggest the closest available slots (e.g. if afternoon was requested, suggest afternoon 12:00 PM to 1:00 PM or evening 4:00 PM to 5:00 PM) or re-present the real available batch timings from COURSE_DATA.\n"
+                f"    - Message #2 (followup): Ask which of the available batch timings works best for their daily routine. 😊\n"
+                f"  • CRITICAL ANTI-ASSUMPTION GUARD: Timing is NOT SELECTED! Under NO circumstances snap to 6:00 AM or any other batch, do NOT claim 'Aapne [timing] select kiya hai', and do NOT assign any instructor!\n"
+            )
+        elif unoffered_type == "TEACHER":
+            turn_intent_guidance = (
+                f"- 🚨 CUSTOMER REQUESTED UNOFFERED INSTRUCTOR ('{unoffered_val}'):\n"
+                f"  • Customer asked for instructor '{unoffered_val}', who does NOT conduct {active_title} classes.\n"
+                f"  • Certified instructors for {active_title} from COURSE_DATA are: {teachers_str}.\n"
+                f"  • REQUIRED ACTION (INTELLIGENT RESPONSE):\n"
+                f"    - Message #1: Warmly clarify that {unoffered_val} does not teach {active_title}, and introduce our certified instructors ({teachers_str}) conducting this course.\n"
+                f"    - Message #2 (followup): Ask which of these certified instructors they would like to learn with, or if they would like to see demo videos. 😊\n"
+                f"  • CRITICAL ANTI-ASSUMPTION GUARD: Instructor is NOT SELECTED! Do NOT assume or assign any instructor!\n"
+            )
+        elif unoffered_type == "COURSE" and unoffered_val and not (kb_loader.get_catalog_entry(unoffered_val) or kb_loader.detect_course_from_text(unoffered_val)):
+            turn_intent_guidance = (
+                f"- 🚨 CUSTOMER REQUESTED UNOFFERED COURSE TYPE ('{unoffered_val}'):\n"
+                f"  • Customer asked for '{unoffered_val}', which is NOT offered by Sensationz.\n"
+                f"  • REQUIRED ACTION (INTELLIGENT RESPONSE):\n"
+                f"    - Message #1: Warmly explain that Sensationz does NOT offer '{unoffered_val}'. State what related courses we do offer (e.g. {active_title}).\n"
+                f"    - Message #2 (followup): Ask if they would like information on one of our available courses. 😊\n"
+            )
+        else:
+            turn_intent_guidance = (
+                f"- ℹ️ CURRENT TURN CONVERSATIONAL MODE: INFORMATIONAL INQUIRY ({q_summary or 'Customer question/demo request'})\n"
+                "  • Message #1: Directly, thoroughly, and warmly address their specific question FIRST.\n"
+                "  • Message #2 (followup): Your follow-up question MUST be directly relevant to their question.\n"
             )
     elif is_question_turn:
         turn_intent_guidance = (
@@ -736,6 +835,15 @@ def format_system_prompt(
             f"    - NEVER ask for package duration or mention payments until an exact hourly slot is confirmed!\n"
         )
 
+    anti_guards = []
+    if timing_str == "NOT SELECTED":
+        anti_guards.append("  • 🛑 BATCH TIMING IS NOT SELECTED: You are STRICTLY FORBIDDEN from claiming 'Aapne [timing] select kiya hai' or assuming any batch timing!")
+    if teacher_str == "NOT SELECTED":
+        anti_guards.append("  • 🛑 INSTRUCTOR IS NOT SELECTED: You are STRICTLY FORBIDDEN from claiming 'Aapne [teacher] select kiya hai' or assuming any instructor!")
+    if package_str == "NOT SELECTED":
+        anti_guards.append("  • 🛑 PACKAGE DURATION IS NOT SELECTED: You are STRICTLY FORBIDDEN from claiming 'Aapne [package] select kiya hai' or assuming any package duration!")
+    anti_assumption_str = ("\n".join(anti_guards) + "\n") if anti_guards else ""
+
     state_context += (
         f"- DATABASE ENROLLMENT FACTS (STATE IS HIGHEST AUTHORITY):\n"
         f"  • SETTLED IN DATABASE (DO NOT RE-ASK): {', '.join(settled_slots) if settled_slots else 'None'}\n"
@@ -746,6 +854,7 @@ def format_system_prompt(
         f"- Customer's Selected Instructor: {teacher_str}\n"
         f"- Customer's Selected Class Days: {days_str}\n"
         f"- Customer's Selected Package Duration: {package_str}\n"
+        f"{anti_assumption_str}"
         f"- Payment Status: {paid_status_str} (Amount Paid: {paid_amt_display})\n"
         f"- Next Funnel Slot to Steer Toward: {next_funnel_slot}\n"
         f"- Trial Class Status: {trial_str}\n"
@@ -771,7 +880,7 @@ def format_system_prompt(
         state_context += "- Trial Video Guide Request: User asked for the Trial Booking video guide. In Message #1, acknowledge and inform them that the trial booking video guide is being sent, then smoothly continue the sales funnel in Message #2.\n"
 
     unoffered_timing = last_turn_dict.get("unoffered_timing_mentioned")
-    if unoffered_timing:
+    if unoffered_timing and any(char.isdigit() for char in str(unoffered_timing)):
         state_context += (
             f"- 🚨 UNOFFERED / UNAVAILABLE BATCH TIMING REQUESTED BY CUSTOMER: The customer asked for '{unoffered_timing}', which is NOT offered for {active_title}.\n"
             f"  • Message #1: Warmly and clearly explain that {active_title} classes are NOT held at {unoffered_timing}. Re-present the real available batch timings from COURSE_DATA.\n"

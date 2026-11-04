@@ -41,11 +41,17 @@ CANONICAL_DB_COURSE_MAP = {
     "yoga": "Yoga",
     "kathak": "Kathak",
     "ladies_dance": "Ladies Bollywood Dance",
-    "western_dance": "Western Dance",
+    "garba": "Garba",
+    "kids_bollywood_dance": "Kids Bollywood Dance",
+    "semi_classical_dance": "Semi Classical Dance",
+    "kids_kathak": "Kids Kathak",
+    "wedding_dance": "Wedding Dance",
     "fitness": "Fitness",
+    "vocal": "Vocal",
     "music": "Vocal",
     "guitar": "Guitar",
     "keyboard": "Keyboard",
+    "ladies_english_spoken": "Ladies English Spoken",
     "face_yoga": "Face Yoga",
     "online live interactive yoga": "Yoga",
     "kathak classical dance": "Kathak",
@@ -68,13 +74,51 @@ def clean_phone_for_contact(phone: str) -> str:
     return digits
 
 
-def clean_email(email_str: str) -> Optional[str]:
+def clean_email(email_str: str, is_awaiting_email: bool = False) -> Optional[str]:
     """Extracts and normalizes email string (lowercased, stripped of surrounding punctuation)."""
     if not email_str:
         return None
-    m = re.search(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)", str(email_str))
+    s = str(email_str).strip()
+    
+    # 1. Standard email pattern
+    m = re.search(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)", s)
     if m:
-        return m.group(1).lower().strip().rstrip(".")
+        extracted = m.group(1).lower().strip().rstrip(".")
+        if extracted.endswith("@razorpay.com") or "void@" in extracted or "example.com" in extracted:
+            return None
+        return extracted
+    
+    # Conversational non-email statements: e.g. "yhi h mra complete gmail"
+    s_low = s.lower()
+    if any(phrase in s_low for phrase in ["yhi h", "yahi h", "mera complete", "mra complete", "complete gmail"]):
+        return None
+
+    # 2. Conversational handle with 'gmail': e.g. "this is my gmail: xyz", "gmail id: test1234"
+    m_handle = re.search(r"(?:gmail(?:\s*id|\s*address)?\s*(?:is|h|hai|:|=|\s)\s*)([a-zA-Z0-9_.+-]{3,35})", s, re.IGNORECASE)
+    if m_handle:
+        handle = m_handle.group(1).lower().strip().rstrip(".")
+        if handle not in ("is", "h", "hai", "id", "address", "mera", "meri", "yhi", "yahi"):
+            if not handle.endswith("@gmail.com"):
+                return f"{handle}@gmail.com"
+            return handle
+        
+    # 3. Bare alphanumeric username when awaiting email: e.g. "xyz"
+    if is_awaiting_email:
+        words = s.split()
+        if len(words) == 1:
+            clean_handle = re.sub(r"[^a-zA-Z0-9_.+-]", "", words[0])
+            if 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle) and any(c.isdigit() for c in clean_handle):
+                return f"{clean_handle.lower()}@gmail.com"
+            elif 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle):
+                non_emails = {"okay", "ok", "theek", "accha", "sure", "thanks", "done", "yes", "ha", "nahi", "no", "hello", "hi", "help"}
+                if clean_handle.lower() not in non_emails:
+                    return f"{clean_handle.lower()}@gmail.com"
+        else:
+            candidates = [re.sub(r"[^a-zA-Z0-9_.+-]", "", w) for w in words]
+            for cand in candidates:
+                if 4 <= len(cand) <= 35 and any(c.isdigit() for cand_c in cand for c in [cand_c]) and any(c.isalpha() for cand_c in cand for c in [cand_c]):
+                    return f"{cand.lower()}@gmail.com"
+                
     return None
 
 
@@ -321,4 +365,3 @@ def trigger_async_staging(payload: Dict[str, Any], phone: str):
     except RuntimeError:
         # Fallback if called outside an active event loop
         asyncio.create_task(_execute_staging_with_retry(payload, phone))
-

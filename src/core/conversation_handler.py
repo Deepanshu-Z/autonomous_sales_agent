@@ -169,22 +169,64 @@ async def handle_incoming_message(
         if norm_old_course and norm_old_course != effective_course_id:
             new_state["timing"] = None
             new_state["selected_timing"] = None
+            new_state["timing_period"] = None
             new_state["teacher"] = None
             new_state["selected_teacher"] = None
             new_state["package"] = None
             new_state["selected_duration"] = None
+            new_state["days"] = None
+            new_state["selected_days"] = None
+            new_state["days_code"] = None
+            new_state["auto_assigned_slot_note"] = None
+            new_state["teacher_timing_conflict"] = None
             new_state["fee"] = None
+            new_state["base_fee"] = None
+            new_state["offer_fee"] = None
+            new_state["gst_amount"] = None
+            new_state["gst_percentage"] = None
             session_state["timing"] = None
             session_state["selected_timing"] = None
+            session_state["timing_period"] = None
             session_state["teacher"] = None
             session_state["selected_teacher"] = None
             session_state["package"] = None
             session_state["selected_duration"] = None
+            session_state["days"] = None
+            session_state["selected_days"] = None
+            session_state["days_code"] = None
+            session_state["auto_assigned_slot_note"] = None
+            session_state["teacher_timing_conflict"] = None
             session_state["fee"] = None
+            session_state["base_fee"] = None
+            session_state["offer_fee"] = None
+            session_state["gst_amount"] = None
+            session_state["gst_percentage"] = None
+
+            # Course-specific enrollment isolation
+            if session_state.get("payment_status") == "PAID" and not session_state.get("paid_course"):
+                session_state["paid_course"] = norm_old_course
+                new_state["paid_course"] = norm_old_course
+            paid_c = session_state.get("paid_course")
+            if paid_c and paid_c != effective_course_id:
+                new_state["payment_status"] = "NONE"
+                new_state["stage"] = "NEW"
+                new_state["is_enrolled"] = False
+                session_state["payment_status"] = "NONE"
+                session_state["stage"] = "NEW"
+                session_state["is_enrolled"] = False
 
     # ── Gmail Interception & Auto-Staging Pipeline ──────────────────────────
     from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
-    user_email = clean_email(user_message)
+    is_awaiting_email = bool(
+        new_state.get("awaiting_email_fulfillment")
+        or session_state.get("awaiting_email_fulfillment")
+        or new_state.get("classes_not_showing")
+        or session_state.get("classes_not_showing")
+        or (new_state.get("payment_status") == "PAID" and not (new_state.get("student_email") or session_state.get("student_email")))
+        or new_state.get("wants_trial")
+        or session_state.get("awaiting_trial_email")
+    )
+    user_email = clean_email(user_message, is_awaiting_email=is_awaiting_email)
 
     if user_email:
         new_state["student_email"] = user_email
@@ -456,7 +498,7 @@ async def handle_incoming_message(
 
     # 4. Generate the actual reply, with conversation history for coherence.
     messages = [SystemMessage(content=system_prompt)]
-    for t in conversation_history[-5:]:
+    for t in conversation_history[-2:]:
         content = (t.get("content") or "").strip()
         if not content:
             continue
@@ -859,6 +901,38 @@ def _sanitize_confirmation_guardrails(
             )
         return sanitized_reply, None
 
+    # 4. Check Gmail Account Linking Confirmation (prevent hallucinated linking when email not verified/staged)
+    is_account_staged = bool(
+        state and (
+            state.get("staged_enrollment") or state.get("staged_trial")
+        ) and (state.get("student_email") or state.get("email"))
+    )
+    _GMAIL_LINKED_PATTERNS = [
+        r"\b(?:link\s*(?:kar\s*diya|ho\s*gaya|ho\s*chuka)|successfully\s*linked|account\s*(?:is\s*)?linked|gmail\s*(?:id\s*)?link)\b",
+        r"\b(?:लिंक\s*(?:कर\s*दिया|हो\s*गया)|अकाउंट\s*लिंक)\b",
+    ]
+    if not is_account_staged and any(re.search(p, full_check, re.IGNORECASE) for p in _GMAIL_LINKED_PATTERNS):
+        logger.warning(f"[guardrails] Fake Gmail linking intercepted and sanitized. Raw reply: {reply[:80]}...")
+        if has_devanagari:
+            sanitized_reply = (
+                "Google Sign-In के लिए पूरा Gmail ID होना ज़रूरी है जिसमें @gmail.com लगा हो (जैसे xyz@gmail.com)। "
+                "कृपया अपना पूरा Gmail एड्रेस यहां चैट में भेजें ताकि सिस्टम आपकी लाइव क्लासेज को ऐप में तुरंत एक्टिवेट कर सके। 😊"
+            )
+            sanitized_followup = "क्या आप अपना पूरा Gmail ID (उदा. yourname@gmail.com) शेयर कर सकते हैं? 😊"
+        elif is_english:
+            sanitized_reply = (
+                "To link your classes with Google Sign-In on the Sensationz App, a full Gmail address ending with @gmail.com is required. "
+                "Please share your complete Gmail address here in chat so our system can immediately connect your batch. 😊"
+            )
+            sanitized_followup = "Could you please provide your full Gmail address (e.g. yourname@gmail.com)? 😊"
+        else:
+            sanitized_reply = (
+                "Google Sign-In ke liye pura Gmail ID zaroori hota hai jisme @gmail.com laga ho (jaise xyz@gmail.com). "
+                "Kripya apna complete Gmail address yahan chat mein bhejein taaki system aapki live classes ko app mein turant activate kar sake. 😊"
+            )
+            sanitized_followup = "Kya aap apna pura Gmail address (e.g. yourname@gmail.com) share kar sakte hain? 😊"
+        return sanitized_reply, sanitized_followup
+
     return reply, followup
 
 
@@ -1065,11 +1139,13 @@ async def dispatch_payment_qr_async(
     timing_val = state.get("timing") or state.get("selected_timing")
     teacher_val = state.get("selected_teacher") or state.get("teacher")
 
-    # Hard guard: ALL mandatory slots (Course, Package, Timing, Teacher) must be explicitly selected
-    if not (cid and pkg and timing_val and teacher_val):
+    # Hard guard: ALL mandatory slots (Course, Package, Timing, Teacher, Days) must be explicitly settled
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots
+    slot_eval = evaluate_enrollment_slots(state, course_id=cid)
+    if not slot_eval.get("is_complete"):
         logger.warning(
             f"[QR Dispatch] Blocked: Missing mandatory slot(s) for {phone}. "
-            f"course={cid!r}, pkg={pkg!r}, timing={timing_val!r}, teacher={teacher_val!r}"
+            f"Missing slots: {slot_eval.get('missing_slots')}"
         )
         return None
 
@@ -1628,12 +1704,13 @@ async def _handle_conversation_turn_unlocked(
         except Exception:
             has_valid_fee = False
 
-    # 5 Mandatory prerequisites: Course, Timing, Teacher, Package, Fee
+    # Centralized slot completeness check from slot_engine (Single Source of Truth for Course, Timing, Teacher, Days, Package):
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots
+    slot_eval = evaluate_enrollment_slots(new_state, course_id=active_cid)
+
+    # ALL mandatory prerequisites: Course, Timing, Teacher, Days, Package, AND Fee
     all_prerequisites_met = bool(
-        has_course_selected
-        and has_timing_selected
-        and has_teacher_selected
-        and is_package_selected
+        slot_eval.get("is_complete")
         and has_valid_fee
     )
 
@@ -1644,12 +1721,15 @@ async def _handle_conversation_turn_unlocked(
     )
 
     # QR Code Dispatch Synchronization Guard:
-    # NEVER dispatch payment QR code if Message #2 is actively asking the user to choose a timing, teacher, or package!
+    # NEVER dispatch payment QR code if slots are incomplete OR if Message #2 is actively asking the user to choose ANY slot (timing, teacher, days, package)!
     is_asking_slot = bool(
-        clean_followup and re.search(
-            r"\b(which timing|which batch|which specific timing|which instructor|which package duration|choose a package|select a package|kisme se|kaunsa batch|kaunsi timing)\b",
-            clean_followup,
-            re.IGNORECASE,
+        not slot_eval.get("is_complete")
+        or (
+            clean_followup and re.search(
+                r"\b(which timing|which batch|which specific timing|which instructor|which package duration|choose a package|select a package|kisme se|kaunsa batch|kaunsi timing|batch days|which days|kaunse din|kaunsa pair|pair chahenge|tuesday|thursday|wednesday|friday|saturday|sunday)\b",
+                clean_followup,
+                re.IGNORECASE,
+            )
         )
     )
 

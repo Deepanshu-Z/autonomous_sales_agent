@@ -1598,18 +1598,9 @@ async def _handle_conversation_turn_unlocked(
     )
 
     allow_app_links = bool(
-        user_asked_links
-        or (
-            (is_client_paid
-             or new_state.get("staged_enrollment")
-             or new_state.get("staged_trial")
-             or new_state.get("stage") in ("ENROLLED", "TRIAL_CONFIRMED"))
-            and not is_classes_troubleshooting
-        )
-        or last_turn.get("intent") == "APP_LINK_REQUEST"
+        last_turn.get("intent") == "APP_LINK_REQUEST"
         or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
         or last_turn.get("wants_app_link")
-        or "lock my seat" in unquoted_text
     )
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)

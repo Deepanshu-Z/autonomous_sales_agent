@@ -1,5 +1,5 @@
 """
-src.core.helpers package — Dedicated helper engines for course schedules and pricing.
+src.core.helpers package — Dedicated helper engines for course schedules, pricing, and email normalization.
 """
 
 from src.core.helpers.schedule_engine import (
@@ -21,6 +21,7 @@ from src.core.helpers.schedule_engine import (
 )
 
 from src.core.helpers.slot_engine import evaluate_enrollment_slots
+from src.core.helpers.email_sanitizer import sanitize_email
 
 from src.core.pricing_engine import (
     get_course_gst_percentage,
@@ -47,6 +48,8 @@ from src.core.pricing_engine import (
 )
 
 __all__ = [
+    # Email Sanitizer
+    "sanitize_email",
     # Schedule & Timings
     "evaluate_enrollment_slots",
     "classify_time_period",
@@ -88,4 +91,3 @@ __all__ = [
     "get_order_summary_details",
     "generate_order_summary",
 ]
-

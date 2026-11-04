@@ -1,229 +1,229 @@
-[
-    {
-        "id": "kathak",
-        "name": "Kathak",
-        "aliases": [
-            "kathak",
-            "kathak dance",
-            "classical dance",
-            "indian classical dance",
-            "tatkar"
-        ],
-        "has_full_kb": true,
-        "kb_file": "data/courses/kathak.json",
-        "gst_percentage": 18,
-        "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
-    },
-    {
-        "id": "garba",
-        "name": "Garba",
-        "aliases": [
-            "garba",
-            "garba dance",
-            "dandiya",
-            "dandiya dance",
-            "navratri garba",
-            "garba classes",
-            "dandiya classes"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Traditional Gujarati Garba and Dandiya folk dance styles, steps, and festive choreographies."
-    },
-    {
-        "id": "kids_bollywood_dance",
-        "name": "Kids Bollywood Dance",
-        "aliases": [
-            "kids bollywood dance",
-            "kids dance",
-            "kids bollywood",
-            "children dance",
-            "dance for kids",
-            "bachon ka dance",
-            "junior bollywood"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Fun, high-energy Bollywood dance sessions designed specifically for kids and young dancers."
-    },
-    {
-        "id": "ladies_dance",
-        "name": "Ladies Bollywood Dance",
-        "aliases": [
-            "ladies bollywood dance",
-            "ladies dance",
-            "bollywood dance",
-            "women dance",
-            "ladies dance classes",
-            "dance for ladies",
-            "ladies timings",
-            "dance timings",
-            "dance classes",
-            "ladies",
-            "dance"
-        ],
-        "has_full_kb": true,
-        "kb_file": "data/courses/ladies_dance.json",
-        "gst_percentage": 18,
-        "description": "Live interactive Bollywood and semi-classical dance sessions for ladies with weekly song-based choreographies."
-    },
-    {
-        "id": "semi_classical_dance",
-        "name": "Semi Classical Dance",
-        "aliases": [
-            "semi classical dance",
-            "semi classical",
-            "semiclassical",
-            "semi classical dance classes",
-            "semi-classical",
-            "semi classical dance styles"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Graceful blend of Indian classical dance movements with contemporary and Bollywood expressions."
-    },
-    {
-        "id": "kids_kathak",
-        "name": "Kids Kathak",
-        "aliases": [
-            "kids kathak",
-            "kathak for kids",
-            "children kathak",
-            "junior kathak",
-            "bachon ka kathak",
-            "kids classical dance"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Foundational Kathak training crafted for children, covering postures, footwork, and rhythm."
-    },
-    {
-        "id": "wedding_dance",
-        "name": "Wedding Dance",
-        "aliases": [
-            "wedding dance",
-            "sangeet choreography",
-            "wedding choreography",
-            "sangeet dance",
-            "marriage dance",
-            "couple dance",
-            "shaadi dance",
-            "wedding sangeet"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Customized wedding and Sangeet dance choreographies for couples, families, and bride/groom squads."
-    },
-    {
-        "id": "keyboard",
-        "name": "Keyboard",
-        "aliases": [
-            "keyboard",
-            "piano",
-            "synthesizer",
-            "keys",
-            "keyboard classes",
-            "piano classes"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Keyboard notation, finger exercises, scale training, and popular compositions."
-    },
-    {
-        "id": "fitness",
-        "name": "Fitness",
-        "aliases": [
-            "fitness",
-            "zumba",
-            "aerobics",
-            "cardio",
-            "weight loss workout",
-            "fitness classes",
-            "workout"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Full-body fitness, dynamic Zumba, and aerobic workouts for weight loss and stamina."
-    },
-    {
-        "id": "yoga",
-        "name": "Yoga",
-        "aliases": [
-            "yoga",
-            "yog",
-            "asanas",
-            "pranayama",
-            "wellness",
-            "yoga classes",
-            "online yoga"
-        ],
-        "has_full_kb": true,
-        "kb_file": "data/courses/yoga.json",
-        "gst_percentage": 5,
-        "description": "Live interactive online yoga sessions with certified female instructors (Mon-Fri) across 10 flexible batch timings."
-    },
-    {
-        "id": "face_yoga",
-        "name": "Face Yoga",
-        "aliases": [
-            "face yoga",
-            "faceyoga",
-            "face-yoga",
-            "facial yoga",
-            "jawline yoga",
-            "anti aging yoga"
-        ],
-        "has_full_kb": true,
-        "kb_file": "data/courses/face_yoga.json",
-        "gst_percentage": 5,
-        "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness."
-    },
-    {
-        "id": "guitar",
-        "name": "Guitar",
-        "aliases": [
-            "guitar",
-            "acoustic guitar",
-            "strings",
-            "guitar classes",
-            "guitar lessons"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Beginner to advanced guitar courses covering chords, strumming patterns, and songs."
-    },
-    {
-        "id": "ladies_english_spoken",
-        "name": "Ladies English Spoken",
-        "aliases": [
-            "ladies english spoken",
-            "ladies english",
-            "spoken english",
-            "english speaking",
-            "communication skills",
-            "english classes",
-            "english for ladies",
-            "spoken english for ladies"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Comfortable and empowering English speaking and communication training designed specifically for women."
-    },
-    {
-        "id": "vocal",
-        "name": "Vocal",
-        "aliases": [
-            "vocal",
-            "singing",
-            "music",
-            "classical singing",
-            "vocal music",
-            "singing classes",
-            "vocal classes",
-            "voice training"
-        ],
-        "has_full_kb": false,
-        "gst_percentage": 18,
-        "description": "Classical and semi-classical vocal training, voice modulation, and sur-taal mastery."
-    }
-]
+    [
+        {
+            "id": "kathak",
+            "name": "Kathak",
+            "aliases": [
+                "kathak",
+                "kathak dance",
+                "classical dance",
+                "indian classical dance",
+                "tatkar"
+            ],
+            "has_full_kb": true,
+            "kb_file": "data/courses/kathak.json",
+            "gst_percentage": 18,
+            "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
+        },
+        {
+            "id": "garba",
+            "name": "Garba",
+            "aliases": [
+                "garba",
+                "garba dance",
+                "dandiya",
+                "dandiya dance",
+                "navratri garba",
+                "garba classes",
+                "dandiya classes"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Traditional Gujarati Garba and Dandiya folk dance styles, steps, and festive choreographies."
+        },
+        {
+            "id": "kids_bollywood_dance",
+            "name": "Kids Bollywood Dance",
+            "aliases": [
+                "kids bollywood dance",
+                "kids dance",
+                "kids bollywood",
+                "children dance",
+                "dance for kids",
+                "bachon ka dance",
+                "junior bollywood"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Fun, high-energy Bollywood dance sessions designed specifically for kids and young dancers."
+        },
+        {
+            "id": "ladies_dance",
+            "name": "Ladies Bollywood Dance",
+            "aliases": [
+                "ladies bollywood dance",
+                "ladies dance",
+                "bollywood dance",
+                "women dance",
+                "ladies dance classes",
+                "dance for ladies",
+                "ladies timings",
+                "dance timings",
+                "dance classes",
+                "ladies",
+                "dance"
+            ],
+            "has_full_kb": true,
+            "kb_file": "data/courses/ladies_dance.json",
+            "gst_percentage": 18,
+            "description": "Live interactive Bollywood and semi-classical dance sessions for ladies with weekly song-based choreographies."
+        },
+        {
+            "id": "semi_classical_dance",
+            "name": "Semi Classical Dance",
+            "aliases": [
+                "semi classical dance",
+                "semi classical",
+                "semiclassical",
+                "semi classical dance classes",
+                "semi-classical",
+                "semi classical dance styles"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Graceful blend of Indian classical dance movements with contemporary and Bollywood expressions."
+        },
+        {
+            "id": "kids_kathak",
+            "name": "Kids Kathak",
+            "aliases": [
+                "kids kathak",
+                "kathak for kids",
+                "children kathak",
+                "junior kathak",
+                "bachon ka kathak",
+                "kids classical dance"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Foundational Kathak training crafted for children, covering postures, footwork, and rhythm."
+        },
+        {
+            "id": "wedding_dance",
+            "name": "Wedding Dance",
+            "aliases": [
+                "wedding dance",
+                "sangeet choreography",
+                "wedding choreography",
+                "sangeet dance",
+                "marriage dance",
+                "couple dance",
+                "shaadi dance",
+                "wedding sangeet"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Customized wedding and Sangeet dance choreographies for couples, families, and bride/groom squads."
+        },
+        {
+            "id": "keyboard",
+            "name": "Keyboard",
+            "aliases": [
+                "keyboard",
+                "piano",
+                "synthesizer",
+                "keys",
+                "keyboard classes",
+                "piano classes"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Keyboard notation, finger exercises, scale training, and popular compositions."
+        },
+        {
+            "id": "fitness",
+            "name": "Fitness",
+            "aliases": [
+                "fitness",
+                "zumba",
+                "aerobics",
+                "cardio",
+                "weight loss workout",
+                "fitness classes",
+                "workout"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Full-body fitness, dynamic Zumba, and aerobic workouts for weight loss and stamina."
+        },
+        {
+            "id": "yoga",
+            "name": "Yoga",
+            "aliases": [
+                "yoga",
+                "yog",
+                "asanas",
+                "pranayama",
+                "wellness",
+                "yoga classes",
+                "online yoga"
+            ],
+            "has_full_kb": true,
+            "kb_file": "data/courses/yoga.json",
+            "gst_percentage": 5,
+            "description": "Live interactive online yoga sessions with certified female instructors (Mon-Fri) across 10 flexible batch timings."
+        },
+        {
+            "id": "face_yoga",
+            "name": "Face Yoga",
+            "aliases": [
+                "face yoga",
+                "faceyoga",
+                "face-yoga",
+                "facial yoga",
+                "jawline yoga",
+                "anti aging yoga"
+            ],
+            "has_full_kb": true,
+            "kb_file": "data/courses/face_yoga.json",
+            "gst_percentage": 5,
+            "description": "Specialized facial exercises for facial toning, jawline sculpting, and anti-aging wellness."
+        },
+        {
+            "id": "guitar",
+            "name": "Guitar",
+            "aliases": [
+                "guitar",
+                "acoustic guitar",
+                "strings",
+                "guitar classes",
+                "guitar lessons"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Beginner to advanced guitar courses covering chords, strumming patterns, and songs."
+        },
+        {
+            "id": "ladies_english_spoken",
+            "name": "Ladies English Spoken",
+            "aliases": [
+                "ladies english spoken",
+                "ladies english",
+                "spoken english",
+                "english speaking",
+                "communication skills",
+                "english classes",
+                "english for ladies",
+                "spoken english for ladies"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Comfortable and empowering English speaking and communication training designed specifically for women."
+        },
+        {
+            "id": "vocal",
+            "name": "Vocal",
+            "aliases": [
+                "vocal",
+                "singing",
+                "music",
+                "classical singing",
+                "vocal music",
+                "singing classes",
+                "vocal classes",
+                "voice training"
+            ],
+            "has_full_kb": false,
+            "gst_percentage": 18,
+            "description": "Classical and semi-classical vocal training, voice modulation, and sur-taal mastery."
+        }
+    ]

@@ -704,12 +704,23 @@ def format_system_prompt(
             "  • Message #2 (followup): Set 'followup': null. NEVER ask for payment or push course packages!\n"
         )
     elif bool(last_turn_dict.get("timing_ambiguous") or s.get("timing_ambiguous")):
+        amb_hr = last_turn_dict.get("ambiguous_hour") or s.get("ambiguous_hour") or "7"
+        amb_cands = last_turn_dict.get("ambiguous_timing_candidates") or s.get("ambiguous_timing_candidates") or []
+        if amb_cands:
+            cands_display = " aur ".join(amb_cands)
+        else:
+            try:
+                cands_display = f"Subah {amb_hr}:00 AM to {int(amb_hr)+1}:00 AM aur Shaam {amb_hr}:00 PM to {int(amb_hr)+1}:00 PM"
+            except Exception:
+                cands_display = f"Subah {amb_hr}:00 AM aur Shaam {amb_hr}:00 PM"
+
         turn_intent_guidance = (
             f"- ⏰ BARE HOUR TIMING DISAMBIGUATION (CUSTOMER CHOSE A TIME WITH BOTH MORNING & EVENING SLOTS):\n"
-            f"  • Customer requested a bare hour without specifying Morning or Evening (e.g. '7bje').\n"
-            f"  • CRITICAL RULE: The class IS OFFERED in {active_title}! Under NO circumstances claim '{active_title} classes are not held at 7bje'!\n"
-            f"  • Message #1: Warmly clarify the two options from COURSE_DATA (e.g. '{active_title} mein 7 baje ke do batches hain — Subah 7:00 AM to 8:00 AM aur Shaam 7:00 PM to 8:00 PM.').\n"
+            f"  • Customer requested bare hour '{amb_hr}' without specifying Morning or Evening (e.g. '{amb_hr} bje').\n"
+            f"  • CRITICAL RULE: The class IS OFFERED in {active_title}! Under NO circumstances claim '{active_title} classes are not held at {amb_hr} bje'!\n"
+            f"  • Message #1: Warmly clarify the two options from COURSE_DATA (e.g. '{active_title} mein {amb_hr} baje ke do batches hain — {cands_display}.').\n"
             f"  • Message #2 (followup): Ask: 'Aap subah ka time prefer karenge ya shaam ka? 😊'\n"
+            f"  • CRITICAL ANTI-ASSUMPTION GUARD: Batch Timing and Instructor are NOT SELECTED! Under NO circumstances say 'Aapne [timing] select kiya hai' or assign an instructor until the customer specifies Morning or Evening!\n"
         )
     elif is_qr_request_turn:
         if is_complete:

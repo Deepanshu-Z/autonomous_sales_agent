@@ -80,6 +80,8 @@ def _empty_flags() -> Dict[str, Any]:
         "claims_payment_or_enrollment": False,
         "cannot_access_classes": False,
         "timing_ambiguous": False,
+        "ambiguous_hour": None,
+        "ambiguous_timing_candidates": None,
         "wants_demo": False,
         "wants_app_guide": False,
         "wants_app_video_guide": False,
@@ -502,6 +504,8 @@ async def extract_intent_and_state_changes(
                     if not matched_batch:
                         # Ambiguous hour (e.g. 7 AM vs 7 PM both exist in Yoga)
                         clean["timing_ambiguous"] = True
+                        clean["ambiguous_hour"] = target_hr
+                        clean["ambiguous_timing_candidates"] = candidates
                         clean["selected_timing"] = None
                         clean["unoffered_type"] = None
                         clean["unoffered_value"] = None
@@ -509,7 +513,7 @@ async def extract_intent_and_state_changes(
                         clean["customer_intent"] = "TIMING_SELECTION"
                         clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
 
-            if not matched_batch:
+            if not matched_batch and not clean.get("timing_ambiguous"):
                 for b in course_batches:
                     b_low = b.lower()
                     if r_low == b_low or b_low.startswith(r_low):
@@ -528,6 +532,9 @@ async def extract_intent_and_state_changes(
 
         if matched_batch:
             clean["selected_timing"] = matched_batch
+            clean["timing_ambiguous"] = False
+            clean["ambiguous_hour"] = None
+            clean["ambiguous_timing_candidates"] = None
             clean["unoffered_timing_mentioned"] = None
             if clean.get("unoffered_type") == "TIMING":
                 clean["unoffered_type"] = None
@@ -537,25 +544,26 @@ async def extract_intent_and_state_changes(
                 clean["customer_intent"] = "TIMING_SELECTION"
         else:
             clean["selected_timing"] = None
-            # Deterministic unoffered timing detection for bare hour (e.g. '3') or unoffered time string
-            if clean_user.isdigit() and 1 <= int(clean_user) <= 12:
-                clean["unoffered_type"] = "TIMING"
-                clean["unoffered_value"] = f"{int(clean_user)}:00"
-                clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
-                if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
-                    clean["customer_intent"] = "QUESTION"
-                    clean["question_summary"] = f"Inquiry about {clean['unoffered_value']} batch timing"
-            elif not is_timing_settled and raw_timing and isinstance(raw_timing, str) and (
-                any(w in raw_timing.lower() for w in ["am", "pm", "to", "baje", "o'clock", "noon"])
-                or re.search(r"\b\d{1,2}:\d{2}\b", raw_timing)
-                or re.search(r"\b\d{1,2}\s*(?:to|-)\s*\d{1,2}\b", raw_timing)
-            ) and not ("@" in raw_timing or re.search(r"[a-zA-Z]{5,}\d+", raw_timing)):
-                if not clean.get("unoffered_type"):
+            if not clean.get("timing_ambiguous"):
+                # Deterministic unoffered timing detection for bare hour (e.g. '3') or unoffered time string
+                if clean_user.isdigit() and 1 <= int(clean_user) <= 12:
                     clean["unoffered_type"] = "TIMING"
-                    clean["unoffered_value"] = raw_timing.strip()
+                    clean["unoffered_value"] = f"{int(clean_user)}:00"
                     clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
-                if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
-                    clean["customer_intent"] = "QUESTION"
+                    if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
+                        clean["customer_intent"] = "QUESTION"
+                        clean["question_summary"] = f"Inquiry about {clean['unoffered_value']} batch timing"
+                elif not is_timing_settled and raw_timing and isinstance(raw_timing, str) and (
+                    any(w in raw_timing.lower() for w in ["am", "pm", "to", "baje", "bje", "o'clock", "noon"])
+                    or re.search(r"\b\d{1,2}:\d{2}\b", raw_timing)
+                    or re.search(r"\b\d{1,2}\s*(?:to|-)\s*\d{1,2}\b", raw_timing)
+                ) and not ("@" in raw_timing or re.search(r"[a-zA-Z]{5,}\d+", raw_timing)):
+                    if not clean.get("unoffered_type"):
+                        clean["unoffered_type"] = "TIMING"
+                        clean["unoffered_value"] = raw_timing.strip()
+                        clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
+                    if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
+                        clean["customer_intent"] = "QUESTION"
 
         # Period Detection (e.g. "Morning Batch", "Evening Batch", "Subah", "Shaam")
         detected_period = None
@@ -571,6 +579,25 @@ async def extract_intent_and_state_changes(
             clean["is_disinterested"] = False
             if clean.get("customer_intent") in ("QUESTION", "COURSE_INQUIRY", "DISINTEREST", "OTHER", None):
                 clean["customer_intent"] = "TIMING_SELECTION"
+
+            # If previous state had an unresolved ambiguous timing, settle it with the detected period!
+            amb_candidates = s.get("ambiguous_timing_candidates") or []
+            if s.get("timing_ambiguous") and amb_candidates and not clean.get("selected_timing"):
+                period_low = detected_period.lower()
+                if period_low in ("morning", "am"):
+                    m_c = [c for c in amb_candidates if "am" in c.lower()]
+                    if m_c:
+                        clean["selected_timing"] = m_c[0]
+                        clean["timing_ambiguous"] = False
+                        clean["ambiguous_hour"] = None
+                        clean["ambiguous_timing_candidates"] = None
+                elif period_low in ("evening", "afternoon", "pm"):
+                    m_c = [c for c in amb_candidates if "pm" in c.lower()]
+                    if m_c:
+                        clean["selected_timing"] = m_c[0]
+                        clean["timing_ambiguous"] = False
+                        clean["ambiguous_hour"] = None
+                        clean["ambiguous_timing_candidates"] = None
 
         # Strict canonical package normalization against allowed course packages
         from src.core.coupons import detect_unoffered_duration
@@ -719,10 +746,14 @@ async def extract_intent_and_state_changes(
                         if len(matching_cands) == 1:
                             clean["selected_timing"] = matching_cands[0]
                             clean["timing_ambiguous"] = False
+                            clean["ambiguous_hour"] = None
+                            clean["ambiguous_timing_candidates"] = None
                             clean["customer_intent"] = "TIMING_SELECTION"
                         else:
                             clean["selected_timing"] = None
                             clean["timing_ambiguous"] = True
+                            clean["ambiguous_hour"] = req_h
+                            clean["ambiguous_timing_candidates"] = matching_cands
                             clean["customer_intent"] = "TIMING_SELECTION"
                             clean["question_summary"] = f"Clarify morning vs evening for {req_h} o'clock"
 
@@ -805,8 +836,16 @@ async def extract_intent_and_state_changes(
                     if p_hint in ("evening", "afternoon", "pm"):
                         pm_c = [c for c in cands if "pm" in c.lower()]
                         flags["selected_timing"] = pm_c[0] if pm_c else cands[0]
+                        flags["timing_ambiguous"] = False
+                    elif p_hint in ("morning", "am"):
+                        am_c = [c for c in cands if "am" in c.lower()]
+                        flags["selected_timing"] = am_c[0] if am_c else cands[0]
+                        flags["timing_ambiguous"] = False
                     else:
-                        flags["selected_timing"] = cands[0]
+                        flags["timing_ambiguous"] = True
+                        flags["ambiguous_hour"] = t_hr
+                        flags["ambiguous_timing_candidates"] = cands
+                        flags["selected_timing"] = None
                     flags["customer_intent"] = "TIMING_SELECTION"
             elif any(w in clean_t for w in ["am", "pm", "to"]):
                 for b in batches_for_fallback:
@@ -951,6 +990,16 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     active_course = new_state.get("course")
 
     # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
+    if flags.get("timing_ambiguous"):
+        new_state["timing_ambiguous"] = True
+        new_state["ambiguous_hour"] = flags.get("ambiguous_hour")
+        new_state["ambiguous_timing_candidates"] = flags.get("ambiguous_timing_candidates")
+        new_state["timing"] = None
+        new_state["selected_timing"] = None
+    elif flags.get("selected_timing"):
+        new_state["timing_ambiguous"] = False
+        new_state["ambiguous_hour"] = None
+        new_state["ambiguous_timing_candidates"] = None
     if flags.get("timing_period"):
         new_state["timing_period"] = flags["timing_period"]
         # If teacher is already known, evaluate dynamic constraints immediately
@@ -1235,6 +1284,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
+        "timing_ambiguous": flags.get("timing_ambiguous", False),
+        "ambiguous_hour": flags.get("ambiguous_hour"),
+        "ambiguous_timing_candidates": flags.get("ambiguous_timing_candidates"),
         "wants_trial": flags.get("wants_trial", False),
         "wants_demo": flags.get("wants_demo", False),
         "wants_app_guide": flags.get("wants_app_guide", False),

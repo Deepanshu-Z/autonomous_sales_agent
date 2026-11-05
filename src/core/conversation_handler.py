@@ -551,6 +551,23 @@ async def handle_incoming_message(
         main_reply, followup_msg, language=detected_lang, state=new_state
     )
 
+    # Strictly sanitize any hallucinated timing selection when timing is ambiguous
+    if new_state.get("timing_ambiguous") or flags.get("timing_ambiguous"):
+        amb_hr = new_state.get("ambiguous_hour") or flags.get("ambiguous_hour") or "7"
+        amb_cands = new_state.get("ambiguous_timing_candidates") or flags.get("ambiguous_timing_candidates") or []
+        cands_str = " aur ".join(amb_cands) if amb_cands else f"Subah {amb_hr}:00 AM aur Shaam {amb_hr}:00 PM"
+
+        SELECTION_LEAK = re.search(
+            r"(?:aapne\s+\d+\s*(?:baje|bje)?\s*(?:ka\s+timing\s+)?select\s+kiya\s+hai|you(?:'ve|\s+have)\s+selected\s+\d+|timing\s+ke\s+liye\s+classes\s+[A-Za-z\s]+\s+ke\s+saath\s+hoti\s+hain)",
+            main_reply,
+            re.IGNORECASE,
+        )
+        if SELECTION_LEAK:
+            catalog_entry = kb_loader.get_catalog_entry(effective_course_id)
+            c_title = catalog_entry.get("name", effective_course_id.title()) if catalog_entry else (effective_course_id.title() if effective_course_id else "Yoga")
+            main_reply = f"{c_title} classes ke liye {amb_hr} baje do batches available hain: {cands_str}."
+            followup_msg = "Aap subah ka batch prefer karenge ya shaam ka? 😊"
+
     # Coupon-sent bookkeeping is a plain state flag, decided from what we
     # KNOW (profile just confirmed + eligible this turn) — never by
     # scanning the model's reply text for the coupon string.

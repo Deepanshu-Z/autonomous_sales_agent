@@ -483,9 +483,14 @@ async def extract_intent_and_state_changes(
                             candidates.append(b)
                     except Exception:
                         pass
-                if len(candidates) == 1:
+                candidates = list(dict.fromkeys(candidates))
+                has_am = any("am" in c.lower() for c in candidates)
+                has_pm = any("pm" in c.lower() for c in candidates)
+
+                if len(candidates) == 1 or (not (has_am and has_pm) and candidates):
+                    # Unambiguous single slot or all candidates belong to the same period (e.g. evening-only or morning-only course)
                     matched_batch = candidates[0]
-                elif len(candidates) > 1:
+                elif len(candidates) > 1 and has_am and has_pm:
                     period_hint = (s.get("timing_period") or "").lower()
                     if not period_hint:
                         if any(w in text.lower() for w in ["evening", "sham", "shaam", "raat", "night", "pm", "afternoon", "dopahar"]):
@@ -502,7 +507,7 @@ async def extract_intent_and_state_changes(
                             matched_batch = am_cands[0]
                     
                     if not matched_batch:
-                        # Ambiguous hour (e.g. 7 AM vs 7 PM both exist in Yoga)
+                        # Genuinely ambiguous hour across morning and evening (e.g. 7 AM vs 7 PM both exist in Yoga)
                         clean["timing_ambiguous"] = True
                         clean["ambiguous_hour"] = target_hr
                         clean["ambiguous_timing_candidates"] = candidates
@@ -738,12 +743,14 @@ async def extract_intent_and_state_changes(
                 m_hr = re.search(r"\b(\d{1,2})\b", t_val)
                 if m_hr and course_batches:
                     req_h = int(m_hr.group(1))
-                    matching_cands = [b for b in course_batches if b.startswith(f"{req_h}:") or b.startswith(f"0{req_h}:")]
+                    matching_cands = list(dict.fromkeys([b for b in course_batches if b.startswith(f"{req_h}:") or b.startswith(f"0{req_h}:")]))
                     if matching_cands:
                         clean["unoffered_type"] = None
                         clean["unoffered_value"] = None
                         clean["unoffered_timing_mentioned"] = None
-                        if len(matching_cands) == 1:
+                        has_am_m = any("am" in c.lower() for c in matching_cands)
+                        has_pm_m = any("pm" in c.lower() for c in matching_cands)
+                        if len(matching_cands) == 1 or not (has_am_m and has_pm_m):
                             clean["selected_timing"] = matching_cands[0]
                             clean["timing_ambiguous"] = False
                             clean["ambiguous_hour"] = None
@@ -827,11 +834,14 @@ async def extract_intent_and_state_changes(
             clean_t = raw_t.replace(" ", "").replace("-", "to")
             if clean_t.isdigit():
                 t_hr = int(clean_t)
-                cands = [b for b in batches_for_fallback if b.startswith(f"{t_hr}:") or b.startswith(f"0{t_hr}:")]
-                if len(cands) == 1:
+                cands = list(dict.fromkeys([b for b in batches_for_fallback if b.startswith(f"{t_hr}:") or b.startswith(f"0{t_hr}:")]))
+                has_am_f = any("am" in c.lower() for c in cands)
+                has_pm_f = any("pm" in c.lower() for c in cands)
+                if len(cands) == 1 or (not (has_am_f and has_pm_f) and cands):
                     flags["selected_timing"] = cands[0]
+                    flags["timing_ambiguous"] = False
                     flags["customer_intent"] = "TIMING_SELECTION"
-                elif len(cands) > 1:
+                elif len(cands) > 1 and has_am_f and has_pm_f:
                     p_hint = (s.get("timing_period") or "").lower()
                     if p_hint in ("evening", "afternoon", "pm"):
                         pm_c = [c for c in cands if "pm" in c.lower()]

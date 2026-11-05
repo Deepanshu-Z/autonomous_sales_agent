@@ -797,14 +797,16 @@ def detect_timing_from_text(text: str, course_id: str = "yoga") -> tuple:
                 elif len(cands) > 1:
                     return None, True, f"{hr}:00"
 
-    # Priority 3: Single bare hour without am/pm (e.g. "6 baje", "10 baje")
+    # Priority 3: Single bare hour without am/pm (e.g. "6 baje", "7bje", "10 baje")
     for hr, aliases in hour_checks:
         for alias in aliases:
             if re_has(rf"(?<![0-9\-])\s*{alias}(?:\s*baje|\s*bje|\b)"):
                 cands = list(dict.fromkeys([vt for vt in valid_timings if re.search(rf"\b{hr}(?::00)?\s*(?:to|-|–)", vt)]))
-                if len(cands) == 1:
+                has_am_c = any("am" in c.lower() for c in cands)
+                has_pm_c = any("pm" in c.lower() for c in cands)
+                if len(cands) == 1 or (not (has_am_c and has_pm_c) and cands):
                     return cands[0], False, ""
-                elif len(cands) > 1:
+                elif len(cands) > 1 and has_am_c and has_pm_c:
                     return None, True, f"{hr}:00"
 
     return None, False, ""

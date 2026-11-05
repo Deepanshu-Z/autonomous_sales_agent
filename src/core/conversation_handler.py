@@ -1365,8 +1365,9 @@ async def _handle_conversation_turn_unlocked(
     new_state = result.get("new_state", state)
     last_turn = new_state.get("_last_turn", {})
 
-    # Check for Human Agent Escalation
-    if last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST":
+    # Check for Human Agent Escalation (Chat handoff to CRM sales agent)
+    # Note: Customer Support Executives handle phone calls directly; phone requests do not trigger chat handoff.
+    if (last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST") and not last_turn.get("wants_phone_call"):
         await execute_agent_handoff_async(
             phone,
             user_reply_text=reply_text,

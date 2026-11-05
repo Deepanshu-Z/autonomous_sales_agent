@@ -70,6 +70,7 @@ def _empty_flags() -> Dict[str, Any]:
         "wants_app_link": False,
         "requests_qr": False,
         "requests_human_agent": False,
+        "wants_phone_call": False,
         "is_coupon_requested": False,
         "is_disinterested": False,
         "is_complaint_or_refund": False,
@@ -204,8 +205,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - boolean: true if customer wants to pay online, asks how to pay, asks for UPI QR code, payment scanner, or payment link (e.g. "pay online", "payment qr", "send qr", "scanner bhejo", "payment link", "how to pay", "kahan pay karein", "upi id bhejo"). Otherwise false.
 
 9. "requests_human_agent":
-   - boolean: true ONLY if customer explicitly requests to speak with a human, live agent, customer support coordinator, representative, or requests a phone call ("agent", "human", "talk to someone", "call me", "phone karo", "executive", "person").
+   - boolean: true ONLY if customer explicitly requests a human agent or coordinator to take over the chat ("agent", "human", "talk to human in chat", "representative").
+   - NEGATIVE GUARD: If customer asks to speak on the phone, connect on a call, or asks for phone numbers to call, do NOT set this to true — set "wants_phone_call" to true instead!
    - NEGATIVE GUARD: DO NOT set to true for general help words or button responses ("help me", "need help", "yes help me", "madad chahiye", "guide me", "kya karna hai", "help with coupon", "help with app"). Those are informational queries, NOT human escalation!
+
+9b. "wants_phone_call":
+   - boolean: true ONLY if customer explicitly wants to connect on a phone call, speak over the phone, asks for phone numbers to call, or asks someone to call them on phone (e.g. "call pe baat karni hai", "can we talk on call?", "give phone number", "call me", "phone number do", "call pe samjha do", "phone support", "contact number", "call karo", "phone karo", "talk on phone"). Otherwise false.
 
 10. "is_coupon_requested":
    - boolean: true if customer explicitly asks to receive, see, or apply their coupon code ("coupon code bhejo", "code kya hai", "discount code", "coupon do", "where is my coupon").
@@ -236,7 +241,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "APP_LINK_REQUEST": Customer asks to receive or resend the app download link or website link, OR chooses/taps an app store platform button (e.g. "android app", "ios app", "app link", "download link", "play store", "app store", "send link", "link bhejo", "link do", "konsi app", "which app").
     - "COUPON_REQUEST": Customer asks for their coupon code or discount code.
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
-    - "AGENT_REQUEST": Customer explicitly wants human/person support or a phone call ("agent", "human", "call me", "executive"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
+    - "AGENT_REQUEST": Customer explicitly wants human chat agent takeover ("agent", "human", "transfer to agent"). NEVER assign for phone call queries (use "PHONE_CALL_REQUEST"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
+    - "PHONE_CALL_REQUEST": Customer explicitly wants to connect on a phone call, speak over the phone, or asks for phone numbers to call ("call me", "phone pe baat karni hai", "phone number do", "call par baat ho sakti hai", "give number", "want to talk on phone").
     - "DISINTEREST": Customer declines, rejects, or specifies their refusal obstacle/reason. This includes:
       • Explicit rejections: "not interested", "nahi chahiye", "cancel", "no", "nahi lena", "koi b nhi".
       • OBJECTION ANSWERS TO AI INQUIRIES: When the AI asked what is holding them back or why they are hesitating, and the customer names their obstacle (e.g. "timings", "timing", "fees", "price", "paise", "schedule"), this MUST be classified as "DISINTEREST" with is_disinterested = true!
@@ -313,6 +319,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "wants_app_link": boolean,
   "requests_qr": boolean,
   "requests_human_agent": boolean,
+  "wants_phone_call": boolean,
   "is_coupon_requested": boolean,
   "is_disinterested": boolean,
   "is_complaint_or_refund": boolean,
@@ -430,7 +437,7 @@ async def extract_intent_and_state_changes(
         # Ensure strict typing on boolean flags
         for bool_key in [
             "wants_trial", "wants_demo_video", "wants_app_link", "requests_qr",
-            "requests_human_agent", "is_coupon_requested", "is_disinterested",
+            "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
             "is_complaint_or_refund", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
             "wants_trial_guide", "wants_trial_video_guide"
@@ -447,14 +454,22 @@ async def extract_intent_and_state_changes(
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
         # Sync semantic request flags with customer_intent without raw-text regex overrides
+        if clean.get("customer_intent") == "PHONE_CALL_REQUEST":
+            clean["wants_phone_call"] = True
+        elif clean.get("wants_phone_call") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+            clean["customer_intent"] = "PHONE_CALL_REQUEST"
+
+        if clean.get("wants_phone_call"):
+            clean["requests_human_agent"] = False
+
         if clean.get("customer_intent") == "PAYMENT_REQUEST":
             clean["requests_qr"] = True
-        elif clean.get("requests_qr") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+        elif clean.get("requests_qr") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
             clean["customer_intent"] = "PAYMENT_REQUEST"
 
         if clean.get("customer_intent") == "APP_LINK_REQUEST":
             clean["wants_app_link"] = True
-        elif clean.get("wants_app_link") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
+        elif clean.get("wants_app_link") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
             clean["customer_intent"] = "APP_LINK_REQUEST"
 
         # Teacher demo inquiries must never trigger tutorial or install video guides
@@ -490,7 +505,7 @@ async def extract_intent_and_state_changes(
             not is_timing_settled
             and not (u_has_am or u_has_pm)
             and not clean.get("selected_package")
-            and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PACKAGE_SELECTION")
+            and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST", "PACKAGE_SELECTION")
             and bool(colloquial_text_match or (u_clean.isdigit() and 1 <= int(u_clean) <= 12))
         )
 
@@ -537,7 +552,7 @@ async def extract_intent_and_state_changes(
                     clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
         else:
             raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")
-            if not raw_timing and not clean.get("selected_package") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PACKAGE_SELECTION"):
+            if not raw_timing and not clean.get("selected_package") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST", "PACKAGE_SELECTION"):
                 if not is_timing_settled:
                     raw_timing = text.strip()
 
@@ -1020,7 +1035,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     new_state = dict(state)
     intent = flags.get("customer_intent") or "QUESTION"
-    is_selection_turn = intent not in ("QUESTION", "OTHER", "DISINTEREST", "COMPLAINT", "GREETING", "AGENT_REQUEST")
+    is_selection_turn = intent not in ("QUESTION", "OTHER", "DISINTEREST", "COMPLAINT", "GREETING", "AGENT_REQUEST", "PHONE_CALL_REQUEST")
 
     # RULE 2 (POST-PAYMENT IMMUTABILITY):
     # Pre-Payment (payment_status != 'PAID' and stage != 'ENROLLED'): Unlimited modifications allowed.

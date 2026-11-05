@@ -117,7 +117,7 @@
     "support_and_escalation": {
         "human_agent_trigger": "User types *agent*",
         "human_agent_action": "Conversation assigned to team member who will reach out shortly",
-        "phone_numbers": "Do NOT share any personal phone numbers. Direct to agent flow only.",
+        "phone_calls": "When customer wants to connect on call or speak on the phone, share the official Customer Support Executive phone numbers from the directory so they can call directly.",
         "emi_queries": "Direct to agent",
         "coupon_queries": "Direct to enrollment flow first, then agent if needed"
     },

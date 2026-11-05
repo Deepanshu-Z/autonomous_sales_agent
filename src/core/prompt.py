@@ -345,7 +345,13 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     - Clearly map out the instructors across their respective batch timings from COURSE_DATA.
     - NEVER restrict your answer to only the first batch in the list or assume only 1 teacher exists!
     - If customer asks in Hinglish (e.g. "kon sikhata h", "baaki teachers kon h"), reply in that same friendly Hinglish!
-- HUMAN ESCALATION: If the customer asks for a phone call, human agent, personal staff contact, or EMI options, guide them to type *agent* so a support coordinator can reach out. Never share personal phone numbers.
+- HUMAN CHAT ESCALATION (AGENT TAKEOVER): If the customer explicitly asks for a human agent in chat, live coordinator takeover, or EMI options, guide them to type *agent* so a support coordinator can take over the chat.
+- PHONE CALL / VOICE CONTACT REQUESTS (CUSTOMER SUPPORT EXECUTIVES):
+  • If the customer asks to speak on the phone, connect over a call, asks for phone numbers to call, or asks someone to call them on phone:
+    - Warmly provide our official Customer Support Executives' names and contact numbers so they can call directly:
+{support_executives_display}
+    - Clearly clarify that these are our Customer Support Executives who can assist them over the phone.
+    - In Message #2 (followup), ask if they have any questions here in the chat as well or how you can assist them further!
 - 1+ YEAR & MULTI-YEAR COURSES:
   • If a customer mentions, asks about, or selects a duration of 1+ years or multi-year learning (e.g. "2 years", "3 years", "4 years", "multi year", "diploma", "degree"):
     - NEVER say Sensationz does not offer multi-year or 2/3/4-year courses!
@@ -976,6 +982,7 @@ def format_system_prompt(
 
     course_dict = kb_loader.get_course_data(cid)
     not_offered_rules = build_not_offered_context(course_dict)
+    support_executives_display = kb_loader.format_support_executives_display()
 
     rendered = BASE_SYSTEM_TEMPLATE.format(
         state_context=state_context,
@@ -984,6 +991,7 @@ def format_system_prompt(
         catalog_course_names=catalog_names,
         not_offered_rules=not_offered_rules,
         gst_pct=gst_pct,
+        support_executives_display=support_executives_display,
     )
 
     effective_lang = detected_language or s.get("language")

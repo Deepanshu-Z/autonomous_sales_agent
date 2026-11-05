@@ -34,15 +34,17 @@ _COURSES_CACHE: Dict[str, Dict[str, Any]] = {}
 _PROMPT_STR_CACHE: Dict[str, str] = {}
 _GLOBALS_CACHE: Optional[Dict[str, Any]] = None
 _CATALOG_CACHE: Optional[List[Dict[str, Any]]] = None
+_SUPPORT_EXECUTIVES_CACHE: Optional[List[Dict[str, str]]] = None
 
 
 def clear_cache() -> None:
     """Call after editing data files during local dev / hot reload."""
-    global _GLOBALS_CACHE, _CATALOG_CACHE
+    global _GLOBALS_CACHE, _CATALOG_CACHE, _SUPPORT_EXECUTIVES_CACHE
     _COURSES_CACHE.clear()
     _PROMPT_STR_CACHE.clear()
     _GLOBALS_CACHE = None
     _CATALOG_CACHE = None
+    _SUPPORT_EXECUTIVES_CACHE = None
 
 
 def get_global_rules() -> Dict[str, Any]:
@@ -316,6 +318,32 @@ def format_app_links_display() -> str:
         f"🍎 iOS: {platforms.get('ios_app', '')}\n"
         f"💻 Website / PC / Laptop: {platforms.get('website_portal', '')}"
     )
+
+
+def get_support_executives() -> List[Dict[str, str]]:
+    """Loads active customer support executives from data/support_executives.json."""
+    global _SUPPORT_EXECUTIVES_CACHE
+    if _SUPPORT_EXECUTIVES_CACHE is not None:
+        return _SUPPORT_EXECUTIVES_CACHE
+    path = os.path.join(_DATA_DIR, "support_executives.json")
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _SUPPORT_EXECUTIVES_CACHE = json.load(f)
+                return _SUPPORT_EXECUTIVES_CACHE
+        except Exception as e:
+            print(f"[kb_loader] Error loading support_executives.json: {e}")
+    _SUPPORT_EXECUTIVES_CACHE = []
+    return _SUPPORT_EXECUTIVES_CACHE
+
+
+def format_support_executives_display() -> str:
+    """Formats customer support executives into a clean customer-facing list."""
+    execs = get_support_executives()
+    if not execs:
+        return ""
+    lines = [f"• {e['name']}: {e['phone']}" for e in execs if e.get("name") and e.get("phone")]
+    return "\n".join(lines)
 
 
 # ── Fallback-only utilities ─────────────────────────────────────────────

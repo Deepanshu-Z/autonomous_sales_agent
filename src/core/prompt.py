@@ -710,6 +710,15 @@ def format_system_prompt(
             "  • Message #1: Warmly and empathetically acknowledge their concern without being pushy or arguing.\n"
             "  • Message #2 (followup): Set 'followup': null. NEVER ask for payment or push course packages!\n"
         )
+    elif (last_turn_dict.get("timing_resolution_status") == "UNRESOLVED"
+          or s.get("timing_resolution_status") == "UNRESOLVED"):
+        turn_intent_guidance = (
+            "- TIMING REQUEST COULD NOT BE NORMALIZED SAFELY:\n"
+            "  - No batch timing has been selected. Do not infer AM/PM, hour, range, or instructor.\n"
+            f"  - Message #1: Briefly explain that the exact batch timing must be confirmed first, then list the official timings from COURSE_DATA:\n{batch_timings_summary}\n"
+            "  - Message #2 (followup): Ask the customer to send the exact timing they want.\n"
+            "  - Do not ask for package duration, fees, payment, or teacher selection yet.\n"
+        )
     elif bool(last_turn_dict.get("timing_ambiguous") or s.get("timing_ambiguous")):
         amb_hr = last_turn_dict.get("ambiguous_hour") or s.get("ambiguous_hour") or "7"
         amb_cands = last_turn_dict.get("ambiguous_timing_candidates") or s.get("ambiguous_timing_candidates") or []

@@ -10,6 +10,270 @@ import re
 from typing import Dict, Any, List, Optional
 
 
+def _clock_value(value: str) -> Optional[int]:
+    """Return a comparable 24-hour minute value from a catalog time token."""
+    if not value:
+        return None
+    token = value.strip().upper().replace(".", ":")
+    match = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?", token)
+    if not match:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    meridiem = match.group(3)
+    if meridiem:
+        if not 1 <= hour <= 12 or minute > 59:
+            return None
+        if meridiem == "AM" and hour == 12:
+            hour = 0
+        elif meridiem == "PM" and hour != 12:
+            hour += 12
+    elif hour > 23 or minute > 59:
+        return None
+    return hour * 60 + minute
+
+
+def _batch_bounds(batch: Dict[str, Any]) -> Optional[tuple[int, int]]:
+    """Read bounds from catalog data; never infer them from a neighboring slot."""
+    raw = str(batch.get("time_24h") or "")
+    parts = re.split(r"\s*[-–—]\s*", raw, maxsplit=1)
+    if len(parts) == 2:
+        start, end = (_clock_value(part) for part in parts)
+        if start is not None and end is not None:
+            return start, end
+
+    raw = str(batch.get("time_12h") or "")
+    parts = re.split(r"\s+(?:to|[-–—])\s+", raw, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        start, end = (_clock_value(part) for part in parts)
+        if start is not None and end is not None:
+            return start, end
+    return None
+
+
+def resolve_requested_batch(
+    text: str,
+    course_id: Optional[str],
+    llm_timing: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolve a customer's timing against the active catalog.
+
+    The LLM timing is only a fallback for number-word expressions. Numeric
+    ranges/hours and periods from the raw message always win. No batch is
+    invented or snapped to a nearby catalog entry.
+    """
+    result = {
+        "status": "NONE",
+        "timing": None,
+        "candidates": [],
+        "period": None,
+        "meridiem": None,
+        "requested_text": text or "",
+    }
+    if not text or not course_id:
+        return result
+
+    lowered = text.casefold()
+    period_words = {
+        "Morning": ("morning", "subah", "subha", "sawere", "savere", "mrng", "am"),
+        "Afternoon": ("afternoon", "dopahar", "dupehar", "lunch"),
+        "Evening": ("evening", "shaam", "sham", "raat", "night", "pm"),
+    }
+    words = set(re.findall(r"[a-z]+", lowered))
+    if re.search(r"(?<![a-z])(?:am|pm)\b", lowered):
+        words.update(re.findall(r"(?<![a-z])(?:am|pm)\b", lowered))
+    mentioned_periods = [
+        period for period, aliases in period_words.items()
+        if any(alias in words for alias in aliases if alias not in ("am", "pm"))
+    ]
+    if "am" in words:
+        result["meridiem"] = "AM"
+    elif "pm" in words:
+        result["meridiem"] = "PM"
+    if len(set(mentioned_periods)) == 1:
+        result["period"] = mentioned_periods[0]
+    elif len(set(mentioned_periods)) > 1:
+        result["status"] = "AMBIGUOUS"
+        result["reason"] = "CONFLICTING_PERIODS"
+        return result
+
+    # Generic numeric extraction. The catalog, not this parser, defines valid hours.
+    raw_numbers = re.findall(r"(?<!\d)\d{1,2}(?::\d{2})?", lowered)
+    numbers = [int(value.split(":", 1)[0]) for value in raw_numbers]
+    if not result["period"] and any(13 <= value <= 23 for value in numbers):
+        result["period"] = "Afternoon" if any(13 <= value < 16 for value in numbers) else "Evening"
+        result["meridiem"] = "PM"
+    elif result["period"] and not result["meridiem"]:
+        result["meridiem"] = "AM" if result["period"] == "Morning" else "PM"
+    has_range_word = any(token in lowered for token in ("-", "–", "—", " to ", " se ", "to"))
+    has_clock_word = any(token in lowered for token in ("baje", "bje", "o'clock", "clock"))
+    has_time_signal = bool(numbers and (result["period"] or has_range_word or has_clock_word))
+
+    batches = get_available_timings(course_id)
+    catalog = []
+    for batch in batches:
+        bounds = _batch_bounds(batch)
+        if bounds:
+            catalog.append((batch, bounds))
+
+    def period_matches(batch: Dict[str, Any]) -> bool:
+        if result["period"] and (batch.get("slot") or "").casefold() != result["period"].casefold():
+            return False
+        if result["meridiem"]:
+            bounds = _batch_bounds(batch)
+            if not bounds:
+                return False
+            batch_meridiem = "AM" if bounds[0] < 12 * 60 else "PM"
+            if batch_meridiem != result["meridiem"]:
+                return False
+        return True
+
+    candidates = []
+    if len(numbers) >= 2 and has_range_word:
+        start_hour, end_hour = numbers[0], numbers[1]
+        # An explicit meridiem/period applies to the requested range.
+        requested_start = start_hour * 60
+        requested_end = end_hour * 60
+        candidates = [
+            batch for batch, (start, end) in catalog
+            if start % 60 == requested_start % 60
+            and end % 60 == requested_end % 60
+            and start // 60 % 12 == start_hour % 12
+            and end // 60 % 12 == end_hour % 12
+            and period_matches(batch)
+        ]
+    elif numbers and (result["period"] or has_clock_word):
+        requested_hour = numbers[0]
+        candidates = [
+            batch for batch, (start, _) in catalog
+            if start // 60 % 12 == requested_hour % 12 and period_matches(batch)
+        ]
+
+    if candidates:
+        result["candidates"] = [batch.get("time_12h") for batch in candidates]
+        if len(candidates) == 1:
+            result["status"] = "SELECTED"
+            result["timing"] = candidates[0].get("time_12h")
+        else:
+            result["status"] = "AMBIGUOUS"
+        return result
+
+    if has_time_signal:
+        result["status"] = "UNAVAILABLE"
+        result["reason"] = "NO_EXACT_CATALOG_BATCH"
+        return result
+
+    if result["period"] and not numbers:
+        period_candidates = [
+            batch.get("time_12h") for batch, _ in catalog if period_matches(batch)
+        ]
+        result["candidates"] = period_candidates
+        result["status"] = "PERIOD_ONLY"
+        return result
+
+    # For number words, use the extractor only as a candidate, then validate it
+    # against the catalog and the raw period. It can never override an explicit
+    # numeric range/hour from the customer message.
+    if llm_timing:
+        for batch, _ in catalog:
+            if batch.get("time_12h") == llm_timing and period_matches(batch):
+                result["status"] = "SELECTED"
+                result["timing"] = llm_timing
+                result["candidates"] = [llm_timing]
+                return result
+    return result
+
+
+def resolve_catalog_batch_semantics(
+    course_id: Optional[str],
+    start_24h: Optional[str] = None,
+    end_24h: Optional[str] = None,
+    period: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolve normalized semantic timing fields against catalog data.
+
+    This is the authoritative path: it does not parse customer text, use
+    aliases, or contain schedule values. The semantic extractor supplies the
+    normalized interval; this function only validates exact catalog matches.
+    """
+    result = {"status": "NONE", "timing": None, "candidates": []}
+    if not course_id:
+        return result
+
+    def parse_clock(value: Optional[str]) -> Optional[int]:
+        if not isinstance(value, str):
+            return None
+        tokens = value.strip().upper().split()
+        meridiem = tokens[-1] if tokens and tokens[-1] in {"AM", "PM"} else None
+        clock = tokens[0] if tokens else ""
+        parts = clock.split(":")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            if len(parts) == 1 and parts[0].isdigit():
+                hour, minute = int(parts[0]), 0
+            else:
+                return None
+        else:
+            hour, minute = (int(part) for part in parts)
+        if meridiem:
+            if hour < 1 or hour > 12 or minute > 59:
+                return None
+            if meridiem == "AM" and hour == 12:
+                hour = 0
+            elif meridiem == "PM" and hour != 12:
+                hour += 12
+        elif hour > 23 or minute > 59:
+            return None
+        return hour * 60 + minute
+
+    def catalog_bounds(batch: Dict[str, Any]) -> Optional[tuple[int, int]]:
+        raw = str(batch.get("time_24h") or "")
+        parts = raw.split("-", 1)
+        if len(parts) != 2:
+            return None
+        start, end = (parse_clock(part) for part in parts)
+        return (start, end) if start is not None and end is not None else None
+
+    requested_start = parse_clock(start_24h)
+    requested_end = parse_clock(end_24h)
+    batches = get_available_timings(course_id)
+
+    def matches(batch: Dict[str, Any], bounds: tuple[int, int]) -> bool:
+        if period and str(batch.get("slot") or "").casefold() != str(period).casefold():
+            return False
+        if requested_start is not None and bounds[0] != requested_start:
+            return False
+        if requested_end is not None and bounds[1] != requested_end:
+            return False
+        return True
+
+    candidates = [
+        batch for batch in batches
+        if (bounds := catalog_bounds(batch)) is not None and matches(batch, bounds)
+    ]
+    result["candidates"] = [batch.get("time_12h") for batch in candidates]
+
+    if len(candidates) == 1:
+        result["status"] = "SELECTED"
+        result["timing"] = candidates[0].get("time_12h")
+        return result
+    if len(candidates) > 1:
+        result["status"] = "AMBIGUOUS"
+        return result
+
+    if requested_start is not None or requested_end is not None:
+        result["status"] = "UNAVAILABLE"
+        return result
+
+    if period:
+        result["status"] = "PERIOD_ONLY"
+        return result
+
+    # Missing semantic timing data is deliberately unresolved. A canonical
+    # timing guessed by the extractor is never enough to select a batch.
+    result["status"] = "UNRESOLVED"
+    return result
+
+
 def classify_time_period(time_str: str) -> Optional[str]:
     """Dynamically categorizes any timing string into 'Morning', 'Afternoon', or 'Evening'.
     - Morning (AM): 4:00 AM – 11:59 AM
@@ -760,7 +1024,3 @@ def get_available_days_for_batch(
             return all_course_days
 
     return matched_days
-
-
-
-

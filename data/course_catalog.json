@@ -15,22 +15,6 @@
             "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
         },
         {
-            "id": "garba",
-            "name": "Garba",
-            "aliases": [
-                "garba",
-                "garba dance",
-                "dandiya",
-                "dandiya dance",
-                "navratri garba",
-                "garba classes",
-                "dandiya classes"
-            ],
-            "has_full_kb": false,
-            "gst_percentage": 18,
-            "description": "Traditional Gujarati Garba and Dandiya folk dance styles, steps, and festive choreographies."
-        },
-        {
             "id": "kids_bollywood_dance",
             "name": "Kids Bollywood Dance",
             "aliases": [

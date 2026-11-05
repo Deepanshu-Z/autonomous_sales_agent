@@ -84,6 +84,11 @@ def _empty_flags() -> Dict[str, Any]:
         "timing_ambiguous": False,
         "ambiguous_hour": None,
         "ambiguous_timing_candidates": None,
+        "timing_resolution_status": "NONE",
+        "timing_selection_attempted": False,
+        "requested_start_24h": None,
+        "requested_end_24h": None,
+        "requested_timing_period": None,
         "wants_demo": False,
         "wants_app_guide": False,
         "wants_app_video_guide": False,
@@ -151,6 +156,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
        • Set "customer_intent": "TIMING_SELECTION".
        • Set "unoffered_type": null, "unoffered_value": null.
    - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
+   - Also return the customer's requested interval independent of the catalog:
+     "requested_start_24h" and "requested_end_24h" as zero-padded HH:MM strings,
+     or null when no numeric time/range was stated. Return the requested period
+     in "requested_timing_period" using the period name from the catalog slot
+     (for example Morning, Afternoon, or Evening), or null. Never substitute a
+     nearby catalog batch into these fields.
    - CRITICAL UNAVAILABLE / UNOFFERED TIMING GUARD:
      • If the customer asks for, selects, or mentions a timing that is NOT in the Allowed Canonical Batch Timings (for example, "3", "3pm", "3:00", "11-12", "11 to 12", "2 to 3", "9 pm", or any unlisted hour), set selected_timing to null!
      • NEVER guess, invent, snap, or substitute an unoffered timing to an adjacent or nearby slot (e.g. NEVER convert "11-12" to "12:00 PM to 1:00 PM", and NEVER convert "3" to "6:00 AM to 7:00 AM")!
@@ -309,6 +320,9 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
   "profile_created_stated": "confirmed" | "denied" | "unmentioned",
   "selected_timing": string | null,
+  "requested_start_24h": string | null,
+  "requested_end_24h": string | null,
+  "requested_timing_period": string | null,
   "timing_period": string | null,
   "selected_teacher": string | null,
   "selected_days": string | null,
@@ -709,6 +723,61 @@ async def extract_intent_and_state_changes(
                         clean["ambiguous_hour"] = None
                         clean["ambiguous_timing_candidates"] = None
 
+        # The raw customer message is authoritative for timing. The extractor
+        # may suggest a canonical slot, but it cannot override an explicit
+        # range/period that does not exist in the active course catalog.
+        from src.core.helpers.schedule_engine import resolve_catalog_batch_semantics
+        timing_requested = bool(
+            clean.get("requested_start_24h")
+            or clean.get("requested_end_24h")
+            or clean.get("requested_timing_period")
+            or clean.get("customer_intent") == "TIMING_SELECTION"
+            or (clean.get("selected_timing") and not clean.get("question_summary"))
+        )
+        if timing_requested:
+            timing_resolution = resolve_catalog_batch_semantics(
+                active_cid,
+                start_24h=clean.get("requested_start_24h"),
+                end_24h=clean.get("requested_end_24h"),
+                period=clean.get("requested_timing_period"),
+            )
+            resolution_status = timing_resolution["status"]
+            clean["timing_resolution_status"] = resolution_status
+            clean["timing_selection_attempted"] = resolution_status != "NONE"
+
+            if resolution_status == "SELECTED":
+                clean["selected_timing"] = timing_resolution["timing"]
+                clean["timing_ambiguous"] = False
+                clean["ambiguous_hour"] = None
+                clean["ambiguous_timing_candidates"] = None
+                clean["unoffered_type"] = None
+                clean["unoffered_value"] = None
+                clean["unoffered_timing_mentioned"] = None
+            elif resolution_status == "AMBIGUOUS":
+                clean["selected_timing"] = None
+                clean["timing_ambiguous"] = True
+                clean["ambiguous_timing_candidates"] = timing_resolution.get("candidates") or None
+                clean["unoffered_type"] = None
+                clean["unoffered_value"] = None
+                clean["unoffered_timing_mentioned"] = None
+                clean["customer_intent"] = "TIMING_SELECTION"
+            elif resolution_status == "PERIOD_ONLY":
+                clean["selected_timing"] = None
+                clean["timing_ambiguous"] = False
+                clean["ambiguous_timing_candidates"] = timing_resolution.get("candidates") or None
+                clean["customer_intent"] = "TIMING_SELECTION"
+            elif resolution_status == "UNAVAILABLE":
+                clean["selected_timing"] = None
+                clean["timing_ambiguous"] = False
+                clean["unoffered_type"] = "TIMING"
+                clean["unoffered_value"] = text.strip()
+                clean["unoffered_timing_mentioned"] = text.strip()
+                clean["customer_intent"] = "QUESTION"
+            elif resolution_status == "UNRESOLVED":
+                clean["selected_timing"] = None
+                clean["timing_ambiguous"] = False
+                clean["customer_intent"] = "TIMING_SELECTION"
+
         # Strict canonical package normalization against allowed course packages
         from src.core.coupons import detect_unoffered_duration
         unoffered_dur = detect_unoffered_duration(text, course_id=active_cid or "yoga", allowed_packages=course_pkgs)
@@ -1103,9 +1172,33 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
             new_state["course"] = cand_course
 
     active_course = new_state.get("course")
+    if flags.get("timing_resolution_status") != "NONE":
+        new_state["timing_resolution_status"] = flags.get("timing_resolution_status")
 
     # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
-    if flags.get("timing_ambiguous"):
+    if flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
+        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED"
+    } and not is_paid:
+        # A new timing attempt supersedes stale pre-payment timing state. Keep
+        # the customer at the timing step; never let the old slot drive teacher
+        # or package progression after a correction.
+        new_state["timing"] = None
+        new_state["selected_timing"] = None
+        new_state["timing_ambiguous"] = flags.get("timing_ambiguous", False)
+        new_state["ambiguous_hour"] = flags.get("ambiguous_hour")
+        new_state["ambiguous_timing_candidates"] = flags.get("ambiguous_timing_candidates")
+        new_state["selected_teacher"] = None
+        new_state["teacher"] = None
+        new_state["package"] = None
+        new_state["selected_duration"] = None
+        new_state["fee"] = None
+        new_state["base_fee"] = None
+        new_state["offer_fee"] = None
+        new_state["gst_amount"] = None
+        new_state["gst_percentage"] = None
+        new_state["timing_resolution_status"] = flags.get("timing_resolution_status")
+        new_state["stage"] = "ENROLL_ASKED"
+    elif flags.get("timing_ambiguous"):
         new_state["timing_ambiguous"] = True
         new_state["ambiguous_hour"] = flags.get("ambiguous_hour")
         new_state["ambiguous_timing_candidates"] = flags.get("ambiguous_timing_candidates")
@@ -1174,7 +1267,12 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     # 3. Teacher Slot Merge (On selection turns OR when teacher is explicitly mentioned / demo requested)
     teacher_flag = flags.get("selected_teacher")
-    if teacher_flag and (is_selection_turn or flags.get("wants_demo") or not new_state.get("selected_teacher")):
+    timing_unresolved = flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
+        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED"
+    }
+    if teacher_flag and not timing_unresolved and (
+        is_selection_turn or flags.get("wants_demo") or not new_state.get("selected_teacher")
+    ):
         resolved = resolve_canonical_teacher(teacher_flag, course_id=active_course)
         teacher_val = resolved or teacher_flag
         new_state["selected_teacher"] = teacher_val
@@ -1399,6 +1497,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     new_state["_last_turn"] = {
         "intent": flags.get("customer_intent"),
+        "timing_resolution_status": flags.get("timing_resolution_status", "NONE"),
         "timing_ambiguous": flags.get("timing_ambiguous", False),
         "ambiguous_hour": flags.get("ambiguous_hour"),
         "ambiguous_timing_candidates": flags.get("ambiguous_timing_candidates"),

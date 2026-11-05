@@ -43,7 +43,6 @@ CANONICAL_DB_COURSE_MAP = {
     "yoga": "Yoga",
     "kathak": "Kathak",
     "ladies_dance": "Ladies Bollywood Dance",
-    "garba": "Garba",
     "kids_bollywood_dance": "Kids Bollywood Dance",
     "semi_classical_dance": "Semi Classical Dance",
     "kids_kathak": "Kids Kathak",

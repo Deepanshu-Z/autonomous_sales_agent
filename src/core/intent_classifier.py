@@ -79,6 +79,7 @@ def _empty_flags() -> Dict[str, Any]:
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
         "cannot_access_classes": False,
+        "timing_ambiguous": False,
         "wants_demo": False,
         "wants_app_guide": False,
         "wants_app_video_guide": False,
@@ -119,6 +120,23 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 3. "selected_timing":
    - Batch timing explicitly and definitively chosen by the user from the Allowed Canonical Batch Timings in context.
    - You MUST translate and map colloquial or informal timing references (e.g. "morning 7 am", "shaam 6 baje", "7-8", "6 to 7 evening", "12-1", "10-11") directly to the exact matching canonical batch timing string from the Allowed Canonical Batch Timings in context (e.g. "7:00 AM to 8:00 AM", "6:00 PM to 7:00 PM", "12:00 PM to 1:00 PM", "10:00 AM to 11:00 AM").
+   - COLLOQUIAL & BARE TIMINGS INTELLIGENCE:
+     * Numbers with colloquial Hindi/Hinglish hour markers like "7bje", "7 baje", "6 baje", "8 baje", or bare numbers like "7", "6", "8" refer to that specific clock hour.
+     * Check the Allowed Canonical Batch Timings for the active course:
+       • If that hour exists in BOTH Morning and Evening (for example, Yoga has BOTH "7:00 AM to 8:00 AM" and "7:00 PM to 8:00 PM"):
+         - The hour IS OFFERED, but AMBIGUOUS.
+         - The brain is STRICTLY FORBIDDEN from marking it as unoffered_type: "TIMING"!
+         - Set "timing_ambiguous": true.
+         - Set "selected_timing": null.
+         - Set "customer_intent": "TIMING_SELECTION".
+         - Set "unoffered_type": null, "unoffered_value": null, and "unoffered_timing_mentioned": null.
+         - Set "question_summary": "Customer selected 7 o'clock; ask them whether they prefer Morning 7:00 AM to 8:00 AM or Evening 7:00 PM to 8:00 PM."
+       • If that hour exists in ONLY ONE slot in the course schedule (for example, "5:00 AM to 6:00 AM" exists and no 5:00 PM slot exists):
+         - Automatically resolve and map directly to that exact canonical slot string (e.g. "5:00 AM to 6:00 AM").
+         - Set "timing_ambiguous": false.
+         - Set "unoffered_type": null.
+       • If that hour does NOT exist at all in the Allowed Canonical Batch Timings in either AM or PM (e.g. "3", "3pm", "11-12", "2 to 3"):
+         - Set "selected_timing": null, set "timing_ambiguous": false, set "unoffered_type": "TIMING", set "unoffered_value" to the requested timing, and set "customer_intent": "QUESTION".
    - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
    - CRITICAL UNAVAILABLE / UNOFFERED TIMING GUARD:
      • If the customer asks for, selects, or mentions a timing that is NOT in the Allowed Canonical Batch Timings (for example, "3", "3pm", "3:00", "11-12", "11 to 12", "2 to 3", "9 pm", or any unlisted hour), set selected_timing to null!
@@ -148,6 +166,11 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 6. "selected_days":
    - Specific batch/class days definitively chosen, preferred, or requested by the user from the Allowed Canonical Batch Days in context (e.g. "Tuesday/Thursday", "Saturday/Sunday", "Wednesday/Friday", "Monday to Friday", "weekend", "weekdays", "Tue/Thu", "Sat/Sun").
+   - DAY SHORTHAND & CHAT ABBREVIATIONS INTELLIGENCE:
+     * "ss", "s-s", "s/s", "sat sun", "sat-sun", "weekend" -> "Saturday/Sunday"
+     * "tt", "t-t", "t/t", "tue thu", "tue-thu" -> "Tuesday/Thursday"
+     * "wf", "w-f", "w/f", "wed fri", "wed-fri" -> "Wednesday/Friday"
+     * "mf", "m-f", "mon fri", "mon-fri", "weekdays" -> "Monday to Friday"
    - Output ONLY the canonical string from Allowed Canonical Batch Days (e.g. "Tuesday/Thursday", "Saturday/Sunday", "Wednesday/Friday", "Monday to Friday"), or null.
 
 7. "selected_course":
@@ -287,6 +310,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "wants_resend_video": boolean,
   "claims_payment_or_enrollment": boolean,
   "cannot_access_classes": boolean,
+  "timing_ambiguous": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
   "unoffered_type": "TIMING" | "PACKAGE" | "TEACHER" | "COURSE" | null,
@@ -445,9 +469,10 @@ async def extract_intent_and_state_changes(
             r_low = raw_timing.strip().lower()
             clean_user = r_low.replace(" ", "").replace("-", "to")
 
-            # Ambiguous bare digit resolution (e.g. '5', '6', '7' without AM/PM)
-            if clean_user.isdigit():
-                target_hr = int(clean_user)
+            # Colloquial bare hour resolution (e.g. '7bje', '7 baje', '7', '6 baje', '5')
+            colloquial_hr_match = re.search(r"^(\d{1,2})(?:bje|baje|o'?clock)?$", clean_user) or re.search(r"\b(\d{1,2})\s*(?:bje|baje|baze)\b", r_low)
+            if colloquial_hr_match or clean_user.isdigit():
+                target_hr = int(colloquial_hr_match.group(1)) if colloquial_hr_match else int(clean_user)
                 candidates = []
                 for b in course_batches:
                     try:
@@ -473,8 +498,16 @@ async def extract_intent_and_state_changes(
                         am_cands = [c for c in candidates if "am" in c.lower()]
                         if am_cands:
                             matched_batch = am_cands[0]
+                    
                     if not matched_batch:
-                        matched_batch = candidates[0]
+                        # Ambiguous hour (e.g. 7 AM vs 7 PM both exist in Yoga)
+                        clean["timing_ambiguous"] = True
+                        clean["selected_timing"] = None
+                        clean["unoffered_type"] = None
+                        clean["unoffered_value"] = None
+                        clean["unoffered_timing_mentioned"] = None
+                        clean["customer_intent"] = "TIMING_SELECTION"
+                        clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
 
             if not matched_batch:
                 for b in course_batches:
@@ -673,6 +706,25 @@ async def extract_intent_and_state_changes(
                 if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
                     clean["customer_intent"] = "QUESTION"
                     clean["question_summary"] = "Inquiry about batch timings"
+            else:
+                # Colloquial hour safety check: If the hour actually exists in course_batches, it is OFFERED!
+                m_hr = re.search(r"\b(\d{1,2})\b", t_val)
+                if m_hr and course_batches:
+                    req_h = int(m_hr.group(1))
+                    matching_cands = [b for b in course_batches if b.startswith(f"{req_h}:") or b.startswith(f"0{req_h}:")]
+                    if matching_cands:
+                        clean["unoffered_type"] = None
+                        clean["unoffered_value"] = None
+                        clean["unoffered_timing_mentioned"] = None
+                        if len(matching_cands) == 1:
+                            clean["selected_timing"] = matching_cands[0]
+                            clean["timing_ambiguous"] = False
+                            clean["customer_intent"] = "TIMING_SELECTION"
+                        else:
+                            clean["selected_timing"] = None
+                            clean["timing_ambiguous"] = True
+                            clean["customer_intent"] = "TIMING_SELECTION"
+                            clean["question_summary"] = f"Clarify morning vs evening for {req_h} o'clock"
 
         # Strict canonical day normalization against allowed course days
         raw_day = clean.get("selected_days")
@@ -1007,6 +1059,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
             new_state["days"] = norm_d
             new_state["selected_days"] = norm_d
             new_state["days_code"] = get_day_code(norm_d)
+            new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "DAYS_SELECTED")
 
     # B. Dynamic Days Auto-Binding vs Confirmation
     # Whenever course is known, check if timing/teacher restricts days to exactly 1 option

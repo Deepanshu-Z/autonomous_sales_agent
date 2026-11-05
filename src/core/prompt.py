@@ -49,6 +49,12 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - If Course is ALREADY identified/selected, NEVER ask which course they are interested in! Warmly acknowledge their course choice and move to the next missing slot (Step 1 Timing). Under NO circumstances list package fees, duration pricing, or coupon tables here unless the customer specifically asked about fees/pricing!
 
     1. TIMING SLOT (If Active Course is SELECTED, but Customer's Selected Batch Timing is NOT SELECTED):
+       - BARE HOUR & COLLOQUIAL TIMINGS DISAMBIGUATION (e.g. "7bje", "7 baje", "7", "6 baje"):
+         * When a customer provides a bare hour without specifying Morning or Evening:
+           - If that hour exists in BOTH morning and evening (e.g. Yoga has both 7:00 AM to 8:00 AM and 7:00 PM to 8:00 PM):
+             • The class IS OFFERED! You are STRICTLY FORBIDDEN from claiming "classes are not held at 7bje"!
+             • Naturally and warmly ask in Hindi/Hinglish: "Yoga mein 7 baje ke do batches hain — Subah 7:00 AM to 8:00 AM aur Shaam 7:00 PM to 8:00 PM. Aap subah ka time prefer karenge ya shaam ka? 😊"
+           - If that hour exists in only one slot (e.g. 5:00 AM), warmly confirm that slot and introduce the instructor.
        - BROAD TIME-OF-DAY PERIOD GUARD (STRICT & NON-NEGOTIABLE):
          If the customer selects, types, or mentions a broad time-of-day period (e.g. "Morning Batch", "Morning", "Evening Batch", "Evening", "Afternoon", "Subah", "Shaam", "Dopahar"):
          * You are STRICTLY FORBIDDEN from assuming, guessing, or auto-assigning an exact hourly timing (such as 5:00 AM)!
@@ -60,7 +66,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - Message #1: Concisely present the available batch timings for the active course from COURSE_DATA.
        - STRICT FEE GUARD: Message #1 and Message #2 MUST NOT list package fees, duration pricing tables, or coupon codes while discussing batch timing! Only share pricing if the customer explicitly asked for fees.
        - Message #2 (followup): Ask which batch timing works best for their daily schedule (e.g. "Which batch timing suits your daily routine best? 😊").
-       - If Timing is ALREADY selected/known, NEVER ask for timing again! Move immediately to Step 2 (Teacher).
+       - If Timing is ALREADY selected/known (e.g. 7:00 PM to 8:00 PM settled in database), NEVER ask for timing again! The AI is STRICTLY FORBIDDEN from re-asking for timing, regardless of whether the customer just chose days, an instructor, or asked a question! Move immediately to the next missing milestone (Teacher or Package Duration).
 
     2. TEACHER SLOT (If Timing is SELECTED, but Customer's Selected Instructor is NOT SELECTED):
        - CASE A: MULTIPLE INSTRUCTORS for this timing (e.g. 2+ instructors available for that slot):
@@ -697,6 +703,14 @@ def format_system_prompt(
             "  • Message #1: Warmly and empathetically acknowledge their concern without being pushy or arguing.\n"
             "  • Message #2 (followup): Set 'followup': null. NEVER ask for payment or push course packages!\n"
         )
+    elif bool(last_turn_dict.get("timing_ambiguous") or s.get("timing_ambiguous")):
+        turn_intent_guidance = (
+            f"- ⏰ BARE HOUR TIMING DISAMBIGUATION (CUSTOMER CHOSE A TIME WITH BOTH MORNING & EVENING SLOTS):\n"
+            f"  • Customer requested a bare hour without specifying Morning or Evening (e.g. '7bje').\n"
+            f"  • CRITICAL RULE: The class IS OFFERED in {active_title}! Under NO circumstances claim '{active_title} classes are not held at 7bje'!\n"
+            f"  • Message #1: Warmly clarify the two options from COURSE_DATA (e.g. '{active_title} mein 7 baje ke do batches hain — Subah 7:00 AM to 8:00 AM aur Shaam 7:00 PM to 8:00 PM.').\n"
+            f"  • Message #2 (followup): Ask: 'Aap subah ka time prefer karenge ya shaam ka? 😊'\n"
+        )
     elif is_qr_request_turn:
         if is_complete:
             turn_intent_guidance = (
@@ -789,7 +803,8 @@ def format_system_prompt(
             f"- 📋 CURRENT FUNNEL SELECTION: The next required slot to settle is: {next_target_label}.\n"
             f"  • ALREADY SETTLED IN DATABASE (DO NOT ASK AGAIN): {', '.join(settled_slots)}\n"
             f"  • STILL MISSING: {', '.join(missing_slots)}\n"
-            f"  • 🛑 STRICT PAYMENT BARRIER (RULE 2):\n"
+            f"  • 🛑 STRICT SLOT MEMORY & PROGRESSION GUARD:\n"
+            f"    - If Batch Timing is settled ({timing_str}), you are STRICTLY FORBIDDEN from asking for timing again, re-listing timings, or saying 'Ab humein aapka preferred timing select karna hai'!\n"
             f"    - Enrollment details are STILL MISSING ({', '.join(missing_slots)})!\n"
             f"    - Under NO circumstances output payable fee breakdowns, UPI QR codes, 'proceeding to payment', or ask 'assistance completing payment'!\n"
             f"    - Message #1 must purely acknowledge the user's choice and state that {next_target_label} is needed next.\n"

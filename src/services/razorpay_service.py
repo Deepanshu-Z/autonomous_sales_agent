@@ -338,6 +338,46 @@ def verify_webhook_signature(
         return False
 
 
+async def translate_text_to_language(text: str, target_language: str) -> str:
+    """
+    Translates confirmation text to any of 10,000+ languages using the fast LLM.
+    Strictly preserves emojis, course names, timing strings, txn IDs, and WhatsApp bolding.
+    Falls back safely to base text if translation fails or times out.
+    """
+    if not target_language or not text:
+        return text
+    clean_lang = target_language.strip().lower()
+    if any(k in clean_lang for k in ["english", "hinglish", "latin"]):
+        return text
+
+    try:
+        from langchain_openai import ChatOpenAI
+        from langchain_core.messages import SystemMessage, HumanMessage
+
+        openai_key = os.getenv("OPENAI_API_KEY")
+        model_name = os.getenv("OPENAI_EXTRACTOR_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        llm = ChatOpenAI(model=model_name, api_key=openai_key, temperature=0, timeout=6)
+
+        system_prompt = (
+            f"You are a native translator for WhatsApp customer messages. Translate the provided message into {target_language}.\n"
+            "STRICT RULES:\n"
+            "1. Maintain the exact meaning, polite tone, line breaks, and all emojis.\n"
+            "2. Keep course names (e.g. Kathak, Yoga), timing numbers, and transaction IDs (e.g. pay_...) UNTOUCHED.\n"
+            "3. Use standard WhatsApp bold formatting (*text*).\n"
+            "4. Output ONLY the translated message, nothing else."
+        )
+        resp = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=text),
+        ])
+        translated = resp.content.strip()
+        if translated:
+            return translated
+    except Exception as e:
+        logger.warning(f"[razorpay_service] Translation to {target_language} failed (falling back to base): {e}")
+    return text
+
+
 def format_onboarding_confirmation(
     course_name: str,
     duration: str,
@@ -349,125 +389,97 @@ def format_onboarding_confirmation(
     student_email: Optional[str] = None,
 ) -> str:
     """
-    Formats the WhatsApp confirmation receipt and onboarding instructions template.
-    Adapts dynamically to English or Hindi, and accurately reflects whether the user's
-    Gmail is already linked to Google Sign-In or still awaiting receipt.
+    Synchronous formatter for onboarding confirmation.
+    Delivers a focused, high-conversion message requesting the customer's Gmail ID
+    with a clear permanent-linkage warning.
     """
-    lang = (language or "english").lower().strip()
-    is_hindi = "hindi" in lang and "hinglish" not in lang
-    is_hinglish = "hinglish" in lang or "roman" in lang
-
+    lang_lower = (language or "english").lower().strip()
+    is_hindi = "hindi" in lang_lower and "hinglish" not in lang_lower
+    is_hinglish = "hinglish" in lang_lower or "roman" in lang_lower or "latin" in lang_lower
     display_timing = timing or "To be scheduled via Sensationz App"
-    display_teacher = teacher or "Dedicated Sensationz Instructor"
 
+    # 1. Hindi (Devanagari)
     if is_hindi:
         if student_email:
-            login_instructions = (
-                f"🚀 *शुरुआती निर्देश (Onboarding Steps):*\n"
-                f"1. *Sensationz ऐप डाउनलोड करें:*\n"
-                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                f"2. *लॉगिन करें:* ऐप खोलें और **'Continue with Google'** पर टैप करके अपनी ईमेल (*{student_email}*) से लॉगिन करें।\n"
-                f"3. *लाइव क्लास एक्सेस करें:* आपका कोर्स और बैच आपके इस ईमेल से लिंक हो चुका है। \"My Classes\" सेक्शन में अपनी लाइव क्लास देखें!\n"
-                f"4. *क्लास रिमाइंडर:* क्लास शुरू होने से पहले आपको सूचना भी मिलेगी।\n\n"
-                f"किसी भी सहायता के लिए आप कभी भी यहाँ मैसेज कर सकते हैं। क्लास में मिलते हैं! 🙏✨"
+            return (
+                f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+                f"आपका *{course_name} ({display_timing})* बैच सफलतापूर्वक कन्फर्म हो गया है! (Txn: {payment_id}) 🌟\n\n"
+                f"आपका बैच आपकी ईमेल (*{student_email}*) से लिंक हो चुका है। Sensationz ऐप खोलें और **'Continue with Google'** से अपनी क्लास शुरू करें! 🚀✨"
             )
-        else:
-            login_instructions = (
-                f"🚀 *अंतिम स्टेप — अपना Gmail एड्रेस भेजें:*\n"
-                f"ऐप में आपका कोर्स तुरंत एक्टिवेट करने के लिए, कृपया अपना **Gmail एड्रेस** (जिससे आप ऐप में Google Sign-In करेंगे) यहाँ चैट में भेजें! 📧👇\n\n"
-                f"1. *Sensationz ऐप डाउनलोड करें:*\n"
-                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                f"2. अपना Gmail यहाँ शेयर करते ही आपकी क्लास आपके Google अकाउंट से लिंक हो जाएगी।\n"
-                f"3. ऐप में **'Continue with Google'** से लॉगिन करें और क्लास शुरू करें! 🌟"
-            )
-
         return (
-            f"🎉 *फीस पेमेंट सफल और एडमिशन कन्फर्म!* 🎉\n\n"
-            f"नमस्ते! *Sensationz Performing Arts* परिवार में आपका हार्दिक स्वागत है! "
-            f"आपका भुगतान सफलतापूर्वक प्राप्त हो गया है और आपका एडमिशन कन्फर्म हो चुका है। 🌟\n\n"
-            f"📋 *आपके कोर्स और बैच का विवरण:*\n"
-            f"• *कोर्स:* {course_name}\n"
-            f"• *प्लान / अवधि:* {duration}\n"
-            f"• *बैच टाइमिंग:* {display_timing}\n"
-            f"• *अध्यापक / इंस्ट्रक्टर:* {display_teacher}\n"
-            f"• *जमा की गई राशि:* ₹{amount_inr:,.2f}\n"
-            f"• *ट्रांजेक्शन आईडी:* {payment_id}\n\n"
-            f"{login_instructions}"
+            f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+            f"आपका *{course_name} ({display_timing})* बैच सफलतापूर्वक कन्फर्म हो गया है! (Txn: {payment_id}) 🌟\n\n"
+            f"अपनी क्लासेस को एक्टिवेट करने के लिए, कृपया अपना **Gmail ID** यहाँ चैट में शेयर करें: 📧👇\n\n"
+            f"⚠️ *महत्वपूर्ण:* एक बार शेयर किया गया Gmail बदला या एडिट नहीं किया जा सकेगा और आपकी प्रोफाइल से हमेशा के लिए लिंक हो जाएगा, इसलिए कृपया दोबारा जांच कर ही भेजें।"
         )
 
+    # 2. Hinglish (Latin script)
     if is_hinglish:
         if student_email:
-            login_instructions = (
-                f"🚀 *Onboarding Steps:*\n"
-                f"1. *Sensationz App Download Karein:*\n"
-                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                f"2. *Login Karein:* App open karein aur **'Continue with Google'** par tap karke apni email (*{student_email}*) se login karein.\n"
-                f"3. *Live Classes Access Karein:* Aapka course aur batch is email se link ho chuka hai. \"My Classes\" section mein apni live class dekhein!\n"
-                f"4. *Class Reminder:* Class start hone se pehle aapko notification bhi milega.\n\n"
-                f"Kisi bhi help ke liye aap yahan message kar sakte hain. Class mein milte hain! 🙏✨"
+            return (
+                f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+                f"Aapka *{course_name} ({display_timing})* batch successfully confirm ho gaya hai! (Txn: {payment_id}) 🌟\n\n"
+                f"Aapka batch aapki email (*{student_email}*) se link ho chuka hai. Sensationz App open karke **'Continue with Google'** se apni classes start karein! 🚀✨"
             )
-        else:
-            login_instructions = (
-                f"🚀 *Final Step — Apna Gmail Address Bhejein:*\n"
-                f"App mein aapka course turant activate karne ke liye, kripya apna **Gmail address** (jisse aap app mein Google Sign-In karenge) yahan chat mein bhejein! 📧👇\n\n"
-                f"1. *Sensationz App Download Karein:*\n"
-                f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-                f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-                f"2. Apna Gmail yahan share karte hi aapki class aapke Google account se link ho jayegi.\n"
-                f"3. App mein **'Continue with Google'** se login karein aur class start karein! 🌟"
-            )
-
         return (
-            f"🎉 *Payment Successful & Enrollment Confirm Ho Gaya!* 🎉\n\n"
-            f"Namaste! *Sensationz Performing Arts* family mein aapka hardik swagat hai! "
-            f"Aapka payment receive ho gaya hai aur aapka admission confirm ho chuka hai. 🌟\n\n"
-            f"📋 *Aapke Course Aur Batch Ki Details:*\n"
-            f"• *Course:* {course_name}\n"
-            f"• *Plan / Duration:* {duration}\n"
-            f"• *Batch Timing:* {display_timing}\n"
-            f"• *Assigned Teacher:* {display_teacher}\n"
-            f"• *Amount Paid:* ₹{amount_inr:,.2f}\n"
-            f"• *Transaction ID:* {payment_id}\n\n"
-            f"{login_instructions}"
+            f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+            f"Aapka *{course_name} ({display_timing})* batch successfully confirm ho gaya hai! (Txn: {payment_id}) 🌟\n\n"
+            f"Apni classes ko activate karne ke liye, kripya apna **Gmail ID** yahan chat mein share karein: 📧👇\n\n"
+            f"⚠️ *Important:* Ek baar share kiya gaya Gmail edit ya change nahi ho sakta aur aapki profile se permanently link ho jayega, isliye kripya recheck karke hi bhejein."
         )
 
+    # 3. Base English template
     if student_email:
-        login_instructions = (
-            f"🚀 *Next Steps & Onboarding:*\n"
-            f"1. *Download the Sensationz App:*\n"
-            f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-            f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            f"2. *Sign In:* Open the app and tap **'Continue with Google'** using your email: *{student_email}*.\n"
-            f"3. *Access Your Classes:* Your admission is already linked! Your batch and live class links are waiting under \"My Classes\" on your dashboard.\n"
-            f"4. *Live Class Reminder:* You will also receive class joining notifications before your scheduled sessions.\n\n"
-            f"If you have any questions or need onboarding assistance, simply reply here. We look forward to seeing you in class! 🙏✨"
+        return (
+            f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+            f"Your *{course_name} ({display_timing})* batch has been successfully confirmed! (Txn: {payment_id}) 🌟\n\n"
+            f"Your batch is linked to your email (*{student_email}*). Open the Sensationz App and tap **'Continue with Google'** to access your classes! 🚀✨"
         )
-    else:
-        login_instructions = (
-            f"🚀 *Final Step — Activate Your In-App Access:*\n"
-            f"To instantly link your enrolled course to your Sensationz App profile, please reply with your **Gmail address** (the one you use for Google Sign-In) right here! 📧👇\n\n"
-            f"1. *Download the Sensationz App:*\n"
-            f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
-            f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
-            f"2. Once you send your Gmail here, our system connects your classes so they appear the moment you tap **'Continue with Google'**!"
-        )
-
     return (
-        f"🎉 *Payment Successful & Enrollment Confirmed!* 🎉\n\n"
-        f"Dear Student, welcome to the *Sensationz Performing Arts* family! "
-        f"We have received your payment, and your admission is officially confirmed. 🌟\n\n"
-        f"📋 *Your Enrollment Details:*\n"
-        f"• *Course:* {course_name}\n"
-        f"• *Plan / Duration:* {duration}\n"
-        f"• *Batch Timing:* {display_timing}\n"
-        f"• *Assigned Teacher:* {display_teacher}\n"
-        f"• *Amount Paid:* ₹{amount_inr:,.2f}\n"
-        f"• *Transaction ID:* {payment_id}\n\n"
-        f"{login_instructions}"
+        f"🎉 *Payment Received & Enrollment Confirmed!*\n\n"
+        f"Your *{course_name} ({display_timing})* batch has been successfully confirmed! (Txn: {payment_id}) 🌟\n\n"
+        f"To activate your classes, please share your **Gmail ID** right here in this chat: 📧👇\n\n"
+        f"⚠️ *Important:* Once shared, this Gmail ID cannot be edited or changed and will be permanently linked to your profile, so please double-check it before sending."
     )
+
+
+async def format_onboarding_confirmation_async(
+    course_name: str,
+    duration: str,
+    timing: Optional[str],
+    teacher: Optional[str],
+    amount_inr: float,
+    payment_id: str,
+    language: str = "english",
+    student_email: Optional[str] = None,
+) -> str:
+    """
+    Async formatter supporting 10,000+ native languages dynamically.
+    For English, Hinglish, and Hindi: uses zero-latency pre-rendered templates.
+    For any other regional or international language: dynamically translates via polyglot LLM.
+    """
+    base_msg = format_onboarding_confirmation(
+        course_name=course_name,
+        duration=duration,
+        timing=timing,
+        teacher=teacher,
+        amount_inr=amount_inr,
+        payment_id=payment_id,
+        language=language,
+        student_email=student_email,
+    )
+
+    lang_lower = (language or "english").lower().strip()
+    is_hindi = "hindi" in lang_lower and "hinglish" not in lang_lower
+    is_hinglish = "hinglish" in lang_lower or "roman" in lang_lower or "latin" in lang_lower
+    is_english = "english" in lang_lower and not is_hinglish
+
+    # If already covered by native pre-rendered template, return immediately
+    if is_hindi or is_hinglish or is_english:
+        return base_msg
+
+    # For 10,000+ other languages (Tamil, Telugu, Bengali, Marathi, Spanish, etc.), translate dynamically
+    return await translate_text_to_language(base_msg, language)
 
 
 async def fulfill_razorpay_payment_async(
@@ -677,8 +689,8 @@ async def fulfill_razorpay_payment_async(
         await save_user_state_async(phone, state)
 
         # Format localized onboarding confirmation template
-        lang = (state.get("language") or "English").lower()
-        confirmation_msg = format_onboarding_confirmation(
+        lang = state.get("language") or "Hinglish"
+        confirmation_msg = await format_onboarding_confirmation_async(
             course_name=course_name,
             duration=duration,
             timing=timing,

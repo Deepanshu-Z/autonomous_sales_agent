@@ -133,11 +133,11 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
          - Set "customer_intent": "TIMING_SELECTION".
          - Set "unoffered_type": null, "unoffered_value": null, and "unoffered_timing_mentioned": null.
          - Set "question_summary": "Customer selected 7 o'clock; ask them whether they prefer Morning 7:00 AM to 8:00 AM or Evening 7:00 PM to 8:00 PM."
-       • If that hour exists in ONLY ONE slot in the course schedule (for example, "5:00 AM to 6:00 AM" exists and no 5:00 PM slot exists):
-         - Automatically resolve and map directly to that exact canonical slot string (e.g. "5:00 AM to 6:00 AM").
+       • If that hour exists in ONLY ONE slot in the course schedule:
+         - Automatically resolve and map directly to that exact canonical slot string.
          - Set "timing_ambiguous": false.
          - Set "unoffered_type": null.
-       • If that hour does NOT exist at all in the Allowed Canonical Batch Timings in either AM or PM (e.g. "3", "3pm", "11-12", "2 to 3"):
+       • If that hour does NOT exist at all in the Allowed Canonical Batch Timings in either AM or PM :
          - Set "selected_timing": null, set "timing_ambiguous": false, set "unoffered_type": "TIMING", set "unoffered_value" to the requested timing, and set "customer_intent": "QUESTION".
    - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
    - CRITICAL UNAVAILABLE / UNOFFERED TIMING GUARD:

@@ -460,80 +460,143 @@ async def extract_intent_and_state_changes(
             or s.get("timing")
             or s.get("awaiting_email_fulfillment")
         )
-        raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")
-        if not raw_timing and not clean.get("selected_package") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PACKAGE_SELECTION"):
-            if not is_timing_settled:
-                raw_timing = text.strip()
+
+        # Check if the user's actual raw text is a colloquial bare hour (e.g. '5bje', '5 baje', '5', '7bje')
+        # without explicit meridiem (AM/PM/subah/shaam). This prevents the LLM classifier from prematurely
+        # guessing a specific AM/PM slot and bypassing morning vs evening ambiguity check.
+        u_raw = text.strip().lower()
+        u_clean = u_raw.replace(" ", "").replace("-", "to")
+        u_has_am = any(w in u_raw for w in ["am", "morning", "subah", "sawere", "savere", "mrng", "morng"])
+        u_has_pm = any(w in u_raw for w in ["pm", "evening", "shaam", "sham", "night", "raat", "dopahar", "afternoon"])
+
+        colloquial_text_match = (
+            re.search(r"^(\d{1,2})(?::00)?(?:to\d{1,2}(?::00)?)?(?:bje|baje|o'?clock)?$", u_clean)
+            or re.search(r"\b(\d{1,2})\s*(?:bje|baje|baze|o'?clock)\b", u_raw)
+        )
+        is_user_bare_hour = (
+            not is_timing_settled
+            and not (u_has_am or u_has_pm)
+            and not clean.get("selected_package")
+            and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PACKAGE_SELECTION")
+            and bool(colloquial_text_match or (u_clean.isdigit() and 1 <= int(u_clean) <= 12))
+        )
 
         matched_batch = None
         clean_user = ""
-        if raw_timing and isinstance(raw_timing, str):
-            r_low = raw_timing.strip().lower()
-            clean_user = r_low.replace(" ", "").replace("-", "to")
 
-            # Colloquial bare hour resolution (e.g. '7bje', '7 baje', '7', '6 baje', '5')
-            colloquial_hr_match = re.search(r"^(\d{1,2})(?:bje|baje|o'?clock)?$", clean_user) or re.search(r"\b(\d{1,2})\s*(?:bje|baje|baze)\b", r_low)
-            if colloquial_hr_match or clean_user.isdigit():
-                target_hr = int(colloquial_hr_match.group(1)) if colloquial_hr_match else int(clean_user)
-                candidates = []
-                for b in course_batches:
-                    try:
-                        start_hr = int(b.split(":")[0])
-                        if start_hr == target_hr:
-                            candidates.append(b)
-                    except Exception:
-                        pass
-                candidates = list(dict.fromkeys(candidates))
-                has_am = any("am" in c.lower() for c in candidates)
-                has_pm = any("pm" in c.lower() for c in candidates)
+        if is_user_bare_hour:
+            target_hr = int(colloquial_text_match.group(1)) if colloquial_text_match else int(u_clean)
+            clean_user = str(target_hr)
+            candidates = []
+            for b in course_batches:
+                try:
+                    start_hr = int(b.split(":")[0])
+                    if start_hr == target_hr:
+                        candidates.append(b)
+                except Exception:
+                    pass
+            candidates = list(dict.fromkeys(candidates))
+            has_am = any("am" in c.lower() for c in candidates)
+            has_pm = any("pm" in c.lower() for c in candidates)
 
-                if len(candidates) == 1 or (not (has_am and has_pm) and candidates):
-                    # Unambiguous single slot or all candidates belong to the same period (e.g. evening-only or morning-only course)
-                    matched_batch = candidates[0]
-                elif len(candidates) > 1 and has_am and has_pm:
-                    period_hint = (s.get("timing_period") or "").lower()
-                    if not period_hint:
-                        if any(w in text.lower() for w in ["evening", "sham", "shaam", "raat", "night", "pm", "afternoon", "dopahar"]):
-                            period_hint = "evening"
-                        elif any(w in text.lower() for w in ["morning", "subah", "am"]):
-                            period_hint = "morning"
-                    if period_hint in ("evening", "afternoon", "pm"):
-                        pm_cands = [c for c in candidates if "pm" in c.lower()]
-                        if pm_cands:
-                            matched_batch = pm_cands[0]
-                    elif period_hint in ("morning", "am"):
-                        am_cands = [c for c in candidates if "am" in c.lower()]
-                        if am_cands:
-                            matched_batch = am_cands[0]
-                    
-                    if not matched_batch:
-                        # Genuinely ambiguous hour across morning and evening (e.g. 7 AM vs 7 PM both exist in Yoga)
-                        clean["timing_ambiguous"] = True
-                        clean["ambiguous_hour"] = target_hr
-                        clean["ambiguous_timing_candidates"] = candidates
-                        clean["selected_timing"] = None
-                        clean["unoffered_type"] = None
-                        clean["unoffered_value"] = None
-                        clean["unoffered_timing_mentioned"] = None
-                        clean["customer_intent"] = "TIMING_SELECTION"
-                        clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
+            if len(candidates) == 1 or (not (has_am and has_pm) and candidates):
+                matched_batch = candidates[0]
+            elif len(candidates) > 1 and has_am and has_pm:
+                period_hint = (s.get("timing_period") or "").lower()
+                if period_hint in ("evening", "afternoon", "pm"):
+                    pm_cands = [c for c in candidates if "pm" in c.lower()]
+                    if pm_cands:
+                        matched_batch = pm_cands[0]
+                elif period_hint in ("morning", "am"):
+                    am_cands = [c for c in candidates if "am" in c.lower()]
+                    if am_cands:
+                        matched_batch = am_cands[0]
 
-            if not matched_batch and not clean.get("timing_ambiguous"):
-                for b in course_batches:
-                    b_low = b.lower()
-                    if r_low == b_low or b_low.startswith(r_low):
-                        matched_batch = b
-                        break
-                    # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
-                    start_part = b_low.split(" to ")[0].replace(":00", "").replace(" ", "")
-                    if clean_user == start_part or start_part.startswith(clean_user):
-                        matched_batch = b
-                        break
-                    # Match full range: e.g. '12to1' or '12pmto1pm'
-                    clean_batch = b_low.replace(":00", "").replace(" ", "")
-                    if clean_user == clean_batch or clean_user == clean_batch.replace("pm", "").replace("am", ""):
-                        matched_batch = b
-                        break
+                if not matched_batch:
+                    clean["timing_ambiguous"] = True
+                    clean["ambiguous_hour"] = target_hr
+                    clean["ambiguous_timing_candidates"] = candidates
+                    clean["selected_timing"] = None
+                    clean["unoffered_type"] = None
+                    clean["unoffered_value"] = None
+                    clean["unoffered_timing_mentioned"] = None
+                    clean["customer_intent"] = "TIMING_SELECTION"
+                    clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
+        else:
+            raw_timing = clean.get("selected_timing") or clean.get("unoffered_timing_mentioned")
+            if not raw_timing and not clean.get("selected_package") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PACKAGE_SELECTION"):
+                if not is_timing_settled:
+                    raw_timing = text.strip()
+
+            if raw_timing and isinstance(raw_timing, str):
+                r_low = raw_timing.strip().lower()
+                clean_user = r_low.replace(" ", "").replace("-", "to")
+
+                # Colloquial bare hour resolution (e.g. '7bje', '7 baje', '7', '6 baje', '5')
+                colloquial_hr_match = re.search(r"^(\d{1,2})(?:bje|baje|o'?clock)?$", clean_user) or re.search(r"\b(\d{1,2})\s*(?:bje|baje|baze)\b", r_low)
+                if colloquial_hr_match or clean_user.isdigit():
+                    target_hr = int(colloquial_hr_match.group(1)) if colloquial_hr_match else int(clean_user)
+                    candidates = []
+                    for b in course_batches:
+                        try:
+                            start_hr = int(b.split(":")[0])
+                            if start_hr == target_hr:
+                                candidates.append(b)
+                        except Exception:
+                            pass
+                    candidates = list(dict.fromkeys(candidates))
+                    has_am = any("am" in c.lower() for c in candidates)
+                    has_pm = any("pm" in c.lower() for c in candidates)
+
+                    if len(candidates) == 1 or (not (has_am and has_pm) and candidates):
+                        # Unambiguous single slot or all candidates belong to the same period (e.g. evening-only or morning-only course)
+                        matched_batch = candidates[0]
+                    elif len(candidates) > 1 and has_am and has_pm:
+                        period_hint = (s.get("timing_period") or "").lower()
+                        if not period_hint:
+                            if any(w in text.lower() for w in ["evening", "sham", "shaam", "raat", "night", "pm", "afternoon", "dopahar"]):
+                                period_hint = "evening"
+                            elif any(w in text.lower() for w in ["morning", "subah", "am"]):
+                                period_hint = "morning"
+                        if period_hint in ("evening", "afternoon", "pm"):
+                            pm_cands = [c for c in candidates if "pm" in c.lower()]
+                            if pm_cands:
+                                matched_batch = pm_cands[0]
+                        elif period_hint in ("morning", "am"):
+                            am_cands = [c for c in candidates if "am" in c.lower()]
+                            if am_cands:
+                                matched_batch = am_cands[0]
+                        
+                        if not matched_batch:
+                            # Genuinely ambiguous hour across morning and evening (e.g. 7 AM vs 7 PM both exist in Yoga)
+                            clean["timing_ambiguous"] = True
+                            clean["ambiguous_hour"] = target_hr
+                            clean["ambiguous_timing_candidates"] = candidates
+                            clean["selected_timing"] = None
+                            clean["unoffered_type"] = None
+                            clean["unoffered_value"] = None
+                            clean["unoffered_timing_mentioned"] = None
+                            clean["customer_intent"] = "TIMING_SELECTION"
+                            clean["question_summary"] = f"Clarify morning vs evening for {target_hr} o'clock"
+
+                if not matched_batch and not clean.get("timing_ambiguous"):
+                    clean_u_compact = clean_user.replace("–", "to").replace(":00", "")
+                    for b in course_batches:
+                        b_low = b.lower()
+                        norm_b = b_low.replace("–", " to ").replace("-", " to ")
+                        if r_low == b_low or b_low.startswith(r_low) or r_low == norm_b or norm_b.startswith(r_low):
+                            matched_batch = b
+                            break
+                        # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
+                        start_part = norm_b.split(" to ")[0].replace(":00", "").replace(" ", "")
+                        if clean_u_compact == start_part or start_part.startswith(clean_u_compact) or clean_user == start_part:
+                            matched_batch = b
+                            break
+                        # Match full range: e.g. '12to1' or '12pmto1pm'
+                        clean_batch = norm_b.replace(":00", "").replace(" ", "")
+                        if clean_u_compact == clean_batch or clean_u_compact == clean_batch.replace("pm", "").replace("am", "") or clean_user == clean_batch:
+                            matched_batch = b
+                            break
 
         if matched_batch:
             clean["selected_timing"] = matched_batch

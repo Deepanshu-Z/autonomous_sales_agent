@@ -562,7 +562,19 @@ async def handle_incoming_message(
             main_reply,
             re.IGNORECASE,
         )
-        if SELECTION_LEAK:
+        # Check if the reply leaked an unrelated hour (e.g. quoting 7:00 PM when amb_hr is 5)
+        mismatched_hours = []
+        try:
+            for hr_match in re.findall(r"\b(\d{1,2}):00\s*(?:am|pm)?\b", main_reply, re.IGNORECASE):
+                h_int = int(hr_match)
+                valid_hrs = {int(amb_hr), (int(amb_hr) % 12) + 1}
+                if h_int not in valid_hrs:
+                    mismatched_hours.append(h_int)
+        except Exception:
+            pass
+
+        CROSS_HOUR_LEAK = bool(mismatched_hours)
+        if SELECTION_LEAK or CROSS_HOUR_LEAK:
             catalog_entry = kb_loader.get_catalog_entry(effective_course_id)
             c_title = catalog_entry.get("name", effective_course_id.title()) if catalog_entry else (effective_course_id.title() if effective_course_id else "Yoga")
             main_reply = f"{c_title} classes ke liye {amb_hr} baje do batches available hain: {cands_str}."

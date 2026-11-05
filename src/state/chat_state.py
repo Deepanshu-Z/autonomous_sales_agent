@@ -304,7 +304,7 @@ def get_user_state(phone: str) -> dict:
             if res.data and len(res.data) > 0:
                 row = dict(res.data[0])
                 raw_topic = row.get("last_topic") or ""
-                if isinstance(raw_topic, str) and ("COURSE:" in raw_topic or "TEACHER:" in raw_topic or "PAY:" in raw_topic or "ORDER:" in raw_topic or "EMAIL:" in raw_topic):
+                if isinstance(raw_topic, str) and ("COURSE:" in raw_topic or "TEACHER:" in raw_topic or "PAY:" in raw_topic or "ORDER:" in raw_topic or "EMAIL:" in raw_topic or "AMB_HR:" in raw_topic):
                     parts = raw_topic.split("||")
                     clean_topic_parts = []
                     for part in parts:
@@ -329,6 +329,11 @@ def get_user_state(phone: str) -> dict:
                             e_val = part_str.replace("EMAIL:", "").strip()
                             if e_val:
                                 row["student_email"] = e_val
+                        elif part_str.startswith("AMB_HR:"):
+                            amb_val = part_str.replace("AMB_HR:", "").strip()
+                            if amb_val.isdigit():
+                                row["ambiguous_hour"] = int(amb_val)
+                                row["timing_ambiguous"] = True
                         else:
                             clean_topic_parts.append(part_str)
                     row["last_topic"] = "||".join(clean_topic_parts)
@@ -438,6 +443,8 @@ def save_user_state(phone: str, state: dict):
             email_val = state.get("student_email") or ""
             if email_val:
                 meta_parts.append(f"EMAIL:{email_val}")
+            if not state.get("timing") and not state.get("selected_timing") and state.get("timing_ambiguous") and state.get("ambiguous_hour"):
+                meta_parts.append(f"AMB_HR:{state['ambiguous_hour']}")
 
             topic_val = str(state.get("last_topic") or "")
             meta_header = "||".join(meta_parts)

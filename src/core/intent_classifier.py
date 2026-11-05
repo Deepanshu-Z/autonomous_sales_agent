@@ -139,6 +139,15 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
          - Set "unoffered_type": null.
        • If that hour does NOT exist at all in the Allowed Canonical Batch Timings in either AM or PM :
          - Set "selected_timing": null, set "timing_ambiguous": false, set "unoffered_type": "TIMING", set "unoffered_value" to the requested timing, and set "customer_intent": "QUESTION".
+   - PERIOD CLARIFICATION & AMBIGUOUS RESOLUTION (MULTILINGUAL):
+     * If 'Pending Ambiguous Timing Hour' is set in context (or the assistant just asked to choose between Morning and Evening):
+     * When the customer responds with their period preference in ANY language, script, dialect, typo, or slang (e.g. English "morning", "evening", "am", "pm", Hindi/Hinglish "subah", "sbh", "sbh ka", "subha", "sawere", "savere", "mrng", "morng", "shaam", "sham", "sham ka", "raat", Bengali "shokal", Tamil "kaalai", Telugu "udayam", Marathi "sakali", Gujarati "savare", etc.):
+       • Immediately resolve and map it to the corresponding canonical slot for that pending hour from Allowed Canonical Batch Timings (for example, if pending hour is 5: "sbh ka" -> "5:00 AM to 6:00 AM", "sham ka" -> "5:00 PM to 6:00 PM").
+       • Set "selected_timing" to that exact canonical string.
+       • Set "timing_ambiguous": false.
+       • Set "ambiguous_hour": null.
+       • Set "customer_intent": "TIMING_SELECTION".
+       • Set "unoffered_type": null, "unoffered_value": null.
    - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
    - CRITICAL UNAVAILABLE / UNOFFERED TIMING GUARD:
      • If the customer asks for, selects, or mentions a timing that is NOT in the Allowed Canonical Batch Timings (for example, "3", "3pm", "3:00", "11-12", "11 to 12", "2 to 3", "9 pm", or any unlisted hour), set selected_timing to null!
@@ -377,11 +386,13 @@ async def extract_intent_and_state_changes(
     catalog_courses = [item.get("name") for item in kb_loader.get_course_catalog() if item.get("name")]
     catalog_str = ", ".join(f'"{c}"' for c in catalog_courses)
 
+    amb_hr_ctx = s.get("ambiguous_hour") or ""
     context_prompt = (
         f"CUSTOMER SESSION CONTEXT:\n"
         f"- Current Stage: {s.get('stage', 'NEW')}\n"
         f"- Refusal / Objection Stage: {s.get('refusal_stage', 0)}\n"
         f"- Active Course: {s.get('course') or 'None (Not Selected)'}\n"
+        f"- Pending Ambiguous Timing Hour: {f'{amb_hr_ctx} (Awaiting Morning vs Evening preference)' if amb_hr_ctx else 'None'}\n"
         f"- Allowed Catalog Courses: [{catalog_str}]\n"
         f"- Allowed Canonical Batch Timings for Active Course: [{timings_str}]\n"
         f"- Allowed Canonical Batch Days for Active Course: [{days_str}]\n"
@@ -633,14 +644,15 @@ async def extract_intent_and_state_changes(
                     if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
                         clean["customer_intent"] = "QUESTION"
 
-        # Period Detection (e.g. "Morning Batch", "Evening Batch", "Subah", "Shaam")
-        detected_period = None
-        if re.search(r"\b(morning|subah|early morning)\b", text, re.IGNORECASE):
-            detected_period = "Morning"
-        elif re.search(r"\b(evening|shaam|sham|night|raat)\b", text, re.IGNORECASE):
-            detected_period = "Evening"
-        elif re.search(r"\b(afternoon|dopahar)\b", text, re.IGNORECASE):
-            detected_period = "Afternoon"
+        # Period Detection: Trust LLM brain extraction first, fallback to basic keywords
+        detected_period = clean.get("timing_period")
+        if not detected_period:
+            if re.search(r"\b(morning|subah|early morning)\b", text, re.IGNORECASE):
+                detected_period = "Morning"
+            elif re.search(r"\b(evening|shaam|sham|night|raat)\b", text, re.IGNORECASE):
+                detected_period = "Evening"
+            elif re.search(r"\b(afternoon|dopahar)\b", text, re.IGNORECASE):
+                detected_period = "Afternoon"
 
         if detected_period:
             clean["timing_period"] = detected_period
@@ -650,7 +662,20 @@ async def extract_intent_and_state_changes(
 
             # If previous state had an unresolved ambiguous timing, settle it with the detected period!
             amb_candidates = s.get("ambiguous_timing_candidates") or []
-            if s.get("timing_ambiguous") and amb_candidates and not clean.get("selected_timing"):
+            if not amb_candidates and s.get("ambiguous_hour"):
+                try:
+                    t_hr = int(s["ambiguous_hour"])
+                    for b in course_batches:
+                        try:
+                            if int(b.split(":")[0]) == t_hr:
+                                amb_candidates.append(b)
+                        except Exception:
+                            pass
+                    amb_candidates = list(dict.fromkeys(amb_candidates))
+                except Exception:
+                    pass
+
+            if (s.get("timing_ambiguous") or s.get("ambiguous_hour")) and amb_candidates and not clean.get("selected_timing"):
                 period_low = detected_period.lower()
                 if period_low in ("morning", "am"):
                     m_c = [c for c in amb_candidates if "am" in c.lower()]

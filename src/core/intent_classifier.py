@@ -816,6 +816,7 @@ async def extract_intent_and_state_changes(
                 clean["timing_ambiguous"] = True
                 clean["ambiguous_hour"] = None
                 clean["ambiguous_timing_candidates"] = timing_resolution.get("candidates") or None
+                clean["invalid_timing_candidates"] = timing_resolution.get("invalid") or None
                 clean["unoffered_type"] = None
                 clean["unoffered_value"] = None
                 clean["unoffered_timing_mentioned"] = None
@@ -1535,6 +1536,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "timing_ambiguous": flags.get("timing_ambiguous", False),
         "ambiguous_hour": flags.get("ambiguous_hour"),
         "ambiguous_timing_candidates": flags.get("ambiguous_timing_candidates"),
+        "invalid_timing_candidates": flags.get("invalid_timing_candidates"),
         "wants_trial": flags.get("wants_trial", False),
         "wants_demo": flags.get("wants_demo", False),
         "wants_app_guide": flags.get("wants_app_guide", False),

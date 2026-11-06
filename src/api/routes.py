@@ -6,6 +6,7 @@ import os
 import time
 import json
 import asyncio
+import httpx
 from fastapi import APIRouter, Request, Response
 
 from src.api.deps import extract_phone
@@ -183,6 +184,31 @@ async def sync_customer_email_endpoint(payload: SyncEmailPayload):
 @router.get("/chat-history/{phone}")
 async def view_chat_history(phone: str):
     return await get_full_history_for_agent_async(phone)
+
+
+@router.get("/qr-image/{code_id}.png")
+async def get_qr_image_png(code_id: str):
+    """
+    Proxies dynamic Razorpay QR codes as clean PNG images with a valid .png extension
+    required by WhatsApp Business API / Interakt media delivery.
+    """
+    clean_id = code_id.replace(".png", "").strip()
+    target_url = f"https://rzp.io/rzp/{clean_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            resp = await client.get(target_url)
+            if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
+                return Response(
+                    content=resp.content,
+                    media_type="image/png",
+                    headers={
+                        "Content-Type": "image/png",
+                        "Cache-Control": "public, max-age=86400",
+                    },
+                )
+    except Exception as e:
+        print(f"[qr_proxy] Error streaming QR image for {clean_id}: {e}")
+    return Response(content="QR Code Image Not Found", status_code=404)
 
 
 @router.post("/webhook")

@@ -1409,7 +1409,14 @@ async def dispatch_payment_qr_async(
     from src.services.interakt import send_image_message_async
     delivered = False
     if image_url:
-        delivered = await send_image_message_async(phone, image_url, caption=caption)
+        # Convert short Razorpay URL (https://rzp.io/rzp/<id>) to direct .png image URL for Interakt
+        qr_media_url = image_url
+        if "rzp.io/rzp/" in image_url:
+            short_id = image_url.split("rzp.io/rzp/")[-1].strip().split("?")[0].strip("/")
+            base_url = os.getenv("APP_BASE_URL", "https://salesagent.sensationzperformingarts.com").rstrip("/")
+            qr_media_url = f"{base_url}/qr-image/{short_id}.png"
+
+        delivered = await send_image_message_async(phone, qr_media_url, caption=caption)
 
     # Fallback to text message if image delivery failed
     if not delivered:

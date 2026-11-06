@@ -317,6 +317,7 @@ async def send_image_message_async(phone: str, image_url: str, caption: str = ""
         "type": "Image",
         "data": {
             "mediaUrl": image_url,
+            "caption": caption or "",
             "message": caption or "",
         },
     }

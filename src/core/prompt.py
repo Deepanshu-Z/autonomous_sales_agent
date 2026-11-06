@@ -730,6 +730,19 @@ def format_system_prompt(
             "  - Message #2 (followup): Ask the customer to send the exact timing they want.\n"
             "  - Do not ask for package duration, fees, payment, or teacher selection yet.\n"
         )
+    elif last_turn_dict.get("timing_resolution_status") in {"MULTIPLE_VALID", "MIXED"}:
+        timing_candidates = last_turn_dict.get("ambiguous_timing_candidates") or s.get("ambiguous_timing_candidates") or []
+        invalid_candidates = last_turn_dict.get("invalid_timing_candidates") or []
+        valid_display = " aur ".join(timing_candidates) if timing_candidates else batch_timings_summary
+        invalid_display = ", ".join(str(value) for value in invalid_candidates)
+        invalid_note = f" {invalid_display} available nahi hai." if invalid_display else ""
+        turn_intent_guidance = (
+            "- MULTIPLE OR MIXED TIMING REQUEST:\n"
+            f"  • Customer mentioned more than one timing.{invalid_note}\n"
+            f"  • Valid catalog option(s): {valid_display}\n"
+            "  • Do not select a timing silently. Ask the customer to choose exactly one available batch.\n"
+            "  • Do not proceed to instructor, package, or payment until one timing is selected.\n"
+        )
     elif bool(last_turn_dict.get("timing_ambiguous") or s.get("timing_ambiguous")):
         amb_hr = last_turn_dict.get("ambiguous_hour") or s.get("ambiguous_hour") or "7"
         amb_cands = last_turn_dict.get("ambiguous_timing_candidates") or s.get("ambiguous_timing_candidates") or []

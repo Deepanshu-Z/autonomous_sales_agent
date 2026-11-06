@@ -304,6 +304,7 @@ def resolve_catalog_batch_semantics(
             return [m for m in matches if m]
 
         requests: List[tuple[int, Optional[int], bool]] = []
+        invalid_requests: List[str] = []
         spans = []
         range_pattern = re.compile(
             r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|\u2013|\u2014|se)\s*"
@@ -319,20 +320,41 @@ def resolve_catalog_batch_semantics(
                 requests.append((start, end, bool(start_meridiem or end_meridiem)))
                 spans.append(match.span())
 
-        # WhatsApp shorthand: "10 11" means an interval only when the two
-        # numbers are adjacent and the catalog contains that exact interval.
+        # WhatsApp shorthand: "10 11" means an interval when the two numbers
+        # are adjacent. Alternatives remain separate requests, e.g.
+        # "10 11 or 56" => [10-11, 56].
         if not requests:
             token_matches = list(re.finditer(r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE))
-            if len(token_matches) == 2:
-                first, second = token_matches
-                between = raw[first.end():second.start()].strip()
-                if not between or between in {" ", ","}:
-                    first_meridiem = (first.group(3) or "").upper() or None
-                    second_meridiem = (second.group(3) or first.group(3) or "").upper() or None
-                    start = to_minutes(int(first.group(1)), int(first.group(2) or 0), first_meridiem)
-                    end = to_minutes(int(second.group(1)), int(second.group(2) or 0), second_meridiem)
+            index = 0
+            while index < len(token_matches):
+                current = token_matches[index]
+                next_match = token_matches[index + 1] if index + 1 < len(token_matches) else None
+                between = raw[current.end():next_match.start()].strip() if next_match else ""
+                if next_match and not between:
+                    first_meridiem = (current.group(3) or "").upper() or None
+                    second_meridiem = (next_match.group(3) or first_meridiem or "").upper() or None
+                    start = to_minutes(int(current.group(1)), int(current.group(2) or 0), first_meridiem)
+                    end = to_minutes(int(next_match.group(1)), int(next_match.group(2) or 0), second_meridiem)
                     if start is not None and end is not None:
                         requests.append((start, end, bool(first_meridiem or second_meridiem)))
+                    else:
+                        invalid_requests.append(raw[current.start():next_match.end()].strip())
+                    index += 2
+                    continue
+
+                meridiem = (current.group(3) or "").upper() or None
+                hour = int(current.group(1))
+                minute = int(current.group(2) or 0)
+                if not meridiem and period == "Morning":
+                    meridiem = "AM"
+                elif not meridiem and period in {"Afternoon", "Evening"}:
+                    meridiem = "PM"
+                start = to_minutes(hour, minute, meridiem)
+                if start is not None:
+                    requests.append((start, None, bool(meridiem)))
+                else:
+                    invalid_requests.append(current.group(0).strip())
+                index += 1
 
         # A single hour is valid only when the catalog resolves it uniquely.
         if not requests:
@@ -354,7 +376,7 @@ def resolve_catalog_batch_semantics(
             return result
 
         valid: List[str] = []
-        invalid: List[str] = []
+        invalid: List[str] = list(invalid_requests)
         for start, end, explicit_meridiem in requests:
             matches = match_interval(start, end)
             if not explicit_meridiem and start < 12 * 60:
@@ -364,7 +386,10 @@ def resolve_catalog_batch_semantics(
             if matches:
                 valid.extend(matches)
             else:
-                invalid.append(f"{start}-{end}" if end is not None else str(start))
+                if end is not None:
+                    invalid.append(f"{start // 60:02d}:{start % 60:02d}-{end // 60:02d}:{end % 60:02d}")
+                else:
+                    invalid.append(f"{start // 60:02d}:{start % 60:02d}")
         valid = list(dict.fromkeys(valid))
 
         if len(valid) == 1 and not invalid:

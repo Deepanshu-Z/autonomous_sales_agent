@@ -33,8 +33,8 @@ def _get_classifier_llm():
                 api_key=openrouter_key,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0,
-                timeout=8,
-                max_retries=1,
+                timeout=22,
+                max_retries=0,
             )
         else:
             openai_key = os.getenv("OPENAI_API_KEY")
@@ -43,8 +43,8 @@ def _get_classifier_llm():
                 model=model_name,
                 api_key=openai_key,
                 temperature=0,
-                timeout=8,
-                max_retries=1,
+                timeout=22,
+                max_retries=0,
             )
     return _classifier_llm
 

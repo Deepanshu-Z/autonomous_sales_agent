@@ -285,11 +285,14 @@ def resolve_catalog_batch_semantics(
             return hour * 60 + minute
 
         def bounds(batch: Dict[str, Any]) -> Optional[tuple[int, int]]:
-            parts = str(batch.get("time_24h") or "").split("-", 1)
-            if len(parts) != 2:
-                return None
-            start, end = parse_clock(parts[0]), parse_clock(parts[1])
-            return (start, end) if start is not None and end is not None else None
+            for key, separator in (("time_24h", r"\s*[-\u2013\u2014]\s*"), ("time_12h", r"\s*(?:to|[-\u2013\u2014])\s*")):
+                raw_batch_time = str(batch.get(key) or "")
+                parts = re.split(separator, raw_batch_time, maxsplit=1, flags=re.IGNORECASE)
+                if len(parts) == 2:
+                    start, end = parse_clock(parts[0]), parse_clock(parts[1])
+                    if start is not None and end is not None:
+                        return start, end
+            return None
 
         def match_interval(start: int, end: Optional[int]) -> List[str]:
             matches = []

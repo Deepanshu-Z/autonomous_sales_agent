@@ -471,6 +471,42 @@ async def handle_incoming_message(
                 "new_state": new_state,
             }
 
+    # ── Fast-Path Guardrail (Pillar 2): Intercept Pure Out-of-Scope Queries ───
+    is_oos = bool(
+        flags.get("is_out_of_scope")
+        or flags.get("customer_intent") == "OUT_OF_SCOPE"
+    )
+    has_academy_signal = bool(
+        course_in_msg
+        or flags.get("wants_fee")
+        or flags.get("wants_schedule")
+        or flags.get("wants_demo")
+        or flags.get("wants_certificate")
+        or flags.get("wants_teacher_info")
+        or flags.get("claims_payment_or_enrollment")
+        or flags.get("booking_intent")
+        or flags.get("wants_human_agent")
+        or flags.get("timing_selected")
+        or flags.get("profile_created")
+        or flags.get("customer_intent") in (
+            "WANTS_FEE", "WANTS_SCHEDULE", "BOOKING_INTENT", "WANTS_DEMO",
+            "PAYMENT_CLAIM", "COMPLAINT", "AGENT_REQUEST", "CONFIRMATION"
+        )
+    )
+
+    if is_oos and not has_academy_signal:
+        logger.info(f"[GUARDRAILS] Pure Out-Of-Scope query detected: '{user_message}'. Fast-path deflecting.")
+        oos_reply, oos_followup = _generate_out_of_scope_deflection(
+            user_message=user_message,
+            detected_language=flags.get("detected_language") or new_state.get("language"),
+        )
+        return {
+            "reply": oos_reply,
+            "followup": oos_followup,
+            "buttons": [],
+            "new_state": new_state,
+        }
+
     # 3. Build the system prompt with the freshly-understood state.
     # The bot strictly uses the customer's selected language unless explicitly switched.
     from src.core import language_loader
@@ -549,6 +585,15 @@ async def handle_incoming_message(
     # Strictly intercept and sanitize any hallucinated confirmation of enrollment, trial, or payment
     main_reply, followup_msg = _sanitize_confirmation_guardrails(
         main_reply, followup_msg, language=detected_lang, state=new_state
+    )
+
+    # Strictly intercept and sanitize any out-of-scope code leaks or off-topic generator output
+    main_reply, followup_msg = _sanitize_out_of_scope_guardrails(
+        reply=main_reply,
+        followup=followup_msg,
+        user_message=user_message,
+        flags=flags,
+        language=detected_lang,
     )
 
     # Strictly sanitize any hallucinated timing selection when timing is ambiguous
@@ -968,6 +1013,103 @@ def _sanitize_confirmation_guardrails(
             )
             sanitized_followup = "Kya aap apna pura Gmail address (e.g. yourname@gmail.com) share kar sakte hain? 😊"
         return sanitized_reply, sanitized_followup
+
+    return reply, followup
+
+
+def _generate_out_of_scope_deflection(
+    user_message: str = "",
+    detected_language: Optional[str] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    Returns a polite, brand-safe deflection for any out-of-scope / off-topic user inquiry,
+    strictly respecting the customer's language and script.
+    """
+    msg = user_message or ""
+    # Check for Devanagari script (Hindi, Marathi, etc.)
+    has_devanagari = any("\u0900" <= c <= "\u097f" for c in msg)
+
+    # Check for pure English
+    lang = (detected_language or "").lower()
+    is_pure_english = (
+        ("english" in lang or lang == "en")
+        and "hinglish" not in lang
+        and not has_devanagari
+        and not re.search(
+            r"\b(?:kya|hai|hain|mujhe|mjhe|bhai|bhaiya|sir|mam|chahiye|chaiye|hlo|krdo|kardo|dedo|batao|karo|raat|subah|shaam|dopahar|kaise|nahi|nhi)\b",
+            msg,
+            re.IGNORECASE,
+        )
+    )
+
+    if has_devanagari:
+        main_reply = (
+            "मैं सेंसेशनज़ एकेडमी (Sensationz Academy) का डिजिटल असिस्टेंट हूँ। "
+            "मैं केवल हमारे कोर्सेस (डांस, योग, कत्थक, वेस्टर्न डांस, ज़ुम्बा, म्यूज़िक, गिटार, सिंगिंग, एक्टिंग, ड्रॉइंग), "
+            "बैच टाइमिंग्स, फीस और एडमिशन से जुड़ी जानकारी में आपकी मदद कर सकता हूँ। 😊"
+        )
+        followup = "क्या आप हमारे किसी कोर्स या क्लास टाइमिंग्स के बारे में जानना चाहेंगे? 😊"
+    elif is_pure_english:
+        main_reply = (
+            "I am the digital assistant for Sensationz Academy. "
+            "I can only assist with information regarding our academy courses "
+            "(Dance, Yoga, Kathak, Western Dance, Zumba, Music, Guitar, Singing, Acting, Drawing), "
+            "schedules, fees, and admissions. 😊"
+        )
+        followup = "Would you like to know more about our courses or batch timings? 😊"
+    else:
+        # Default to polite Hinglish
+        main_reply = (
+            "Main Sensationz Academy ka digital assistant hoon. "
+            "Main sirf hamare courses (Dance, Yoga, Kathak, Western Dance, Zumba, Music, Guitar, Singing, Acting, Drawing), "
+            "batch timings, fees aur admissions se judi jaankari mein aapki madad kar sakta hoon. 😊"
+        )
+        followup = "Kya aap hamare kisi course ya batch timings ke baare mein jaanna chahenge? 😊"
+
+    return main_reply, followup
+
+
+def _sanitize_out_of_scope_guardrails(
+    reply: str,
+    followup: Optional[str] = None,
+    user_message: str = "",
+    flags: Optional[Dict[str, Any]] = None,
+    language: Optional[str] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    Deterministic Fail-Safe Guardrail (Pillar 4):
+    Catches and intercepts any leaked code blocks, programming scripts, math derivations,
+    or off-topic answers in LLM output before it ever reaches the user.
+    """
+    if not reply:
+        return reply, followup
+
+    # Pattern 1: Markdown code fences with programming language tags or triple backticks with code
+    CODE_FENCE_REGEX = re.search(
+        r"```(?:python|javascript|js|typescript|ts|html|css|cpp|c|java|bash|sh|php|ruby|go|sql|json)?\s*[\r\n]+[\s\S]*?```",
+        reply,
+        re.IGNORECASE,
+    )
+
+    # Pattern 2: Raw programming statements / function definitions / log statements
+    CODE_SYNTAX_REGEX = re.search(
+        r"(?:\bprint\s*\(|console\.log\s*\(|\bdef\s+[a-zA-Z_]\w*\s*\(|\bfunction\s*\w*\s*\(|\bvar\s+\w+\s*=|\blet\s+\w+\s*=|\bconst\s+\w+\s*=|\bpublic\s+static\s+void\s+main|<!DOCTYPE\s+html>|import\s+(?:numpy|pandas|sys|os|react|express)\b)",
+        reply,
+        re.IGNORECASE,
+    )
+
+    # Pattern 3: Off-topic topic leakage if flagged out of scope
+    is_oos_flagged = bool(flags and (flags.get("is_out_of_scope") or flags.get("customer_intent") == "OUT_OF_SCOPE"))
+    mentions_academy = bool(re.search(r"\b(?:sensationz|academy|course|batch|class|timing|admission|fee)\b", reply, re.IGNORECASE))
+
+    has_code_leak = bool(CODE_FENCE_REGEX or CODE_SYNTAX_REGEX)
+    has_unredirected_oos_leak = bool(is_oos_flagged and not mentions_academy)
+
+    if has_code_leak or has_unredirected_oos_leak:
+        logger.warning(
+            f"[GUARDRAILS] Post-generation Out-of-Scope leak detected! Code leak: {has_code_leak}, OOS leak: {has_unredirected_oos_leak}. Intercepting."
+        )
+        return _generate_out_of_scope_deflection(user_message=user_message, detected_language=language)
 
     return reply, followup
 
@@ -1644,6 +1786,13 @@ async def _handle_conversation_turn_unlocked(
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(
         clean_reply, followup_msg, language=new_state.get("language"), state=new_state
     )
+    clean_reply, clean_followup = _sanitize_out_of_scope_guardrails(
+        reply=clean_reply,
+        followup=clean_followup,
+        user_message=text,
+        flags=last_turn,
+        language=new_state.get("language"),
+    )
     clean_reply, clean_followup = _sanitize_state_grounded_replies(
         clean_reply, clean_followup, state=new_state, last_turn=last_turn, active_cid=active_cid
     )
@@ -1827,6 +1976,7 @@ async def _handle_conversation_turn_unlocked(
         not new_state.get("payment_claimed")
         and not new_state.get("is_escalated")
         and not new_state.get("_last_turn", {}).get("is_disinterested")
+        and not new_state.get("_last_turn", {}).get("is_out_of_scope")
     ):
         arm_followup_timer(new_state, topic=text_clean)
     else:

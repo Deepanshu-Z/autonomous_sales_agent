@@ -74,6 +74,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_coupon_requested": False,
         "is_disinterested": False,
         "is_complaint_or_refund": False,
+        "is_out_of_scope": False,
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
@@ -240,8 +241,13 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 12. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
 
+12b. "is_out_of_scope":
+    - boolean: true if the customer's message asks about programming/coding, software code, syntax errors (e.g. Python, JavaScript, Hello World), mathematics, science, homework, medical diagnosis, recipes/cooking, politics, news, trivia, general world knowledge, or treats this bot as a general-purpose AI / search engine (ChatGPT, Siri, Google).
+    - CLOSED-WORLD ACADEMY DOMAIN: Sensationz Academy strictly offers Performing Arts & Dance courses (Dance, Yoga, Kathak, Western Dance, Zumba, Music, Guitar, Singing, Acting, Drawing). Anything outside our courses, batches, admissions, trial, app, and fees is strictly OUT OF SCOPE. Otherwise false.
+
 13. "customer_intent":
     Must be EXACTLY ONE of:
+    - "OUT_OF_SCOPE": Customer is asking an off-topic or general knowledge question completely unrelated to Sensationz Performing Arts Academy (e.g. coding/programming, syntax errors, recipes, general trivia, homework, jokes, medical advice, politics, general AI tasks). When assigned, set "is_out_of_scope" = true and set "question_summary" = "Off-topic query about [topic]".
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
       • CRITICAL NEGATIVE GUARD (OBJECTION ANSWERING): If the AI in the recent transcript asked what is holding the customer back, why they are hesitating, or asked if it's timing or fees (e.g. "kya cheez rok rahi hai? Kya timing, fees...?"), and the customer answers by naming an obstacle/topic (e.g. "timings", "timing", "fees", "price", "paise", "cost", "offline", "subah"), this is an OBJECTION REASON ("DISINTEREST"), NOT A "QUESTION"! NEVER output "QUESTION" when the customer is naming what is holding them back!
     - "TIMING_SELECTION": Customer is selecting or stating their preferred batch timing (e.g. "morning 7 am", "shaam 6 baje", "7:00-8:00 AM", "subah ka batch").
@@ -452,7 +458,7 @@ async def extract_intent_and_state_changes(
         for bool_key in [
             "wants_trial", "wants_demo_video", "wants_app_link", "requests_qr",
             "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
-            "is_complaint_or_refund", "wants_resend_video", "claims_payment_or_enrollment",
+            "is_complaint_or_refund", "is_out_of_scope", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
             "wants_trial_guide", "wants_trial_video_guide"
         ]:
@@ -468,6 +474,11 @@ async def extract_intent_and_state_changes(
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
         # Sync semantic request flags with customer_intent without raw-text regex overrides
+        if clean.get("customer_intent") == "OUT_OF_SCOPE":
+            clean["is_out_of_scope"] = True
+        elif clean.get("is_out_of_scope") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
+            clean["customer_intent"] = "OUT_OF_SCOPE"
+
         if clean.get("customer_intent") == "PHONE_CALL_REQUEST":
             clean["wants_phone_call"] = True
         elif clean.get("wants_phone_call") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST"):
@@ -1470,6 +1481,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "is_coupon_requested": flags.get("is_coupon_requested", False),
         "is_disinterested": flags.get("is_disinterested", False),
         "is_complaint_or_refund": flags.get("is_complaint_or_refund", False),
+        "is_out_of_scope": flags.get("is_out_of_scope", False),
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),

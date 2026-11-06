@@ -239,6 +239,141 @@ def resolve_catalog_batch_semantics(
     requested_start = parse_clock(start_24h)
     requested_end = parse_clock(end_24h)
 
+    def resolve_raw_requests(text: str) -> Dict[str, Any]:
+        """Resolve all timing expressions in free text against the catalog.
+
+        The catalog remains the authority; this only turns common WhatsApp
+        shorthand into candidate intervals. It deliberately returns multiple
+        candidates instead of silently choosing the first or last number.
+        """
+        result = {"status": "NONE", "timing": None, "candidates": [], "invalid": []}
+        raw = str(text or "").strip().lower()
+        if not raw:
+            return result
+
+        # Package phrases own their numbers ("1 month ka dedo"). Do not let
+        # the timing parser reinterpret those numbers as hours.
+        package_words = r"month|months|year|years|mahina|mahine|saal"
+        if re.search(rf"\b(?:\d{{1,2}}\s*)?(?:{package_words})\b", raw, re.IGNORECASE):
+            return result
+
+        if re.search(r"\b(?:baar|bar|times|weeks?|hafte?)\b", raw, re.IGNORECASE):
+            return result
+
+        period = None
+        if re.search(r"\b(?:morning|subah|subha|sawere|savere|mrng|am|sbh)\b", raw):
+            period = "Morning"
+        elif re.search(r"\b(?:evening|shaam|sham|raat|night|pm)\b", raw):
+            period = "Evening"
+        elif re.search(r"\b(?:afternoon|dopahar|lunch)\b", raw):
+            period = "Afternoon"
+
+        def to_minutes(hour: int, minute: int, meridiem: Optional[str]) -> Optional[int]:
+            if minute > 59:
+                return None
+            if meridiem:
+                if hour < 1 or hour > 12:
+                    return None
+                if meridiem == "AM" and hour == 12:
+                    hour = 0
+                elif meridiem == "PM" and hour != 12:
+                    hour += 12
+            elif hour > 23:
+                return None
+            return hour * 60 + minute
+
+        def bounds(batch: Dict[str, Any]) -> Optional[tuple[int, int]]:
+            parts = str(batch.get("time_24h") or "").split("-", 1)
+            if len(parts) != 2:
+                return None
+            start, end = parse_clock(parts[0]), parse_clock(parts[1])
+            return (start, end) if start is not None and end is not None else None
+
+        def match_interval(start: int, end: Optional[int]) -> List[str]:
+            matches = []
+            for batch in batches:
+                b = bounds(batch)
+                if not b:
+                    continue
+                if period and str(batch.get("slot") or "").casefold() != period.casefold():
+                    continue
+                if b[0] == start and (end is None or b[1] == end):
+                    matches.append(batch.get("time_12h"))
+            return [m for m in matches if m]
+
+        requests: List[tuple[int, Optional[int]]] = []
+        spans = []
+        range_pattern = re.compile(
+            r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|–|—|se)\s*"
+            r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?",
+            re.IGNORECASE,
+        )
+        for match in range_pattern.finditer(raw):
+            start_meridiem = (match.group(3) or match.group(6) or "").upper() or None
+            end_meridiem = (match.group(6) or match.group(3) or "").upper() or None
+            start = to_minutes(int(match.group(1)), int(match.group(2) or 0), start_meridiem)
+            end = to_minutes(int(match.group(4)), int(match.group(5) or 0), end_meridiem)
+            if start is not None and end is not None:
+                requests.append((start, end))
+                spans.append(match.span())
+
+        # WhatsApp shorthand: "10 11" means an interval only when the two
+        # numbers are adjacent and the catalog contains that exact interval.
+        if not requests:
+            token_matches = list(re.finditer(r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE))
+            if len(token_matches) == 2:
+                first, second = token_matches
+                between = raw[first.end():second.start()].strip()
+                if not between or between in {" ", ","}:
+                    first_meridiem = (first.group(3) or "").upper() or None
+                    second_meridiem = (second.group(3) or first.group(3) or "").upper() or None
+                    start = to_minutes(int(first.group(1)), int(first.group(2) or 0), first_meridiem)
+                    end = to_minutes(int(second.group(1)), int(second.group(2) or 0), second_meridiem)
+                    if start is not None and end is not None:
+                        requests.append((start, end))
+
+        # A single hour is valid only when the catalog resolves it uniquely.
+        if not requests:
+            token_matches = list(re.finditer(r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE))
+            if len(token_matches) == 1:
+                token = token_matches[0]
+                meridiem = (token.group(3) or "").upper() or None
+                hour = int(token.group(1))
+                minute = int(token.group(2) or 0)
+                if not meridiem and period == "Morning":
+                    meridiem = "AM"
+                elif not meridiem and period in {"Afternoon", "Evening"}:
+                    meridiem = "PM"
+                start = to_minutes(hour, minute, meridiem)
+                if start is not None:
+                    requests.append((start, None))
+
+        if not requests:
+            return result
+
+        valid: List[str] = []
+        invalid: List[str] = []
+        for start, end in requests:
+            matches = match_interval(start, end)
+            if matches:
+                valid.extend(matches)
+            else:
+                invalid.append(f"{start}-{end}" if end is not None else str(start))
+        valid = list(dict.fromkeys(valid))
+
+        if len(valid) == 1 and not invalid:
+            return {"status": "SELECTED", "timing": valid[0], "candidates": valid, "invalid": []}
+        if len(valid) > 1 and not invalid:
+            return {"status": "MULTIPLE_VALID", "timing": None, "candidates": valid, "invalid": []}
+        if valid:
+            return {"status": "MIXED", "timing": None, "candidates": valid, "invalid": invalid}
+        return {"status": "UNAVAILABLE", "timing": None, "candidates": [], "invalid": invalid}
+
+    if raw_text:
+        raw_resolution = resolve_raw_requests(raw_text)
+        if raw_resolution["status"] != "NONE":
+            return raw_resolution
+
     # Detect period if not provided
     if not period and raw_text:
         low = raw_text.lower()

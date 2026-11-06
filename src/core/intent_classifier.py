@@ -147,15 +147,23 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
          - Set "unoffered_type": null.
        • If that hour does NOT exist at all in the Allowed Canonical Batch Timings in either AM or PM :
          - Set "selected_timing": null, set "timing_ambiguous": false, set "unoffered_type": "TIMING", set "unoffered_value" to the requested timing, and set "customer_intent": "QUESTION".
-   - PERIOD CLARIFICATION & AMBIGUOUS RESOLUTION (MULTILINGUAL):
-     * If 'Pending Ambiguous Timing Hour' is set in context (or the assistant just asked to choose between Morning and Evening):
+   - PERIOD CLARIFICATION & BROAD PERIOD RULE (MULTILINGUAL):
+     * CASE A: If 'Pending Ambiguous Timing Hour' is set in context (or the assistant just asked to choose between Morning and Evening for a specific hour):
      * When the customer responds with their period preference in ANY language, script, dialect, typo, or slang (e.g. English "morning", "evening", "am", "pm", Hindi/Hinglish "subah", "sbh", "sbh ka", "subha", "sawere", "savere", "mrng", "morng", "shaam", "sham", "sham ka", "raat", Bengali "shokal", Tamil "kaalai", Telugu "udayam", Marathi "sakali", Gujarati "savare", etc.):
-       • Immediately resolve and map it to the corresponding canonical slot for that pending hour from Allowed Canonical Batch Timings (for example, if pending hour is 5: "sbh ka" -> "5:00 AM to 6:00 AM", "sham ka" -> "5:00 PM to 6:00 PM").
+       • Immediately resolve and map it to the corresponding canonical slot for that pending hour from Allowed Canonical Batch Timings (for example, if pending hour is 7: "sbh" -> "7:00 AM to 8:00 AM", "sham" -> "7:00 PM to 8:00 PM").
+
        • Set "selected_timing" to that exact canonical string.
-       • Set "timing_ambiguous": false.
-       • Set "ambiguous_hour": null.
-       • Set "customer_intent": "TIMING_SELECTION".
+       • Set "timing_ambiguous": false, "ambiguous_hour": null, "customer_intent": "TIMING_SELECTION".
        • Set "unoffered_type": null, "unoffered_value": null.
+     * CASE B: If NO pending ambiguous hour is set in context, and the customer asks for or mentions a broad period WITHOUT any clock number (e.g. "subah ka batch", "sbh", "subah", "morning", "shaam", "evening", "afternoon", "dopahar"):
+       • Broad periods contain multiple distinct batches. You are STRICTLY FORBIDDEN from guessing, picking, assuming, or auto-assigning an exact hourly slot (such as 5:00 AM)!
+       • Set "selected_timing": null.
+       • Set "requested_timing_period" to that period (e.g. "Morning", "Evening", "Afternoon").
+       • Set "requested_start_24h": null and "requested_end_24h": null (NEVER invent hours).
+       • Set "customer_intent": "TIMING_SELECTION".
+       • Set "timing_ambiguous": false.
+
+
    - Output ONLY the exact matching canonical string from the Allowed Canonical Batch Timings list, or null.
    - Also return the customer's requested interval independent of the catalog:
      "requested_start_24h" and "requested_end_24h" as zero-padded HH:MM strings,
@@ -268,7 +276,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "PAYMENT_REQUEST": Customer wants to pay online, asks how to pay, asks for UPI QR code, payment scanner, or payment link (e.g. "pay online", "payment qr", "send qr", "scanner bhejo", "payment link", "how to pay", "kahan pay karein", "upi id bhejo").
     - "PAYMENT_CLAIM": Customer states they completed payment, sent a payment screenshot/slip, or asks to verify payment / confirm enrollment ("paid", "payment done", "maine pay kar diya", "screenshot check karo", "paise bhej diye", "fees bhar di", "enrollment confirm karo").
     - "CLASSES_NOT_SHOWING": Customer states that their enrolled/purchased class, batch, or course is not visible in the app, classes not showing, cannot access class, blank app screen, or asks why course is not showing after login/payment ("show nhi hori", "classes nahi dikh rahi", "batch not showing", "not able to access classes", "kaha se join kare", "cannot see my class", "krlia lkn show nahi hori").
-    - "OTHER": Casual acknowledgement ("ok", "theek hai") or uncategorized.
+    - "OTHER": Casual acknowledgement ("ok", "ok thk h", "thik h", "theek hai", "haan", "yes", "sure", "done", "sahi hai", "hnji", "proceed") or uncategorized.
+      • CRITICAL: Casual agreement words without clock numbers MUST be classified as "OTHER", NEVER as "TIMING_SELECTION"! Casual agreement does NOT change, select, or state a timing!
 
 13. "question_summary":
     - Brief 3-8 word English description of what they are asking about if customer_intent is "QUESTION", else null.
@@ -657,6 +666,8 @@ async def extract_intent_and_state_changes(
             clean["timing_ambiguous"] = False
             clean["ambiguous_hour"] = None
             clean["ambiguous_timing_candidates"] = None
+            clean["timing_resolution_status"] = "SELECTED"
+            clean["timing_selection_attempted"] = True
             clean["unoffered_timing_mentioned"] = None
             if clean.get("unoffered_type") == "TIMING":
                 clean["unoffered_type"] = None
@@ -670,7 +681,7 @@ async def extract_intent_and_state_changes(
         # Period Detection: Trust LLM brain extraction first, fallback to basic keywords
         detected_period = clean.get("timing_period")
         if not detected_period:
-            if re.search(r"\b(morning|subah|early morning)\b", text, re.IGNORECASE):
+            if re.search(r"\b(morning|subah|sbh|subha|sawere|savere|mrng|early morning)\b", text, re.IGNORECASE):
                 detected_period = "Morning"
             elif re.search(r"\b(evening|shaam|sham|night|raat)\b", text, re.IGNORECASE):
                 detected_period = "Evening"
@@ -698,35 +709,63 @@ async def extract_intent_and_state_changes(
                 except Exception:
                     pass
 
-            if (s.get("timing_ambiguous") or s.get("ambiguous_hour")) and amb_candidates and not clean.get("selected_timing"):
-                period_low = detected_period.lower()
-                if period_low in ("morning", "am"):
+            if (s.get("timing_ambiguous") or s.get("ambiguous_hour")) and amb_candidates:
+                period_low = (detected_period or "").lower()
+                if period_low in ("morning", "am", "sbh", "subah", "sawere", "savere", "mrng"):
                     m_c = [c for c in amb_candidates if "am" in c.lower()]
                     if m_c:
                         clean["selected_timing"] = m_c[0]
                         clean["timing_ambiguous"] = False
                         clean["ambiguous_hour"] = None
                         clean["ambiguous_timing_candidates"] = None
-                elif period_low in ("evening", "afternoon", "pm"):
+                        clean["timing_resolution_status"] = "SELECTED"
+                        clean["timing_selection_attempted"] = True
+                elif period_low in ("evening", "afternoon", "pm", "shaam", "sham", "raat"):
                     m_c = [c for c in amb_candidates if "pm" in c.lower()]
                     if m_c:
                         clean["selected_timing"] = m_c[0]
                         clean["timing_ambiguous"] = False
                         clean["ambiguous_hour"] = None
                         clean["ambiguous_timing_candidates"] = None
+                        clean["timing_resolution_status"] = "SELECTED"
+                        clean["timing_selection_attempted"] = True
 
         # The raw customer message is authoritative for timing. The extractor
         # may suggest a canonical slot, but it cannot override an explicit
         # range/period that does not exist in the active course catalog.
         from src.core.helpers.schedule_engine import resolve_catalog_batch_semantics
-        timing_requested = bool(
-            clean.get("requested_start_24h")
-            or clean.get("requested_end_24h")
-            or clean.get("requested_timing_period")
-            or clean.get("customer_intent") == "TIMING_SELECTION"
-            or (clean.get("selected_timing") and not clean.get("question_summary"))
-            or re.search(r'(?<!\d)\d{1,2}(?::\d{2})?\s*(?:am|pm|bje|baje|o\'clock)?', text, re.IGNORECASE)
+        AFFIRMATIVE_AGREEMENT_REGEX = re.compile(
+            r"^(?:ok|okay|thk|thik|theek|sahi|done|hnji|haan|ha|yes|yep|sure|fine|alright|cool|proceed|perfect|chalega|chlega)"
+            r"(?:\s+(?:hai|h|bhai|ji|sir|mam|ok|okay|thk|theek|sahi|kardo|krdo|done|sure|yes|chalega|chlega))*"
+            r"[.!?\s]*$",
+            re.IGNORECASE,
         )
+        is_casual_agreement = bool(AFFIRMATIVE_AGREEMENT_REGEX.match(text.strip()))
+        has_time_num = bool(re.search(r'(?<!\d)\d{1,2}(?::\d{2}\s*(?:am|pm)?|\s*(?:am|pm|bje|baje|o\'clock))\b', text, re.IGNORECASE))
+        has_bare_time_word = bool(re.search(r'\b(morning|subah|subha|sawere|savere|mrng|evening|shaam|sham|raat|dopahar|afternoon|sbh)\b', text, re.IGNORECASE))
+
+        if is_casual_agreement and not has_time_num and not has_bare_time_word:
+            if clean.get("customer_intent") == "TIMING_SELECTION":
+                clean["customer_intent"] = "OTHER"
+            clean["selected_timing"] = None
+            clean["timing_ambiguous"] = False
+            clean["ambiguous_hour"] = None
+            clean["ambiguous_timing_candidates"] = None
+            clean["timing_resolution_status"] = "NONE"
+            clean["timing_selection_attempted"] = False
+            timing_requested = False
+        elif clean.get("selected_timing") and (clean.get("timing_resolution_status") == "SELECTED" or clean.get("selected_timing") in course_batches):
+            timing_requested = False
+        else:
+            timing_requested = bool(
+                clean.get("requested_start_24h")
+                or clean.get("requested_end_24h")
+                or clean.get("requested_timing_period")
+                or clean.get("customer_intent") == "TIMING_SELECTION"
+                or (clean.get("selected_timing") and not clean.get("question_summary"))
+                or has_time_num
+                or has_bare_time_word
+            )
         if timing_requested:
             timing_resolution = resolve_catalog_batch_semantics(
                 active_cid,

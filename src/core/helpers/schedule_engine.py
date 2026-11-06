@@ -246,7 +246,7 @@ def resolve_catalog_batch_semantics(
             period = "Evening"
         elif re.search(r'\b(afternoon|dopahar|lunch)\b', low):
             period = "Afternoon"
-        elif re.search(r'\b(morning|subah|subha|sawere|savere|mrng|am)\b', low):
+        elif re.search(r'\b(morning|subah|subha|sawere|savere|mrng|am|sbh)\b', low):
             period = "Morning"
 
     # Raw numeric evidence outranks an extractor's rewritten canonical slot.
@@ -259,7 +259,10 @@ def resolve_catalog_batch_semantics(
             merid = m.group(3).upper() if m.group(3) else None
             tokens.append((hr, mn, merid, m.start()))
 
-        if tokens:
+        if not tokens:
+            requested_start = None
+            requested_end = None
+        else:
             # If multiple tokens and some have explicit meridiem, prefer token with meridiem
             merid_tokens = [t for t in tokens if t[2]]
             chosen = merid_tokens[-1] if merid_tokens else tokens[-1]
@@ -334,9 +337,17 @@ def resolve_catalog_batch_semantics(
     ]
     result["candidates"] = [batch.get("time_12h") for batch in candidates]
 
-    if len(candidates) == 1:
+    if requested_start is None and requested_end is None and not period:
+        result["status"] = "NONE"
+        result["candidates"] = []
+        return result
+
+    if len(candidates) == 1 and (requested_start is not None or not period):
         result["status"] = "SELECTED"
         result["timing"] = candidates[0].get("time_12h")
+        return result
+    if len(candidates) >= 1 and period and requested_start is None and requested_end is None:
+        result["status"] = "PERIOD_ONLY"
         return result
     if len(candidates) > 1:
         result["status"] = "AMBIGUOUS"
@@ -352,7 +363,7 @@ def resolve_catalog_batch_semantics(
 
     # Missing semantic timing data is deliberately unresolved. A canonical
     # timing guessed by the extractor is never enough to select a batch.
-    result["status"] = "UNRESOLVED"
+    result["status"] = "NONE"
     return result
 
 
@@ -1089,11 +1100,10 @@ def get_available_days_for_batch(
     # Robust fallback: If strict intersection of timing + teacher yielded no matches (due to slot clash),
     # fall back to teacher's days, timing's days, or course-wide days!
     if not matched_days:
-        if teacher:
+        if teacher and timing:
             fallback_teacher = get_available_days_for_batch(course_id=course_id, teacher=teacher)
             if fallback_teacher:
                 return fallback_teacher
-        if timing:
             fallback_timing = get_available_days_for_batch(course_id=course_id, timing=timing)
             if fallback_timing:
                 return fallback_timing

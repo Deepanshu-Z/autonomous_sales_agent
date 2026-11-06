@@ -323,16 +323,20 @@ def resolve_catalog_batch_semantics(
         # WhatsApp shorthand: "10 11" means an interval when the two numbers
         # are adjacent. Alternatives remain separate requests, e.g.
         # "10 11 or 56" => [10-11, 56].
-        if not requests:
-            token_matches = list(re.finditer(r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE))
+        token_matches = list(re.finditer(r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE))
+        uncovered_tokens = [
+            token for token in token_matches
+            if not any(start <= token.start() and token.end() <= end for start, end in spans)
+        ]
+        if uncovered_tokens:
             index = 0
-            while index < len(token_matches):
-                current = token_matches[index]
-                next_match = token_matches[index + 1] if index + 1 < len(token_matches) else None
+            while index < len(uncovered_tokens):
+                current = uncovered_tokens[index]
+                next_match = uncovered_tokens[index + 1] if index + 1 < len(uncovered_tokens) else None
                 between = raw[current.end():next_match.start()].strip() if next_match else ""
                 if next_match and not between:
-                    first_meridiem = (current.group(3) or "").upper() or None
-                    second_meridiem = (next_match.group(3) or first_meridiem or "").upper() or None
+                    second_meridiem = (next_match.group(3) or current.group(3) or "").upper() or None
+                    first_meridiem = (current.group(3) or second_meridiem or "").upper() or None
                     start = to_minutes(int(current.group(1)), int(current.group(2) or 0), first_meridiem)
                     end = to_minutes(int(next_match.group(1)), int(next_match.group(2) or 0), second_meridiem)
                     if start is not None and end is not None:
@@ -373,6 +377,8 @@ def resolve_catalog_batch_semantics(
                     requests.append((start, None, bool(meridiem)))
 
         if not requests:
+            if invalid_requests:
+                return {"status": "UNAVAILABLE", "timing": None, "candidates": [], "invalid": invalid_requests}
             return result
 
         valid: List[str] = []

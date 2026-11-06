@@ -734,6 +734,8 @@ async def extract_intent_and_state_changes(
         # may suggest a canonical slot, but it cannot override an explicit
         # range/period that does not exist in the active course catalog.
         from src.core.helpers.schedule_engine import resolve_catalog_batch_semantics
+        raw_timing_preview = resolve_catalog_batch_semantics(active_cid, raw_text=text)
+        raw_timing_attempt = raw_timing_preview.get("status") != "NONE"
         AFFIRMATIVE_AGREEMENT_REGEX = re.compile(
             r"^(?:ok|okay|thk|thik|theek|sahi|done|hnji|haan|ha|yes|yep|sure|fine|alright|cool|proceed|perfect|chalega|chlega)"
             r"(?:\s+(?:hai|h|bhai|ji|sir|mam|ok|okay|thk|theek|sahi|kardo|krdo|done|sure|yes|chalega|chlega))*"
@@ -766,7 +768,11 @@ async def extract_intent_and_state_changes(
             clean["timing_resolution_status"] = "NONE"
             clean["timing_selection_attempted"] = False
             timing_requested = False
-        elif clean.get("selected_timing") and (clean.get("timing_resolution_status") == "SELECTED" or clean.get("selected_timing") in course_batches):
+        elif (
+            clean.get("selected_timing")
+            and not raw_timing_attempt
+            and (clean.get("timing_resolution_status") == "SELECTED" or clean.get("selected_timing") in course_batches)
+        ):
             timing_requested = False
         else:
             timing_requested = bool(
@@ -778,6 +784,7 @@ async def extract_intent_and_state_changes(
                 or has_time_num
                 or has_bare_hour
                 or has_bare_time_word
+                or raw_timing_attempt
             )
             if package_candidate and not (has_time_num or has_bare_time_word):
                 timing_requested = False
@@ -1024,6 +1031,53 @@ async def extract_intent_and_state_changes(
             elif clean.get("selected_course"):
                 clean["unoffered_type"] = None
                 clean["unoffered_value"] = None
+
+        # Final timing authority: legacy extractor normalization above may
+        # reinterpret malformed alternatives (for example, "56" as 5 PM).
+        # Re-validate the original message after all legacy paths and make
+        # the catalog resolver's decision immutable for this turn.
+        from src.core.helpers.schedule_engine import resolve_catalog_batch_semantics
+        final_timing = (
+            resolve_catalog_batch_semantics(active_cid, raw_text=text)
+            if timing_requested else {"status": "NONE"}
+        )
+        final_status = final_timing.get("status")
+        if final_status in {"MULTIPLE_VALID", "MIXED"}:
+            clean["selected_timing"] = None
+            clean["timing_ambiguous"] = True
+            clean["ambiguous_hour"] = None
+            clean["ambiguous_timing_candidates"] = final_timing.get("candidates") or None
+            clean["invalid_timing_candidates"] = final_timing.get("invalid") or None
+            clean["unoffered_type"] = None
+            clean["unoffered_value"] = None
+            clean["unoffered_timing_mentioned"] = None
+            clean["timing_resolution_status"] = final_status
+            clean["timing_selection_attempted"] = True
+            clean["customer_intent"] = "TIMING_SELECTION"
+        elif final_status == "SELECTED":
+            clean["selected_timing"] = final_timing.get("timing")
+            clean["timing_ambiguous"] = False
+            clean["ambiguous_hour"] = None
+            clean["ambiguous_timing_candidates"] = None
+            clean["invalid_timing_candidates"] = None
+            clean["unoffered_type"] = None
+            clean["unoffered_value"] = None
+            clean["unoffered_timing_mentioned"] = None
+            clean["timing_resolution_status"] = "SELECTED"
+            clean["timing_selection_attempted"] = True
+            clean["customer_intent"] = "TIMING_SELECTION"
+        elif final_status == "UNAVAILABLE":
+            clean["selected_timing"] = None
+            clean["timing_ambiguous"] = False
+            clean["ambiguous_hour"] = None
+            clean["ambiguous_timing_candidates"] = None
+            clean["invalid_timing_candidates"] = final_timing.get("invalid") or None
+            clean["unoffered_type"] = "TIMING"
+            clean["unoffered_value"] = ", ".join(str(v) for v in (final_timing.get("invalid") or [])) or text.strip()
+            clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
+            clean["timing_resolution_status"] = "UNAVAILABLE"
+            clean["timing_selection_attempted"] = True
+            clean["customer_intent"] = "QUESTION"
 
         return clean
     except Exception as e:

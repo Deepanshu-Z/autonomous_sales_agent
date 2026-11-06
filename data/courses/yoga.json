@@ -52,7 +52,7 @@
         "currency": "INR",
         "gst_included_in_listed_price": false,
         "gst_percentage": 5,
-        "gst_added_at": "Checkout in app or website",
+        "gst_added_at": "Checkout",
         "offer_mechanism": "Welcome Offer coupon sent after profile creation in app/website",
         "beginner_recommendation": "1 Month package",
         "packages": [

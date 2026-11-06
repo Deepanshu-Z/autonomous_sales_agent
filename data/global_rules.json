@@ -107,11 +107,11 @@
         "video_caption": "🎬 How to Download Sensationz App & Create Profile",
         "steps": [
             "Select your preferred batch timing and package duration",
-            "Complete payment via UPI QR code or Sensationz App / website checkout",
+            "Complete payment directly in the WhatsApp chat via the provided UPI QR code or payment link",
             "Download the Sensationz App and log in using your registered phone number",
             "Access your live interactive classes under 'My Classes' on your dashboard"
         ],
-        "payment_platform": "Sensationz App or official website only",
+        "payment_platform": "WhatsApp chat via dynamic Razorpay UPI QR code or direct payment link",
         "coupon_delivery": "Provided upfront with package pricing"
     },
     "support_and_escalation": {

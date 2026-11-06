@@ -307,7 +307,7 @@ def format_package_fees_display(course_id: Optional[str] = None) -> str:
         return ""
     gst_pct = get_course_gst_percentage(course_id)
     lines = [f"• *{pkg}:* {fee}" for pkg, fee in pkgs.items()]
-    lines.append(f"\n*Note:* {gst_pct}% GST will be applicable at checkout on the app/website.")
+    lines.append(f"\n*Note:* {gst_pct}% GST will be applicable at checkout.")
     return "\n".join(lines)
 
 
@@ -820,4 +820,3 @@ def format_order_summary(state: Optional[Dict[str, Any]] = None, **kwargs) -> st
 def generate_order_summary(state: Optional[Dict[str, Any]] = None, **kwargs) -> str:
     """Convenience alias for format_order_summary."""
     return format_order_summary(state, **kwargs)
-

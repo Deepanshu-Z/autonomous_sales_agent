@@ -49,7 +49,7 @@
         "currency": "INR",
         "gst_included_in_listed_price": false,
         "gst_percentage": 5,
-        "gst_added_at": "Checkout in app or website",
+        "gst_added_at": "Checkout",
         "offer_mechanism": "Coupon code applied at checkout",
         "beginner_recommendation": "1 Month package",
         "packages": [
@@ -98,7 +98,7 @@
                 "per_day_offer": "Rs.4.9/day"
             }
         ],
-        "note": "5% GST is applicable at checkout on app or website; listed base prices and offer prices are exclusive of 5% GST."
+        "note": "5% GST is applicable at checkout; listed base prices and offer prices are exclusive of 5% GST."
     },
     "batch_timings": {
         "total_batches": 4,

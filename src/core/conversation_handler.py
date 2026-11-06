@@ -1975,6 +1975,7 @@ async def _handle_conversation_turn_unlocked(
     if (
         not new_state.get("payment_claimed")
         and not new_state.get("is_escalated")
+        and new_state.get("payment_status") != "PAID"
         and not new_state.get("_last_turn", {}).get("is_disinterested")
         and not new_state.get("_last_turn", {}).get("is_out_of_scope")
     ):

@@ -342,6 +342,10 @@ def format_support_executives_display() -> str:
     execs = get_support_executives()
     if not execs:
         return ""
+    for executive in execs:
+        salutation = str(executive.get("salutation") or "").strip()
+        if salutation and salutation.lower() not in str(executive.get("name") or "").lower():
+            executive["name"] = f"{executive['name']} {salutation}"
     lines = [f"• {e['name']}: {e['phone']}" for e in execs if e.get("name") and e.get("phone")]
     return "\n".join(lines)
 
@@ -433,4 +437,4 @@ from src.core.pricing_engine import (
     format_order_summary,
     get_order_summary_details,
     generate_order_summary,
-)
+)

@@ -469,9 +469,20 @@ async def format_onboarding_confirmation_async(
         student_email=student_email,
     )
 
+    from src.core.kb_loader import format_support_executives_display
+    support_contacts = format_support_executives_display()
     lang_lower = (language or "english").lower().strip()
     is_hindi = "hindi" in lang_lower and "hinglish" not in lang_lower
     is_hinglish = "hinglish" in lang_lower or "roman" in lang_lower or "latin" in lang_lower
+    if is_hindi:
+        support_intro = "Kisi bhi sawaal ke liye aap apni pasand ki language mein hamari support team se baat kar sakte hain:"
+    elif is_hinglish:
+        support_intro = "Agar aapko koi doubt ho, toh aap apni preferred language mein hamari support team se baat kar sakte hain:"
+    else:
+        support_intro = "If you have any questions, you can also connect with our support team in your preferred language:"
+    if support_contacts:
+        base_msg = f"{base_msg}\n\n{support_intro}\n{support_contacts}"
+
     is_english = "english" in lang_lower and not is_hinglish
 
     # If already covered by native pre-rendered template, return immediately
@@ -686,6 +697,9 @@ async def fulfill_razorpay_payment_async(
             )
 
         # Save session state
+        state["follow_up_count"] = 0
+        state["next_followup_due_at"] = None
+        state["next_follow_up_due_at"] = None
         await save_user_state_async(phone, state)
 
         # Format localized onboarding confirmation template

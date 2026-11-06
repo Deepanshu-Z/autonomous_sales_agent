@@ -246,7 +246,7 @@ def resolve_catalog_batch_semantics(
         shorthand into candidate intervals. It deliberately returns multiple
         candidates instead of silently choosing the first or last number.
         """
-        result = {"status": "NONE", "timing": None, "candidates": [], "invalid": []}
+        result = {"status": "NONE", "timing": None, "candidates": [], "invalid": [], "skip": False}
         raw = str(text or "").strip().lower()
         if not raw:
             return result
@@ -255,9 +255,11 @@ def resolve_catalog_batch_semantics(
         # the timing parser reinterpret those numbers as hours.
         package_words = r"month|months|year|years|mahina|mahine|saal"
         if re.search(rf"\b(?:\d{{1,2}}\s*)?(?:{package_words})\b", raw, re.IGNORECASE):
+            result["skip"] = True
             return result
 
         if re.search(r"\b(?:baar|bar|times|weeks?|hafte?)\b", raw, re.IGNORECASE):
+            result["skip"] = True
             return result
 
         period = None
@@ -301,10 +303,10 @@ def resolve_catalog_batch_semantics(
                     matches.append(batch.get("time_12h"))
             return [m for m in matches if m]
 
-        requests: List[tuple[int, Optional[int]]] = []
+        requests: List[tuple[int, Optional[int], bool]] = []
         spans = []
         range_pattern = re.compile(
-            r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|–|—|se)\s*"
+            r"(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|\u2013|\u2014|se)\s*"
             r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?",
             re.IGNORECASE,
         )
@@ -314,7 +316,7 @@ def resolve_catalog_batch_semantics(
             start = to_minutes(int(match.group(1)), int(match.group(2) or 0), start_meridiem)
             end = to_minutes(int(match.group(4)), int(match.group(5) or 0), end_meridiem)
             if start is not None and end is not None:
-                requests.append((start, end))
+                requests.append((start, end, bool(start_meridiem or end_meridiem)))
                 spans.append(match.span())
 
         # WhatsApp shorthand: "10 11" means an interval only when the two
@@ -330,7 +332,7 @@ def resolve_catalog_batch_semantics(
                     start = to_minutes(int(first.group(1)), int(first.group(2) or 0), first_meridiem)
                     end = to_minutes(int(second.group(1)), int(second.group(2) or 0), second_meridiem)
                     if start is not None and end is not None:
-                        requests.append((start, end))
+                        requests.append((start, end, bool(first_meridiem or second_meridiem)))
 
         # A single hour is valid only when the catalog resolves it uniquely.
         if not requests:
@@ -346,15 +348,19 @@ def resolve_catalog_batch_semantics(
                     meridiem = "PM"
                 start = to_minutes(hour, minute, meridiem)
                 if start is not None:
-                    requests.append((start, None))
+                    requests.append((start, None, bool(meridiem)))
 
         if not requests:
             return result
 
         valid: List[str] = []
         invalid: List[str] = []
-        for start, end in requests:
+        for start, end, explicit_meridiem in requests:
             matches = match_interval(start, end)
+            if not explicit_meridiem and start < 12 * 60:
+                # Bare 12-hour input is matched against the catalog's actual
+                # AM/PM values; no schedule value is invented or hardcoded.
+                matches = list(dict.fromkeys(matches + match_interval(start + 12 * 60, end + 12 * 60 if end is not None and end < 12 * 60 else end)))
             if matches:
                 valid.extend(matches)
             else:
@@ -371,7 +377,7 @@ def resolve_catalog_batch_semantics(
 
     if raw_text:
         raw_resolution = resolve_raw_requests(raw_text)
-        if raw_resolution["status"] != "NONE":
+        if raw_resolution["status"] != "NONE" or raw_resolution.get("skip"):
             return raw_resolution
 
     # Detect period if not provided

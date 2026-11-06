@@ -743,6 +743,18 @@ async def extract_intent_and_state_changes(
         is_casual_agreement = bool(AFFIRMATIVE_AGREEMENT_REGEX.match(text.strip()))
         has_time_num = bool(re.search(r'(?<!\d)\d{1,2}(?::\d{2}\s*(?:am|pm)?|\s*(?:am|pm|bje|baje|o\'clock))\b', text, re.IGNORECASE))
         has_bare_time_word = bool(re.search(r'\b(morning|subah|subha|sawere|savere|mrng|evening|shaam|sham|raat|dopahar|afternoon|sbh)\b', text, re.IGNORECASE))
+        # WhatsApp shorthand: "10ok", "10done", and "10 book krdo".
+        # The catalog resolver remains authoritative; this only opens the
+        # timing path so those messages are not discarded before validation.
+        timing_stage = s.get("stage") in {
+            "DAYS_SELECTED", "ENROLL_ASKED", "TIMING_SELECTED",
+            "TEACHER_SELECTED", "PACKAGE_SELECTED"
+        }
+        has_bare_hour = bool(
+            timing_stage
+            and re.search(r'(?<!\d)\d{1,2}(?!\d)', text)
+        )
+        package_candidate = bool(clean.get("selected_package") or clean.get("customer_intent") == "PACKAGE_SELECTION")
 
         if is_casual_agreement and not has_time_num and not has_bare_time_word:
             if clean.get("customer_intent") == "TIMING_SELECTION":
@@ -764,8 +776,11 @@ async def extract_intent_and_state_changes(
                 or clean.get("customer_intent") == "TIMING_SELECTION"
                 or (clean.get("selected_timing") and not clean.get("question_summary"))
                 or has_time_num
+                or has_bare_hour
                 or has_bare_time_word
             )
+            if package_candidate and not (has_time_num or has_bare_time_word):
+                timing_requested = False
         if timing_requested:
             timing_resolution = resolve_catalog_batch_semantics(
                 active_cid,
@@ -789,6 +804,17 @@ async def extract_intent_and_state_changes(
             elif resolution_status == "AMBIGUOUS":
                 clean["selected_timing"] = None
                 clean["timing_ambiguous"] = True
+                clean["ambiguous_timing_candidates"] = timing_resolution.get("candidates") or None
+                clean["unoffered_type"] = None
+                clean["unoffered_value"] = None
+                clean["unoffered_timing_mentioned"] = None
+                clean["customer_intent"] = "TIMING_SELECTION"
+            elif resolution_status in {"MULTIPLE_VALID", "MIXED"}:
+                # Several requests must never be reduced to the first/last
+                # number. The prompt layer asks the customer to choose one.
+                clean["selected_timing"] = None
+                clean["timing_ambiguous"] = True
+                clean["ambiguous_hour"] = None
                 clean["ambiguous_timing_candidates"] = timing_resolution.get("candidates") or None
                 clean["unoffered_type"] = None
                 clean["unoffered_value"] = None
@@ -1185,7 +1211,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     # 2. Timing Slot Merge (Only on selection turns or when explicitly provided)
     if flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
-        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED"
+        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED", "MULTIPLE_VALID", "MIXED"
     } and not is_paid:
         # A new timing attempt supersedes stale pre-payment timing state. Keep
         # the customer at the timing step; never let the old slot drive teacher
@@ -1276,7 +1302,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     # 3. Teacher Slot Merge (On selection turns OR when teacher is explicitly mentioned / demo requested)
     teacher_flag = flags.get("selected_teacher")
     timing_unresolved = flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
-        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED"
+        "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED", "MULTIPLE_VALID", "MIXED"
     }
     if teacher_flag and not timing_unresolved and (
         is_selection_turn or flags.get("wants_demo") or not new_state.get("selected_teacher")

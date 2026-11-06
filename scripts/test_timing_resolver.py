@@ -21,6 +21,11 @@ def main() -> None:
             start_24h=semantic["start"],
             end_24h=semantic["end"],
             period=semantic["period"],
+            raw_text=(
+                "4-5 morning" if semantic["start"] == "04:00"
+                else "4-5 evening" if semantic["start"] == "16:00"
+                else None
+            ),
         )
         assert result["status"] == expected_status, (semantic, result)
         if expected_timing:

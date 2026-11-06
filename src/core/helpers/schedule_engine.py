@@ -189,6 +189,7 @@ def resolve_catalog_batch_semantics(
     start_24h: Optional[str] = None,
     end_24h: Optional[str] = None,
     period: Optional[str] = None,
+    raw_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Resolve normalized semantic timing fields against catalog data.
 
@@ -233,9 +234,90 @@ def resolve_catalog_batch_semantics(
         start, end = (parse_clock(part) for part in parts)
         return (start, end) if start is not None and end is not None else None
 
+    batches = get_available_timings(course_id)
+
     requested_start = parse_clock(start_24h)
     requested_end = parse_clock(end_24h)
-    batches = get_available_timings(course_id)
+
+    # Detect period if not provided
+    if not period and raw_text:
+        low = raw_text.lower()
+        if re.search(r'\b(evening|shaam|sham|raat|night|pm)\b', low):
+            period = "Evening"
+        elif re.search(r'\b(afternoon|dopahar|lunch)\b', low):
+            period = "Afternoon"
+        elif re.search(r'\b(morning|subah|subha|sawere|savere|mrng|am)\b', low):
+            period = "Morning"
+
+    # Raw numeric evidence outranks an extractor's rewritten canonical slot.
+    # Respects explicit meridiem (am/pm), multi-number contexts, and colloquial periods.
+    if raw_text:
+        tokens = []
+        for m in re.finditer(r'(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', raw_text, re.IGNORECASE):
+            hr = int(m.group(1))
+            mn = int(m.group(2) or 0)
+            merid = m.group(3).upper() if m.group(3) else None
+            tokens.append((hr, mn, merid, m.start()))
+
+        if tokens:
+            # If multiple tokens and some have explicit meridiem, prefer token with meridiem
+            merid_tokens = [t for t in tokens if t[2]]
+            chosen = merid_tokens[-1] if merid_tokens else tokens[-1]
+
+            # Range match: e.g. "12 to 1", "5-6"
+            range_match = re.search(r'(?<!\d)(\d{1,2})(?::(\d{2}))?\s*(?:to|-|se)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', raw_text, re.IGNORECASE)
+            if range_match:
+                s_hr = int(range_match.group(1))
+                s_mn = int(range_match.group(2) or 0)
+                e_hr = int(range_match.group(3))
+                e_mn = int(range_match.group(4) or 0)
+                r_merid = range_match.group(5).upper() if range_match.group(5) else (chosen[2] or (
+                    "PM" if period in ("Evening", "Afternoon") else ("AM" if period == "Morning" else None)
+                ))
+                if r_merid == "PM":
+                    s_hr = s_hr if s_hr == 12 else (s_hr + 12 if s_hr < 12 else s_hr)
+                    e_hr = e_hr if e_hr == 12 else (e_hr + 12 if e_hr < 12 else e_hr)
+                elif r_merid == "AM":
+                    s_hr = 0 if s_hr == 12 else s_hr
+                    e_hr = 0 if e_hr == 12 else e_hr
+                requested_start = s_hr * 60 + s_mn
+                requested_end = e_hr * 60 + e_mn
+            else:
+                hr, mn, merid, _ = chosen
+                effective_merid = merid or ("PM" if period in ("Evening", "Afternoon") else ("AM" if period == "Morning" else None))
+                if effective_merid == "PM":
+                    hr = hr if hr == 12 else (hr + 12 if hr < 12 else hr)
+                elif effective_merid == "AM":
+                    hr = 0 if hr == 12 else hr
+                elif period == "Evening" and hr < 12:
+                    hr += 12
+                elif period == "Afternoon" and 1 <= hr <= 6:
+                    hr += 12
+
+                # If bare hour without meridiem or period, evaluate ambiguity across AM and PM
+                if not effective_merid and not period and hr <= 12:
+                    am_time = (0 if hr == 12 else hr) * 60 + mn
+                    pm_time = (12 if hr == 12 else hr + 12) * 60 + mn
+                    am_cands = [b for b in batches if (bounds := catalog_bounds(b)) and bounds[0] == am_time]
+                    pm_cands = [b for b in batches if (bounds := catalog_bounds(b)) and bounds[0] == pm_time]
+                    if am_cands and pm_cands:
+                        result["status"] = "AMBIGUOUS"
+                        result["candidates"] = [b.get("time_12h") for b in am_cands + pm_cands]
+                        return result
+                    elif len(am_cands) == 1 and not pm_cands:
+                        result["status"] = "SELECTED"
+                        result["timing"] = am_cands[0].get("time_12h")
+                        result["candidates"] = [result["timing"]]
+                        return result
+                    elif len(pm_cands) == 1 and not am_cands:
+                        result["status"] = "SELECTED"
+                        result["timing"] = pm_cands[0].get("time_12h")
+                        result["candidates"] = [result["timing"]]
+                        return result
+                    else:
+                        result["status"] = "UNAVAILABLE"
+                        return result
+                requested_start = hr * 60 + mn
 
     def matches(batch: Dict[str, Any], bounds: tuple[int, int]) -> bool:
         if period and str(batch.get("slot") or "").casefold() != str(period).casefold():

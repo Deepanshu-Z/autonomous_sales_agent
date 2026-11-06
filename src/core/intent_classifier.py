@@ -525,6 +525,7 @@ async def extract_intent_and_state_changes(
 
         matched_batch = None
         clean_user = ""
+        raw_timing = None
 
         if is_user_bare_hour:
             target_hr = int(colloquial_text_match.group(1)) if colloquial_text_match else int(u_clean)
@@ -626,12 +627,12 @@ async def extract_intent_and_state_changes(
                     for b in course_batches:
                         b_low = b.lower()
                         norm_b = b_low.replace("–", " to ").replace("-", " to ")
-                        if r_low == b_low or b_low.startswith(r_low) or r_low == norm_b or norm_b.startswith(r_low):
+                        if r_low == b_low or r_low == norm_b:
                             matched_batch = b
                             break
                         # Match start hour/meridiem: e.g. '12pm' -> '12:00 PM', '5pm' -> '5:00 PM'
                         start_part = norm_b.split(" to ")[0].replace(":00", "").replace(" ", "")
-                        if clean_u_compact == start_part or start_part.startswith(clean_u_compact) or clean_user == start_part:
+                        if clean_u_compact == start_part or clean_user == start_part:
                             matched_batch = b
                             break
                         # Match full range: e.g. '12to1' or '12pmto1pm'
@@ -654,26 +655,6 @@ async def extract_intent_and_state_changes(
                 clean["customer_intent"] = "TIMING_SELECTION"
         else:
             clean["selected_timing"] = None
-            if not clean.get("timing_ambiguous"):
-                # Deterministic unoffered timing detection for bare hour (e.g. '3') or unoffered time string
-                if clean_user.isdigit() and 1 <= int(clean_user) <= 12:
-                    clean["unoffered_type"] = "TIMING"
-                    clean["unoffered_value"] = f"{int(clean_user)}:00"
-                    clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
-                    if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
-                        clean["customer_intent"] = "QUESTION"
-                        clean["question_summary"] = f"Inquiry about {clean['unoffered_value']} batch timing"
-                elif not is_timing_settled and raw_timing and isinstance(raw_timing, str) and (
-                    any(w in raw_timing.lower() for w in ["am", "pm", "to", "baje", "bje", "o'clock", "noon"])
-                    or re.search(r"\b\d{1,2}:\d{2}\b", raw_timing)
-                    or re.search(r"\b\d{1,2}\s*(?:to|-)\s*\d{1,2}\b", raw_timing)
-                ) and not ("@" in raw_timing or re.search(r"[a-zA-Z]{5,}\d+", raw_timing)):
-                    if not clean.get("unoffered_type"):
-                        clean["unoffered_type"] = "TIMING"
-                        clean["unoffered_value"] = raw_timing.strip()
-                        clean["unoffered_timing_mentioned"] = clean["unoffered_value"]
-                    if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
-                        clean["customer_intent"] = "QUESTION"
 
         # Period Detection: Trust LLM brain extraction first, fallback to basic keywords
         detected_period = clean.get("timing_period")
@@ -733,13 +714,15 @@ async def extract_intent_and_state_changes(
             or clean.get("requested_timing_period")
             or clean.get("customer_intent") == "TIMING_SELECTION"
             or (clean.get("selected_timing") and not clean.get("question_summary"))
+            or re.search(r'(?<!\d)\d{1,2}(?::\d{2})?\s*(?:am|pm|bje|baje|o\'clock)?', text, re.IGNORECASE)
         )
         if timing_requested:
             timing_resolution = resolve_catalog_batch_semantics(
                 active_cid,
                 start_24h=clean.get("requested_start_24h"),
                 end_24h=clean.get("requested_end_24h"),
-                period=clean.get("requested_timing_period"),
+                period=clean.get("timing_period") or clean.get("requested_timing_period"),
+                raw_text=text,
             )
             resolution_status = timing_resolution["status"]
             clean["timing_resolution_status"] = resolution_status
@@ -912,31 +895,6 @@ async def extract_intent_and_state_changes(
                 if clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT"):
                     clean["customer_intent"] = "QUESTION"
                     clean["question_summary"] = "Inquiry about batch timings"
-            else:
-                # Colloquial hour safety check: If the hour actually exists in course_batches, it is OFFERED!
-                m_hr = re.search(r"\b(\d{1,2})\b", t_val)
-                if m_hr and course_batches:
-                    req_h = int(m_hr.group(1))
-                    matching_cands = list(dict.fromkeys([b for b in course_batches if b.startswith(f"{req_h}:") or b.startswith(f"0{req_h}:")]))
-                    if matching_cands:
-                        clean["unoffered_type"] = None
-                        clean["unoffered_value"] = None
-                        clean["unoffered_timing_mentioned"] = None
-                        has_am_m = any("am" in c.lower() for c in matching_cands)
-                        has_pm_m = any("pm" in c.lower() for c in matching_cands)
-                        if len(matching_cands) == 1 or not (has_am_m and has_pm_m):
-                            clean["selected_timing"] = matching_cands[0]
-                            clean["timing_ambiguous"] = False
-                            clean["ambiguous_hour"] = None
-                            clean["ambiguous_timing_candidates"] = None
-                            clean["customer_intent"] = "TIMING_SELECTION"
-                        else:
-                            clean["selected_timing"] = None
-                            clean["timing_ambiguous"] = True
-                            clean["ambiguous_hour"] = req_h
-                            clean["ambiguous_timing_candidates"] = matching_cands
-                            clean["customer_intent"] = "TIMING_SELECTION"
-                            clean["question_summary"] = f"Clarify morning vs evening for {req_h} o'clock"
 
         # Strict canonical day normalization against allowed course days
         raw_day = clean.get("selected_days")

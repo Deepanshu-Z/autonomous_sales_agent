@@ -263,9 +263,9 @@ def resolve_catalog_batch_semantics(
             return result
 
         period = None
-        if re.search(r"\b(?:morning|subah|subha|sawere|savere|mrng|am|sbh)\b", raw):
+        if re.search(r"\b(?:morning|subah|subha|sawere|savere|mrng|sbh)\b", raw):
             period = "Morning"
-        elif re.search(r"\b(?:evening|shaam|sham|raat|night|pm)\b", raw):
+        elif re.search(r"\b(?:evening|shaam|sham|raat|night)\b", raw):
             period = "Evening"
         elif re.search(r"\b(?:afternoon|dopahar|lunch)\b", raw):
             period = "Afternoon"
@@ -300,8 +300,15 @@ def resolve_catalog_batch_semantics(
                 b = bounds(batch)
                 if not b:
                     continue
-                if period and str(batch.get("slot") or "").casefold() != period.casefold():
-                    continue
+                if period:
+                    slot_val = str(batch.get("slot") or "").strip().casefold()
+                    batch_period = (classify_time_period(str(batch.get("time_12h") or batch.get("time_24h") or "")) or "").casefold()
+                    if slot_val in {"morning", "afternoon", "evening"}:
+                        if slot_val != period.casefold():
+                            continue
+                    elif batch_period:
+                        if batch_period != period.casefold():
+                            continue
                 if b[0] == start and (end is None or b[1] == end):
                     matches.append(batch.get("time_12h"))
             return [m for m in matches if m]
@@ -320,6 +327,8 @@ def resolve_catalog_batch_semantics(
             start = to_minutes(int(match.group(1)), int(match.group(2) or 0), start_meridiem)
             end = to_minutes(int(match.group(4)), int(match.group(5) or 0), end_meridiem)
             if start is not None and end is not None:
+                if not start_meridiem and not end_meridiem and end <= start and end < 12 * 60:
+                    end += 12 * 60
                 requests.append((start, end, bool(start_meridiem or end_meridiem)))
                 spans.append(match.span())
 
@@ -417,11 +426,11 @@ def resolve_catalog_batch_semantics(
     # Detect period if not provided
     if not period and raw_text:
         low = raw_text.lower()
-        if re.search(r'\b(evening|shaam|sham|raat|night|pm)\b', low):
+        if re.search(r'\b(evening|shaam|sham|raat|night)\b', low):
             period = "Evening"
         elif re.search(r'\b(afternoon|dopahar|lunch)\b', low):
             period = "Afternoon"
-        elif re.search(r'\b(morning|subah|subha|sawere|savere|mrng|am|sbh)\b', low):
+        elif re.search(r'\b(morning|subah|subha|sawere|savere|mrng|sbh)\b', low):
             period = "Morning"
 
     # Raw numeric evidence outranks an extractor's rewritten canonical slot.

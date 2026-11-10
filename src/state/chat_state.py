@@ -486,6 +486,70 @@ async def clear_escalation_async(phone: str):
     return await asyncio.to_thread(clear_escalation, phone)
 
 
+def is_at_qr_stage(state_or_phone) -> bool:
+    """
+    Checks whether a lead has reached the payment / QR scanner stage.
+    Leads at this stage:
+    - Must NOT be assigned to staff agents on silence.
+    - Only receive the 5-minute follow-up reminder.
+    - AI remains 100% active and un-escalated to answer future questions.
+    """
+    if isinstance(state_or_phone, str):
+        state = get_user_state(state_or_phone)
+    elif isinstance(state_or_phone, dict):
+        state = state_or_phone
+    else:
+        return False
+
+    if not isinstance(state, dict):
+        return False
+
+    # Already paid / enrolled is handled separately
+    if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED":
+        return False
+
+    # 1. Direct boolean flag indicating QR was sent
+    if state.get("qr_code_sent") is True:
+        return True
+
+    # 2. Razorpay QR ID tracking (starts with "qr_")
+    order_id = str(state.get("order_id") or "")
+    if order_id.startswith("qr_"):
+        return True
+
+    last_qr_id = str(state.get("last_qr_id") or "")
+    if last_qr_id.startswith("qr_"):
+        return True
+
+    # 3. QR image link
+    if state.get("last_qr_url"):
+        return True
+
+    # 4. Funnel stages where package is confirmed / QR code is generated
+    stage = str(state.get("stage") or "").upper()
+    if stage in {"PAYMENT_QR_SENT", "PACKAGE_SELECTED", "PAYMENT_PENDING", "CHECKOUT"}:
+        return True
+
+    # 5. DB last_topic packed with Razorpay QR ID
+    last_topic = str(state.get("last_topic") or "")
+    if "ORDER:qr_" in last_topic or "qr_" in last_topic:
+        return True
+
+    return False
+
+
+async def is_at_qr_stage_async(state_or_phone) -> bool:
+    """Non-blocking async wrapper to check if lead has reached QR stage."""
+    if isinstance(state_or_phone, str):
+        state = await get_user_state_async(state_or_phone)
+    elif isinstance(state_or_phone, dict):
+        state = state_or_phone
+    else:
+        return False
+    return is_at_qr_stage(state)
+
+
+
 class AsyncPhoneRLock:
     """
     Re-entrant asynchronous lock with optional Redis distributed locking.

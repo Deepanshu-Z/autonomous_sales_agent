@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 from src.services.interakt import send_text_message_async, assign_chat_to_agent_async
-from src.state.chat_state import mark_escalated_async
+from src.state.chat_state import mark_escalated_async, is_at_qr_stage
 from src.state.chat_history import save_message_async
 from src.state.csv_logger import log_message_async
 from src.services.redis_client import get_redis_connection
@@ -61,6 +61,16 @@ async def sweep_once():
             continue
 
         try:
+            from src.state.chat_state import get_user_state, save_user_state, is_at_qr_stage
+            paid_state = get_user_state(phone)
+            if paid_state.get("payment_status") == "PAID" or paid_state.get("stage") == "ENROLLED":
+                paid_state["follow_up_count"] = 0
+                paid_state["next_followup_due_at"] = None
+                paid_state["next_follow_up_due_at"] = None
+                save_user_state(phone, paid_state)
+                continue
+
+            lead_at_qr = is_at_qr_stage(paid_state)
             if count == 0:
                 from src.state.chat_state import get_user_state
                 from src.state.chat_history import get_recent_history
@@ -103,24 +113,62 @@ async def sweep_once():
                     await save_message_async(phone, "assistant", reply)
                     await log_message_async(phone, "ai", reply)
 
-                    next_due_iso = datetime.fromtimestamp(now_ts + 1800, tz=timezone.utc).isoformat()
+                    if lead_at_qr:
+                        # Leads at QR stage only get the 5-min follow-up reminder.
+                        # No agent handoff is scheduled. Lead stays with owner and AI remains 100% active.
+                        await asyncio.to_thread(
+                            lambda: supabase.table("user_session_state").update({
+                                "follow_up_count": 1,
+                                "next_followup_due_at": None,
+                                "is_escalated": False,
+                            }).eq("phone", phone).execute()
+                        )
+                        try:
+                            st = get_user_state(phone)
+                            st["follow_up_count"] = 1
+                            st["next_followup_due_at"] = None
+                            st["is_escalated"] = False
+                            save_user_state(phone, st)
+                        except Exception:
+                            pass
+                        print(f"[instagram_followup] {phone}: sent 5-min reminder for QR lead — no agent handoff scheduled, AI remains active.")
+                    else:
+                        next_due_iso = datetime.fromtimestamp(now_ts + 1800, tz=timezone.utc).isoformat()
+                        await asyncio.to_thread(
+                            lambda: supabase.table("user_session_state").update({
+                                "follow_up_count": 1,
+                                "next_followup_due_at": next_due_iso,
+                            }).eq("phone", phone).execute()
+                        )
+                        try:
+                            from src.state.chat_state import get_user_state, save_user_state
+                            st = get_user_state(phone)
+                            st["follow_up_count"] = 1
+                            st["next_followup_due_at"] = now_ts + 1800
+                            save_user_state(phone, st)
+                        except Exception:
+                            pass
+                        print(f"[instagram_followup] {phone}: sent 1st reminder — scheduled agent assignment in 30 mins")
+
+            elif count == 1:
+                if lead_at_qr:
+                    # Fail-safe: QR leads must never be escalated or reassigned to staff on silence.
+                    print(f"[instagram_followup] {phone}: QR lead reached count 1 — skipping escalation. AI stays active.")
                     await asyncio.to_thread(
                         lambda: supabase.table("user_session_state").update({
-                            "follow_up_count": 1,
-                            "next_followup_due_at": next_due_iso,
+                            "next_followup_due_at": None,
+                            "is_escalated": False,
                         }).eq("phone", phone).execute()
                     )
                     try:
-                        from src.state.chat_state import get_user_state, save_user_state
                         st = get_user_state(phone)
-                        st["follow_up_count"] = 1
-                        st["next_followup_due_at"] = now_ts + 1800
+                        st["next_followup_due_at"] = None
+                        st["is_escalated"] = False
                         save_user_state(phone, st)
                     except Exception:
                         pass
-                    print(f"[instagram_followup] {phone}: sent 1st reminder — scheduled agent assignment in 30 mins")
+                    continue
 
-            elif count == 1:
                 agent, agent_index = get_next_agent_email()
                 reply = "Connecting you with our team now. Someone will be with you shortly!"
                 if agent:

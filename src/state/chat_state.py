@@ -525,14 +525,14 @@ def is_at_qr_stage(state_or_phone) -> bool:
     if state.get("last_qr_url"):
         return True
 
-    # 4. Funnel stages where package is confirmed / QR code is generated
+    # 4. Funnel stage where QR code was explicitly sent
     stage = str(state.get("stage") or "").upper()
-    if stage in {"PAYMENT_QR_SENT", "PACKAGE_SELECTED", "PAYMENT_PENDING", "CHECKOUT"}:
+    if stage == "PAYMENT_QR_SENT":
         return True
 
     # 5. DB last_topic packed with Razorpay QR ID
     last_topic = str(state.get("last_topic") or "")
-    if "ORDER:qr_" in last_topic or "qr_" in last_topic:
+    if "ORDER:qr_" in last_topic:
         return True
 
     return False

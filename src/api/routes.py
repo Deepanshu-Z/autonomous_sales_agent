@@ -542,7 +542,7 @@ async def receive_whatsapp_test_webhook(request: Request):
         name = item.get("name") or ""
 
         clean_num = str(raw_phone).replace("+", "").strip()
-        user_key = f"wa_{clean_num}"
+        user_key = clean_num
 
         limited, rl_info = await is_rate_limited(user_key)
         if limited:

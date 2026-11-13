@@ -57,8 +57,7 @@ async def send_text_message_async(phone: str, message: str):
         return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message), channel=channel)
 
     if clean_phone.startswith("wa_"):
-        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_text_async
-        return await send_whatsapp_cloud_text_async(clean_phone.split("_", 1)[1], message)
+        clean_phone = clean_phone[3:]
 
     country_code, number = _split_phone(clean_phone)
     payload = {
@@ -91,7 +90,9 @@ import re
 
 def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
     clean_phone = str(phone or "").strip()
-    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_") or clean_phone.startswith("wa_"):
+    if clean_phone.startswith("wa_"):
+        clean_phone = clean_phone[3:]
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
         return True
 
     digits_only = re.sub(r"\D", "", clean_phone)
@@ -126,8 +127,10 @@ def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
 
 async def assign_chat_to_agent_async(phone: str, agent_email: str) -> bool:
     clean_phone = str(phone or "").strip()
-    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_") or clean_phone.startswith("wa_"):
-        # Cloud API & Meta channels do not use Interakt agent assignment
+    if clean_phone.startswith("wa_"):
+        clean_phone = clean_phone[3:]
+    if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
+        # Meta channels do not use Interakt agent assignment
         return True
 
     digits_only = re.sub(r"\D", "", clean_phone)
@@ -234,15 +237,7 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
         return False
 
     if clean_phone.startswith("wa_"):
-        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_video_async
-        recipient_id = clean_phone.split("_", 1)[1]
-        try:
-            res = await send_whatsapp_cloud_video_async(recipient_id, video_url, caption=caption)
-            if isinstance(res, dict) and "error" not in res:
-                return True
-        except Exception as e:
-            print(f"[interakt] send_video_message_async WhatsApp Cloud error for {clean_phone}: {e}")
-        return False
+        clean_phone = clean_phone[3:]
 
     country_code, number = _split_phone(clean_phone)
     payload = {
@@ -300,15 +295,7 @@ async def send_image_message_async(phone: str, image_url: str, caption: str = ""
         return False
 
     if clean_phone.startswith("wa_"):
-        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_image_async
-        recipient_id = clean_phone.split("_", 1)[1]
-        try:
-            res = await send_whatsapp_cloud_image_async(recipient_id, image_url, caption=caption)
-            if isinstance(res, dict) and "error" not in res:
-                return True
-        except Exception as e:
-            print(f"[interakt] send_image_message_async WhatsApp Cloud error for {clean_phone}: {e}")
-        return False
+        clean_phone = clean_phone[3:]
 
     country_code, number = _split_phone(clean_phone)
     payload = {

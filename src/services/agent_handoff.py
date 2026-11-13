@@ -67,7 +67,12 @@ def get_next_agent() -> tuple:
         fallback_email = OWNER_EMAIL
         return {"email": fallback_email, "phone": "", "name": "Default Agent"}, 0
 
-    counter = redis_conn.incr("agent_round_robin_counter")
+    try:
+        counter = redis_conn.incr("agent_round_robin_counter")
+    except Exception as e:
+        print(f"[agent_handoff] Redis incr failed, using in-memory fallback: {e}")
+        counter = getattr(get_next_agent, "_mem_counter", 0) + 1
+        setattr(get_next_agent, "_mem_counter", counter)
     index = (counter - 1) % len(ALL_AGENTS)
     agent = ALL_AGENTS[index]
     print(f"[agent_handoff] counter={counter} -> agent[{index}] = {agent.get('name')} ({agent.get('email')})")

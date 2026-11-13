@@ -53,7 +53,8 @@ async def sweep_once():
     print(f"[whatsapp_followup] Fetched {len(result.data)} WhatsApp user(s) due for follow-up")
 
     for row in result.data:
-        phone = row["phone"]
+        raw_phone = row["phone"]
+        phone = raw_phone[3:] if str(raw_phone).startswith("wa_") else raw_phone
         count = row.get("follow_up_count", 0)
 
         lock = redis_conn.lock(f"phone-lock:{phone}", timeout=30, blocking_timeout=2)

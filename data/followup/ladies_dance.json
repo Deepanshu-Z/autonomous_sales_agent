@@ -1,15 +1,8 @@
 {
   "course": "ladies_dance",
   "course_name": "Online Live Interactive Ladies Bollywood Dance",
-  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
   "followups": [
-    {
-      "step": 0,
-      "delay_label": "5 min",
-      "trigger_after_minutes": 5,
-      "topic": "Fun Cardio & Calorie Burn",
-      "message": "Hello! 💃 Quick fun fact: Sirf 1 ghante ki Bollywood Dance session mein 350 se 500 calories naturally burn hoti hain — bina boring treadmill ya heavy weights ke! 🎶\n\nSensationz Ladies Dance classes 100% interactive live hoti hain jahan aap energetic Bollywood beats par step-by-step choreography seekhte hain. Kya aap morning ya evening batches dekhna chahenge? 😊"
-    },
     {
       "step": 1,
       "delay_label": "30 min",

@@ -1,15 +1,8 @@
 {
   "course": "yoga",
   "course_name": "Online Live Interactive Yoga",
-  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
   "followups": [
-    {
-      "step": 0,
-      "delay_label": "5 min",
-      "trigger_after_minutes": 5,
-      "topic": "Flexibility & Energy Impact",
-      "message": "Namaste! 🙏 Quick fact: Sirf 3 hafte ki daily 45-minute live yoga practice se body flexibility 35% tak improve hoti hai aur stress hormone (cortisol) significantly reduce hota hai! ✨\n\nSensationz par hamari classes 100% live aur interactive hoti hain jahan certified instructor aapke postures real-time mein correct karte hain. Kya aap morning ya evening batch timing dekhna chahenge? 😊"
-    },
     {
       "step": 1,
       "delay_label": "30 min",

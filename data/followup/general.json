@@ -1,15 +1,8 @@
 {
   "course": "general",
   "course_name": "Sensationz Performing Arts Academy",
-  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
   "followups": [
-    {
-      "step": 0,
-      "delay_label": "5 min",
-      "trigger_after_minutes": 5,
-      "topic": "100% Live 2-Way Interactive Learning",
-      "message": "Namaste! 🙏 Sensationz Performing Arts mein hamari sabhi classes 100% live aur interactive hoti hain — yeh koi boring recorded videos nahi hain jahan koi dekhne wala na ho! 🌟\n\nLive session mein certified teacher aapko aamne-saamne dekhte hain aur real-time guidance dete hain. Aap kis course mein interested hain — Yoga, Dance, ya Kathak? 😊"
-    },
     {
       "step": 1,
       "delay_label": "30 min",

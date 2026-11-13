@@ -1,15 +1,8 @@
 {
   "course": "face_yoga",
   "course_name": "Online Live Interactive Face Yoga",
-  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
   "followups": [
-    {
-      "step": 0,
-      "delay_label": "5 min",
-      "trigger_after_minutes": 5,
-      "topic": "57 Facial Muscles & Natural Glow",
-      "message": "Namaste! ✨ Kya aapko pata hai? Hamare chehre par 57 facial muscles hote hain jinki regular exercise na hone se skin loose hoti hai aur wrinkles aate hain. Sirf 30 minutes ki daily Face Yoga practice se facial blood circulation 40% tak badhta hai aur natural skin glow wapas aata hai! 💆‍♀️\n\nSensationz par hamari classes 100% live aur interactive hoti hain jahan instructor aapke hand techniques aur angles live dekhte hain. Kya aap batch timings dekhna chahenge? 😊"
-    },
     {
       "step": 1,
       "delay_label": "30 min",

@@ -1,15 +1,8 @@
 {
   "course": "kathak",
   "course_name": "Online Live Interactive Kathak",
-  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
   "followups": [
-    {
-      "step": 0,
-      "delay_label": "5 min",
-      "trigger_after_minutes": 5,
-      "topic": "Classical Heritage & Grace",
-      "message": "Namaste! 🙏 Kya aapko pata hai? Kathak sirf ek nritya nahi balki Bharat ki 500+ saal purani shastriya kala hai. Iski practice se body balance, rhythmic sense aur posture mein aisi grace aati hai jo kisi aur dance form mein nahi milti! ✨\n\nSensationz par har class live interactive hoti hai jahan guru ji aapse directly judkar footwork aur mudras sikhate hain. Kya aap batch timings dekhna chahenge? 😊"
-    },
     {
       "step": 1,
       "delay_label": "30 min",

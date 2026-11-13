@@ -1,8 +1,13 @@
 """
 whatsapp_followup_worker.py — Dedicated standalone worker for WhatsApp follow-ups.
+
 Polls Supabase every 30 seconds strictly for WhatsApp customers (excludes ig_ and fb_).
-Implements a 24-hour factual follow-up cadence (5m, 30m, 3h, 9h, 15h, 21h) with
-the 3 Free Live Trial Classes offer on the final follow-up, followed by agent handoff at 24h.
+Delegates all decision-making, cadence scheduling, message selection, and deduplication
+to `src.services.followup_service` (the single point of entry).
+
+Easily toggled between:
+  1. LEGACY MODE (5-min check-in -> 30-min agent handoff in Interakt)
+  2. 24-HOUR AI VALUE MODE (5-min check-in -> 30m/3h/9h/15h facts -> 21h trial -> 24h agent)
 """
 
 import os
@@ -17,12 +22,15 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 from src.services.interakt import send_text_message_async, assign_chat_to_agent_async
-from src.state.chat_state import mark_escalated_async, is_at_qr_stage
-from src.state.chat_history import save_message_async
+from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state
+from src.state.chat_history import save_message_async, get_recent_history
 from src.state.csv_logger import log_message_async
 from src.services.redis_client import get_redis_connection
-from src.services.agent_handoff import get_next_agent_email
-from src.services.followup_service import get_followup_for_step, get_next_gap_seconds, TOTAL_STEPS
+from src.services.followup_service import (
+    get_followup_decision,
+    get_total_steps,
+    is_legacy_mode,
+)
 from src.core import kb_loader
 
 load_dotenv()
@@ -36,7 +44,10 @@ POLL_INTERVAL = int(os.getenv("WHATSAPP_FOLLOWUP_INTERVAL", 30))
 async def sweep_once():
     now_ts = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
-    print(f"[whatsapp_followup] Sweep started at {time.strftime('%H:%M:%S')}")
+    mode_str = "LEGACY (5m->30m Agent)" if is_legacy_mode() else "24-HOUR AI VALUE"
+    print(f"[whatsapp_followup] Sweep started at {time.strftime('%H:%M:%S')} [Mode: {mode_str}]")
+
+    max_steps = get_total_steps()
     try:
         result = await asyncio.to_thread(
             lambda: supabase.table("user_session_state")
@@ -44,7 +55,7 @@ async def sweep_once():
             .not_.like("phone", "ig_%")
             .not_.like("phone", "fb_%")
             .lte("next_followup_due_at", now_iso)
-            .lt("follow_up_count", TOTAL_STEPS + 1)
+            .lt("follow_up_count", max_steps + 1)
             .eq("is_escalated", False)
             .execute()
         )
@@ -65,43 +76,63 @@ async def sweep_once():
             continue
 
         try:
-            from src.state.chat_state import get_user_state, save_user_state, is_at_qr_stage
-            paid_state = get_user_state(phone)
-            if paid_state.get("payment_status") == "PAID" or paid_state.get("stage") == "ENROLLED":
-                paid_state["follow_up_count"] = 0
-                paid_state["next_followup_due_at"] = None
-                paid_state["next_follow_up_due_at"] = None
-                save_user_state(phone, paid_state)
+            state = get_user_state(phone)
+            # 1. Skip paid / enrolled users
+            if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED":
+                state["follow_up_count"] = 0
+                state["next_followup_due_at"] = None
+                state["next_follow_up_due_at"] = None
+                save_user_state(phone, state)
+                await asyncio.to_thread(
+                    lambda: supabase.table("user_session_state").update({
+                        "next_followup_due_at": None,
+                        "follow_up_count": 0,
+                    }).eq("phone", phone).execute()
+                )
                 continue
 
-            lead_at_qr = is_at_qr_stage(paid_state)
-            if lead_at_qr and count >= 1:
-                # Leads at QR stage only get the initial reminder; lead stays with owner and AI remains active.
-                print(f"[whatsapp_followup] {phone}: QR lead reached count {count} — skipping, AI remains active.")
+            # 2. Detect course details
+            course_id = (state.get("course") or "").strip()
+            course_name = None
+            if not course_id:
+                hist = get_recent_history(phone, limit=6)
+                if hist:
+                    hist_text = " ".join((t.get("content") or "") for t in hist)
+                    detected = kb_loader.detect_course_from_text(hist_text, default_course=None)
+                    if detected:
+                        course_id = detected
+            if course_id:
+                cdata = kb_loader.get_course_data(course_id)
+                course_name = cdata.get("course") or course_id.replace("_", " ")
+
+            lead_at_qr = is_at_qr_stage(state)
+            sent_steps = state.get("sent_followup_steps", [])
+
+            # 3. Get decision from unified followup_service
+            decision = get_followup_decision(
+                phone=phone,
+                count=count,
+                course_id=course_id,
+                course_name=course_name,
+                lead_at_qr=lead_at_qr,
+                sent_steps=sent_steps,
+            )
+
+            # 4. Handle Decision
+            if decision.action == "SKIP":
+                print(f"[whatsapp_followup] {phone}: {decision.step_label}")
                 await asyncio.to_thread(
                     lambda: supabase.table("user_session_state").update({
                         "next_followup_due_at": None,
                         "is_escalated": False,
                     }).eq("phone", phone).execute()
                 )
-                continue
+                state["next_followup_due_at"] = None
+                state["is_escalated"] = False
+                save_user_state(phone, state)
 
-            if count < TOTAL_STEPS:
-                from src.state.chat_history import get_recent_history
-                state = get_user_state(phone)
-                course_id = (state.get("course") or "").strip()
-                if not course_id:
-                    hist = get_recent_history(phone, limit=6)
-                    if hist:
-                        hist_text = " ".join((t.get("content") or "") for t in hist)
-                        course_id = kb_loader.detect_course_from_text(hist_text, default_course=None)
-
-                followup_data = get_followup_for_step(course_id, count)
-                if not followup_data or not followup_data.get("message"):
-                    print(f"[whatsapp_followup] No followup message found for {phone} (course={course_id}, step={count})")
-                    continue
-
-                reply = followup_data["message"]
+            elif decision.action == "SEND_MESSAGE":
+                reply = decision.message
                 res = await send_text_message_async(phone, reply)
                 is_failed = isinstance(res, dict) and "error" in res
 
@@ -111,60 +142,60 @@ async def sweep_once():
                     await save_message_async(phone, "assistant", reply)
                     await log_message_async(phone, "ai", reply)
 
-                    next_gap = get_next_gap_seconds(count)
-                    next_count = count + 1
-                    next_due_iso = datetime.fromtimestamp(now_ts + next_gap, tz=timezone.utc).isoformat() if next_gap else None
+                    next_gap = decision.next_gap_seconds
+                    next_due_iso = (
+                        datetime.fromtimestamp(now_ts + next_gap, tz=timezone.utc).isoformat()
+                        if next_gap
+                        else None
+                    )
 
                     await asyncio.to_thread(
                         lambda: supabase.table("user_session_state").update({
-                            "follow_up_count": next_count,
+                            "follow_up_count": decision.next_count,
                             "next_followup_due_at": next_due_iso,
                         }).eq("phone", phone).execute()
                     )
-                    try:
-                        st = get_user_state(phone)
-                        st["follow_up_count"] = next_count
-                        st["next_followup_due_at"] = (now_ts + next_gap) if next_gap else None
-                        save_user_state(phone, st)
-                    except Exception:
-                        pass
 
-                    delay_lbl = followup_data.get("delay_label", f"step {count}")
-                    is_trial = followup_data.get("is_final_trial_offer")
-                    if is_trial:
-                        print(f"[whatsapp_followup] {phone}: 🎁 Sent Step {count} ({delay_lbl}) [3 FREE TRIALS OFFER] — next agent handoff in {next_gap}s")
+                    state["follow_up_count"] = decision.next_count
+                    state["next_followup_due_at"] = (now_ts + next_gap) if next_gap else None
+                    if decision.updated_sent_steps is not None:
+                        state["sent_followup_steps"] = decision.updated_sent_steps
+                    save_user_state(phone, state)
+
+                    if decision.is_trial_offer:
+                        print(f"[whatsapp_followup] {phone}: 🎁 Sent [{decision.step_label}] [3 FREE TRIALS OFFER] — next agent handoff in {next_gap}s")
                     else:
-                        print(f"[whatsapp_followup] {phone}: Sent Step {count} ({delay_lbl}) — next due in {next_gap}s")
+                        print(f"[whatsapp_followup] {phone}: Sent [{decision.step_label}] — next due in {next_gap}s")
 
-            elif count >= TOTAL_STEPS:
-                # 24 hours completed without reply after the 3 Free Trials offer -> Escalate to human agent in Interakt
-                agent, agent_index = get_next_agent_email()
-                reply = "Connecting you with our team now. Someone will be with you shortly! 🙏"
+            elif decision.action == "ESCALATE_TO_AGENT":
+                agent = decision.agent_email
+                reply = decision.message
                 if agent:
                     await assign_chat_to_agent_async(phone, agent)
-                res = await send_text_message_async(phone, reply)
-                is_failed = isinstance(res, dict) and "error" in res
-                if not is_failed:
-                    await save_message_async(phone, "assistant", reply)
-                    await log_message_async(phone, "agent", reply)
+                if reply:
+                    res = await send_text_message_async(phone, reply)
+                    is_failed = isinstance(res, dict) and "error" in res
+                    if not is_failed:
+                        await save_message_async(phone, "assistant", reply)
+                        await log_message_async(phone, "agent", reply)
                 await mark_escalated_async(phone)
 
                 await asyncio.to_thread(
                     lambda: supabase.table("user_session_state").update({
-                        "follow_up_count": TOTAL_STEPS + 1,
+                        "follow_up_count": decision.next_count,
                         "next_followup_due_at": None,
                         "is_escalated": True,
                     }).eq("phone", phone).execute()
                 )
-                try:
-                    st = get_user_state(phone)
-                    st["follow_up_count"] = TOTAL_STEPS + 1
-                    st["next_followup_due_at"] = None
-                    st["is_escalated"] = True
-                    save_user_state(phone, st)
-                except Exception:
-                    pass
-                print(f"[whatsapp_followup] {phone}: 24-hour cycle completed — escalated to human agent ({agent})")
+
+                state["follow_up_count"] = decision.next_count
+                state["next_followup_due_at"] = None
+                state["is_escalated"] = True
+                if decision.updated_sent_steps is not None:
+                    state["sent_followup_steps"] = decision.updated_sent_steps
+                save_user_state(phone, state)
+
+                print(f"[whatsapp_followup] {phone}: [{decision.step_label}] — escalated to human agent ({agent})")
 
         except Exception as e:
             print(f"[whatsapp_followup] Error processing {phone}: {e}")

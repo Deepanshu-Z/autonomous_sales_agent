@@ -1,0 +1,50 @@
+{
+  "course": "face_yoga",
+  "course_name": "Online Live Interactive Face Yoga",
+  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "followups": [
+    {
+      "step": 0,
+      "delay_label": "5 min",
+      "trigger_after_minutes": 5,
+      "topic": "57 Facial Muscles & Natural Glow",
+      "message": "Namaste! ✨ Kya aapko pata hai? Hamare chehre par 57 facial muscles hote hain jinki regular exercise na hone se skin loose hoti hai aur wrinkles aate hain. Sirf 30 minutes ki daily Face Yoga practice se facial blood circulation 40% tak badhta hai aur natural skin glow wapas aata hai! 💆‍♀️\n\nSensationz par hamari classes 100% live aur interactive hoti hain jahan instructor aapke hand techniques aur angles live dekhte hain. Kya aap batch timings dekhna chahenge? 😊"
+    },
+    {
+      "step": 1,
+      "delay_label": "30 min",
+      "trigger_after_minutes": 30,
+      "topic": "Certified Facial Sculpting Experts",
+      "message": "Khas baat: Hamari certified faculty — jaise Parul mam aur Sonali mam — facial anatomy aur non-invasive natural anti-aging ke expert hain. Yahan bina kisi chemical cream ya injections ke, sirf authentic facial exercises aur pressure points se skin rejuvenation sikhaya jata hai. 🌿\n\nAapko kis batch timing mein join karna convenient rahega?"
+    },
+    {
+      "step": 2,
+      "delay_label": "3 hours",
+      "trigger_after_minutes": 180,
+      "topic": "Jawline, Double Chin & Lymphatic Drainage",
+      "message": "Face Yoga sirf glow ke liye nahi hai — isse visible results milte hain: 🌸✨\n• Sharp jawline definition aur double chin reduction\n• Lymphatic drainage massage se morning face puffiness khatam\n• Forehead lines aur smile lines ki natural softening\n• Neck & cheek toning bina kisi machine ke\n\nDaily routine ke hisaab se kaunsa time slot aapko suit karega? 😊"
+    },
+    {
+      "step": 3,
+      "delay_label": "+6 hours (9h total)",
+      "trigger_after_minutes": 540,
+      "topic": "Gua Sha & Jade Roller Techniques",
+      "message": "Did you know? Sensationz Face Yoga syllabus mein traditional hand exercises ke saath-saath Gua Sha, Jade Roller, aur Ice-cube massage techniques live sikhaayi jaati hain jo skin collagen boost karti hain! 💎✨\n\nYeh aapka daily self-care aur relaxation ritual ban jata hai. Kya main aapke saath packages ya batches share karoon?"
+    },
+    {
+      "step": 4,
+      "delay_label": "+6 hours (15h total)",
+      "trigger_after_minutes": 900,
+      "topic": "Safe, Natural & Long-Lasting Results",
+      "message": "Expensive salon facials ka asar 2 din mein chala jata hai, lekin Face Yoga se muscles naturally tone hoti hain jiska result lifelong rehta hai. Sensationz App par hazaron ladies daily apne chehre par natural glow aur confidence la rahi hain. 🌟\n\nApne natural beauty transformation ke liye kya main aapka batch confirm karoon? 😊"
+    },
+    {
+      "step": 5,
+      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
+      "trigger_after_minutes": 1260,
+      "topic": "Final Offer: 3 Free Live Trial Classes",
+      "is_final_trial_offer": true,
+      "message": "Namaste! ✨ Agar aap abhi decide nahi kar pa rahe hain, toh bilkul koi baat nahi — hum chahte hain ki aap pehle face yoga ka refreshing feel khud live class mein dekhein! 🌸\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero cost\n• Live guidance with certified Face Yoga expert\n• Instant fresh glow & relaxation feel\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur batayein kaunsa time suit karega! 🌟🙏"
+    }
+  ]
+}

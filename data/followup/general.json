@@ -1,0 +1,50 @@
+{
+  "course": "general",
+  "course_name": "Sensationz Performing Arts Academy",
+  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "followups": [
+    {
+      "step": 0,
+      "delay_label": "5 min",
+      "trigger_after_minutes": 5,
+      "topic": "100% Live 2-Way Interactive Learning",
+      "message": "Namaste! 🙏 Sensationz Performing Arts mein hamari sabhi classes 100% live aur interactive hoti hain — yeh koi boring recorded videos nahi hain jahan koi dekhne wala na ho! 🌟\n\nLive session mein certified teacher aapko aamne-saamne dekhte hain aur real-time guidance dete hain. Aap kis course mein interested hain — Yoga, Dance, ya Kathak? 😊"
+    },
+    {
+      "step": 1,
+      "delay_label": "30 min",
+      "trigger_after_minutes": 30,
+      "topic": "Certified Master Faculty",
+      "message": "Sensationz par har ek subject ke liye certified master instructors hain jinhe 4 se 13+ saal ka teaching experience hai. Chahe aap complete beginner hon ya experienced, har class zero se systematically sikhayi jaati hai. ✨\n\nKya aap kisi specific batch timing ya instructor ke baare mein jaanna chahte hain?"
+    },
+    {
+      "step": 2,
+      "delay_label": "3 hours",
+      "trigger_after_minutes": 180,
+      "topic": "15,000+ Students & 4.8 Star Satisfaction",
+      "message": "Did you know? Sensationz family mein 15,000+ students India aur abroad se live interactive classes attend karte hain with 4.8★ student rating! 🏆\n\nGhar baithe premium learning ka anand lijiye bina kisi traffic ya travel hassle ke. Kaunsa time slot aapke schedule mein fit baithta hai? 😊"
+    },
+    {
+      "step": 3,
+      "delay_label": "+6 hours (9h total)",
+      "trigger_after_minutes": 540,
+      "topic": "Schedule Flexibility (Morning to Night)",
+      "message": "Hamare paas morning early 5:00 AM se lekar evening 8:00 PM tak wide variety of batches available hain. Saath hi aap 1 month ke baad apna batch timing switch bhi kar sakte hain agar aapka routine change ho! 🌿\n\nKya main aapke saath syllabus aur packages share karoon?"
+    },
+    {
+      "step": 4,
+      "delay_label": "+6 hours (15h total)",
+      "trigger_after_minutes": 900,
+      "topic": "Consistent Daily Habit & Confidence",
+      "message": "Chahe health aur wellness ho ya dance aur creativity — consistency hi sabse bada secret hai. Sensationz App par aapko structured community milti hai jo aapko roz motivate karti hai. 🌟\n\nApna learning journey start karne ke liye kya main aapka slot check karoon? 😊"
+    },
+    {
+      "step": 5,
+      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
+      "trigger_after_minutes": 1260,
+      "topic": "Final Offer: 3 Free Live Trial Classes",
+      "is_final_trial_offer": true,
+      "message": "Namaste! 😊 Agar aap decide nahi kar pa rahe hain, toh koi baat nahi — hum chahte hain ki aap pehle khud class ka standard aur teaching style live experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul Free\n• Live 2-way session with master instructor\n• Zero commitment\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar reply karein aur apna preferred course batayein! 🙏✨"
+    }
+  ]
+}

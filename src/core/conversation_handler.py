@@ -1426,11 +1426,14 @@ async def dispatch_payment_qr_async(
 
     if delivered:
         state["qr_code_sent"] = True
+        state["is_qr_sent"] = True
+        state["qr_id"] = qr_id
         state["last_qr_id"] = qr_id
         state["order_id"] = qr_id
         state["last_qr_package"] = pkg
         state["last_qr_url"] = image_url
         state["last_qr_amount"] = final_amount
+        state["payable_amount"] = final_amount
         return qr_data
 
     return None
@@ -1870,6 +1873,8 @@ async def _handle_conversation_turn_unlocked(
         or last_turn.get("requests_qr")
         or re.search(r"\b(send\s*qr|qr\s*code|payment\s*link|scanner|pay\s*online)\b", text_clean, re.IGNORECASE)
     )
+    if user_asked_qr:
+        new_state["requests_qr"] = True
     has_course_selected = bool(active_cid or new_state.get("course"))
     is_package_selected = bool(new_state.get("package") or new_state.get("selected_duration"))
     has_timing_selected = bool(new_state.get("timing") or new_state.get("selected_timing"))

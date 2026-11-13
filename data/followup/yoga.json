@@ -1,0 +1,50 @@
+{
+  "course": "yoga",
+  "course_name": "Online Live Interactive Yoga",
+  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "followups": [
+    {
+      "step": 0,
+      "delay_label": "5 min",
+      "trigger_after_minutes": 5,
+      "topic": "Flexibility & Energy Impact",
+      "message": "Namaste! 🙏 Quick fact: Sirf 3 hafte ki daily 45-minute live yoga practice se body flexibility 35% tak improve hoti hai aur stress hormone (cortisol) significantly reduce hota hai! ✨\n\nSensationz par hamari classes 100% live aur interactive hoti hain jahan certified instructor aapke postures real-time mein correct karte hain. Kya aap morning ya evening batch timing dekhna chahenge? 😊"
+    },
+    {
+      "step": 1,
+      "delay_label": "30 min",
+      "trigger_after_minutes": 30,
+      "topic": "Certified Master Instructors",
+      "message": "Ek khas baat: Sensationz Yoga family mein hamare paas certified expert female instructors hain — jaise Mradula mam (13+ years experience in mindful wellness) aur Suman Lata mam (Yoga Therapy & comprehensive wellness specialist). 🧘‍♀️\n\nHar session beginner-friendly pace se start hota hai taaki koi injury ka risk na ho. Aapko kaunsa time slot routine mein fit lagta hai — morning ya evening? 🌟"
+    },
+    {
+      "step": 2,
+      "delay_label": "3 hours",
+      "trigger_after_minutes": 180,
+      "topic": "10 Flexible Batches (5 AM to 8 PM)",
+      "message": "Daily routine busy rehti hai? 🌿 Sensationz par subah 5:00 AM se lekar raat 8:00 PM tak total 10 alag-alag live batch slots available hain (Mon-Fri).\n\nAapko koi fixed rigid schedule follow nahi karna — aap 1 month baad apna timing switch bhi kar sakte hain! Aapke schedule ke hisaab se kaunsa time best rahega? 😊"
+    },
+    {
+      "step": 3,
+      "delay_label": "+6 hours (9h total)",
+      "trigger_after_minutes": 540,
+      "topic": "Holistic Syllabus: Pranayama & Sound Healing",
+      "message": "Did you know? Sensationz Yoga sirf physical exercise nahi hai. Hamare structured syllabus mein Asanas ke saath-saath Pranayama (Anulom Vilom, Kapalbhati, Bhastrika), Sound Healing, aur Guided Meditation shamil hai jo sleep quality aur spine posture ko naturally improve karta hai. 🌿✨\n\nKya aap batch timings ya packages explore karna chahenge?"
+    },
+    {
+      "step": 4,
+      "delay_label": "+6 hours (15h total)",
+      "trigger_after_minutes": 900,
+      "topic": "15,000+ Active Students & Home Convenience",
+      "message": "15,000+ women aur students across India Sensationz App ke live interactive platform se ghar baithe practice karte hain. Travel ka time bachta hai aur studio jaisi personal attention milti hai. 🌟\n\nAapka health transformation bas ek decision door hai! Kya main aapke liye batch timing confirm karoon? 😊"
+    },
+    {
+      "step": 5,
+      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
+      "trigger_after_minutes": 1260,
+      "topic": "Final Offer: 3 Free Live Trial Classes",
+      "is_final_trial_offer": true,
+      "message": "Namaste! 😊 Agar aap abhi decide nahi kar pa rahe hain toh bilkul koi baat nahi — hum chahte hain ki aap pehle khud live class experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul free\n• Live 2-way interactive session with certified teacher\n• Koi commitment nahi\n\nKya main aapka free trial book kar doon? Bas 'YES' reply karein ya batayein kaunsa time suit karega! 🙏✨"
+    }
+  ]
+}

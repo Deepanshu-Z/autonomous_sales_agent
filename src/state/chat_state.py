@@ -400,7 +400,8 @@ def save_user_state(phone: str, state: dict):
                 "phone", "stage", "timing", "package", "fee", "app_installed",
                 "profile_created", "coupon_sent", "is_escalated", "is_target_ad",
                 "low_confidence_count", "already_assigned",
-                "follow_up_count", "next_followup_due_at", "last_topic"
+                "follow_up_count", "next_followup_due_at", "last_topic",
+                "is_qr_sent", "requests_qr", "course", "teacher", "qr_id", "payable_amount"
             }
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
 
@@ -423,21 +424,38 @@ def save_user_state(phone: str, state: dict):
             db_state["timing"] = state.get("selected_timing") or state.get("timing")
             db_state["package"] = state.get("selected_duration") or state.get("package")
 
+            # Dedicated relational columns
+            course_val = state.get("course") or None
+            teacher_val = state.get("selected_teacher") or state.get("teacher") or None
+            db_state["course"] = course_val
+            db_state["teacher"] = teacher_val
+
+            is_qr = bool(state.get("qr_code_sent") or state.get("is_qr_sent"))
+            qr_id_val = state.get("last_qr_id") or state.get("qr_id") or state.get("order_id") or state.get("payment_id") or None
+            if qr_id_val and any(str(qr_id_val).startswith(prefix) for prefix in ("qr_", "order_", "pay_")):
+                is_qr = True
+            db_state["is_qr_sent"] = is_qr
+            db_state["qr_id"] = str(qr_id_val) if qr_id_val else None
+            db_state["requests_qr"] = bool(state.get("requests_qr"))
+
+            amt_val = state.get("last_qr_amount") or state.get("paid_amount") or state.get("amount") or state.get("fee")
+            if amt_val is not None:
+                try:
+                    db_state["payable_amount"] = float(amt_val)
+                except Exception:
+                    pass
+
             # Encode metadata safely in last_topic to avoid schema cache errors
             meta_parts = []
-            course_val = state.get("course") or ""
             if course_val:
                 meta_parts.append(f"COURSE:{course_val}")
-            teacher_val = state.get("selected_teacher") or state.get("teacher") or ""
             if teacher_val:
                 meta_parts.append(f"TEACHER:{teacher_val}")
             pay_val = state.get("payment_status") or ("PAID" if state.get("stage") == "ENROLLED" or state.get("is_enrolled") else "")
             if pay_val and pay_val != "NONE":
                 meta_parts.append(f"PAY:{pay_val}")
-            order_val = state.get("order_id") or state.get("payment_id") or ""
-            if order_val:
-                meta_parts.append(f"ORDER:{order_val}")
-            amt_val = state.get("paid_amount") or state.get("amount") or ""
+            if qr_id_val:
+                meta_parts.append(f"ORDER:{qr_id_val}")
             if amt_val:
                 meta_parts.append(f"AMOUNT:{amt_val}")
             email_val = state.get("student_email") or ""

@@ -1,0 +1,50 @@
+{
+  "course": "ladies_dance",
+  "course_name": "Online Live Interactive Ladies Bollywood Dance",
+  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "followups": [
+    {
+      "step": 0,
+      "delay_label": "5 min",
+      "trigger_after_minutes": 5,
+      "topic": "Fun Cardio & Calorie Burn",
+      "message": "Hello! 💃 Quick fun fact: Sirf 1 ghante ki Bollywood Dance session mein 350 se 500 calories naturally burn hoti hain — bina boring treadmill ya heavy weights ke! 🎶\n\nSensationz Ladies Dance classes 100% interactive live hoti hain jahan aap energetic Bollywood beats par step-by-step choreography seekhte hain. Kya aap morning ya evening batches dekhna chahenge? 😊"
+    },
+    {
+      "step": 1,
+      "delay_label": "30 min",
+      "trigger_after_minutes": 30,
+      "topic": "Certified Choreographers & Beginner Friendly",
+      "message": "Khas baat: Agar aapne pehle kabhi dance nahi seekha, toh bilkul chinta mat kijiye! Hamare certified choreographers — jaise Aditi Vyas (4+ yrs experience) aur Mansi Pal (expressions & choreography specialist) — har step ko slow motion mein break down karke sikhate hain. 🌟\n\nPure beginner se lekar confident dancer banne ka safar yahan se start hota hai. Kis timing mein aap comfortable rahenge?"
+    },
+    {
+      "step": 2,
+      "delay_label": "3 hours",
+      "trigger_after_minutes": 180,
+      "topic": "7 Batches for Homemakers & Working Women",
+      "message": "Sensationz Ladies Dance batches specially designed hain homemakers aur working women ke schedule ko dhyan mein rakh kar. 🌸\n\nHumare paas Morning (11 AM), Afternoon (12 PM, 1 PM), aur Evening (4 PM, 5 PM, 6 PM, 8 PM) mein total 7 live batch slots hain (Mon-Fri). Aapke routine ke hisaab se kaunsa time sabse convenient rahega? 😊"
+    },
+    {
+      "step": 3,
+      "delay_label": "+6 hours (9h total)",
+      "trigger_after_minutes": 540,
+      "topic": "Grace, Rhythm & Expressions",
+      "message": "Did you know? Hamari classes sirf steps copy karna nahi hain — yahan aap rhythm, stage presence, body coordination aur beautiful facial expressions (abhinaya) seekhte hain jo aapko family functions aur parties mein stand out karwate hain! ✨💃\n\nKya main aapke saath syllabus ya packages share karoon?"
+    },
+    {
+      "step": 4,
+      "delay_label": "+6 hours (15h total)",
+      "trigger_after_minutes": 900,
+      "topic": "Women Community & Judgment-Free Space",
+      "message": "Hazaron ladies Sensationz live platform par regular dance enjoy karti hain ek safe, supportive aur judgment-free atmosphere mein. Live batch mein sabhi saath enjoy karte hain aur confidence boost hota hai! 🌟\n\nAap bhi apni daily routine mein thoda 'me-time' aur fun add kar lijiye. Kya main aapka batch slot confirm karoon? 😊"
+    },
+    {
+      "step": 5,
+      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
+      "trigger_after_minutes": 1260,
+      "topic": "Final Offer: 3 Free Live Trial Classes",
+      "is_final_trial_offer": true,
+      "message": "Hi! 😊 Agar aap decide nahi kar pa rahe hain, toh no problem! Hum chahte hain ki aap pehle class ka fun aur energy khud experience karein! 💃🎉\n\nHum aapke liye **3 Free Live Interactive Trial Classes** de rahe hain Sensationz App par! 🎁\n• 100% Free / Zero commitment\n• Live session with expert female choreographer\n• Ghar baithe live interactive fun\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🌟✨"
+    }
+  ]
+}

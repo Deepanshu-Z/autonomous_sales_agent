@@ -1,0 +1,50 @@
+{
+  "course": "kathak",
+  "course_name": "Online Live Interactive Kathak",
+  "cadence_description": "5m -> 30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
+  "followups": [
+    {
+      "step": 0,
+      "delay_label": "5 min",
+      "trigger_after_minutes": 5,
+      "topic": "Classical Heritage & Grace",
+      "message": "Namaste! 🙏 Kya aapko pata hai? Kathak sirf ek nritya nahi balki Bharat ki 500+ saal purani shastriya kala hai. Iski practice se body balance, rhythmic sense aur posture mein aisi grace aati hai jo kisi aur dance form mein nahi milti! ✨\n\nSensationz par har class live interactive hoti hai jahan guru ji aapse directly judkar footwork aur mudras sikhate hain. Kya aap batch timings dekhna chahenge? 😊"
+    },
+    {
+      "step": 1,
+      "delay_label": "30 min",
+      "trigger_after_minutes": 30,
+      "topic": "12+ Years Experienced Classical Gurus",
+      "message": "Khas baat: Hamari senior faculty Ms. Madhuri mam ke paas 12+ saal ka traditional Kathak repertoire aur Layakari ka deep experience hai. Unke saath Kratika Gontiya, Vibha Mittal aur Sneha Maurya jaisi certified instructors har beginner ko zero se guide karti hain. 🌟\n\nTatkar se lekar Chakkars tak sab kuch step-by-step sikhaya jata hai. Aap kis batch timing mein comfortable rahenge?"
+    },
+    {
+      "step": 2,
+      "delay_label": "3 hours",
+      "trigger_after_minutes": 180,
+      "topic": "Structured Authentic Syllabus",
+      "message": "Sensationz Kathak ka syllabus pure classical authenticity par based hai: 📜✨\n• Tatkar (Footwork & Taal mastery)\n• Hastaks & Mudras (Classical hand gestures)\n• Chakkars & Padhanth (Rhythmic recitation)\n• Bhava & Abhinaya (Expressive storytelling)\n\nChahe aap beginner hon ya pehle seekh chuke hon, batch aapke level ke anusaar milega. Kaunsa time aapke schedule mein fit baithta hai? 😊"
+    },
+    {
+      "step": 3,
+      "delay_label": "+6 hours (9h total)",
+      "trigger_after_minutes": 540,
+      "topic": "Convenient Home Learning",
+      "message": "Did you know? Pehle classical Kathak seekhne ke liye dur-dur tak academy travel karna padta tha. Ab Sensationz App ke 2-way live interactive setup se aap apne ghar ke comfortable space mein authentic classical dance seekh sakte hain — bina kisi travel stress ke! 🏠💃\n\nKya main aapke saath packages aur timing details share karoon?"
+    },
+    {
+      "step": 4,
+      "delay_label": "+6 hours (15h total)",
+      "trigger_after_minutes": 900,
+      "topic": "Discipline, Mind Focus & Confidence",
+      "message": "Kathak ki Taal aur Layakari dimag ko sharp banati hai aur mental focus improve karti hai. Sensationz family mein school students se lekar working women aur mothers tak sabhi shastriya sangeet aur nritya ka anand le rahe hain. 🌸\n\nApne andar ke classical artist ko jagane ka yeh best samay hai. Kya main aapka slot check karoon? 😊"
+    },
+    {
+      "step": 5,
+      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
+      "trigger_after_minutes": 1260,
+      "topic": "Final Offer: 3 Free Live Trial Classes",
+      "is_final_trial_offer": true,
+      "message": "Namaste! 🙏 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul chinta mat kijiye — hum chahte hain ki aap pehle guru ji ki live teaching style ko khud experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero fee\n• Direct live interaction with expert Kathak Guru\n• Complete beginner friendly guidance\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar bhej dijiye aur apna time batayein! 🙏✨"
+    }
+  ]
+}

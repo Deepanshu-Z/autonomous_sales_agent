@@ -59,6 +59,7 @@ from src.state.chat_state import (
     save_user_state_async,
     reset_user_state_async,
     clear_escalation_async,
+    mark_escalated,
     arm_followup_timer,
     reset_follow_up_timer,
     phone_concurrency_lock,
@@ -472,6 +473,46 @@ async def handle_incoming_message(
                 "buttons": ["Download App", "How to Book", "Talk to Agent"],
                 "new_state": new_state,
             }
+
+    # ── Fast-Path Guardrail: Intercept Stop Messaging / Irritation Opt-Out ───
+    if flags.get("wants_stop_messaging") or flags.get("customer_intent") == "STOP_MESSAGING":
+        logger.info(f"[GUARDRAILS] Customer requested to stop messages: '{user_message}'. Intercepting with polite opt-out.")
+        from src.core.kb_loader import format_support_executives_display
+        support_contacts = format_support_executives_display()
+        detected_lang = flags.get("detected_language") or new_state.get("language") or "Hinglish"
+        is_pure_english = "english" in str(detected_lang).lower() and "hinglish" not in str(detected_lang).lower()
+
+        if is_pure_english:
+            optout_reply = (
+                "We completely understand and respect your request. We have removed your number from our automated messages, "
+                "and you will not receive any further messages from us. 🙏\n\n"
+                "If you ever have any course-related inquiries in the future, please feel free to reach out directly to our "
+                f"Sales & Customer Support team:\n{support_contacts}\n\n"
+                "Wishing you the very best!"
+            )
+        else:
+            optout_reply = (
+                "Bilkul, hum samajh sakte hain. Humne aapka number automated messages se hata diya hai "
+                "aur aage se aapko koi automated messages nahi aayenge. 🙏\n\n"
+                "Agar future mein aapko kisi bhi course ya class ke baare mein koi jaankari chahiye ho, "
+                f"toh aap directly hamari Sales & Customer Support team se connect kar sakte hain:\n{support_contacts}\n\n"
+                "Wishing you the very best!"
+            )
+
+        new_state["next_followup_due_at"] = None
+        new_state["is_escalated"] = True
+        new_state["refusal_stage"] = 3
+        new_state["wants_stop_messaging"] = True
+        if phone_key:
+            mark_escalated(phone_key)
+        session_state.update(new_state)
+
+        return {
+            "reply": optout_reply,
+            "followup": None,
+            "buttons": [],
+            "new_state": new_state,
+        }
 
     # ── Fast-Path Guardrail (Pillar 2): Intercept Pure Out-of-Scope Queries ───
     is_oos = bool(
@@ -1529,6 +1570,46 @@ async def _handle_conversation_turn_unlocked(
             start_time=start_time,
         )
         return {"status": "handed_off", "reply": reply_text}
+
+    # ── Stop Messaging / Opt-out Intercept ─────────────────────────────────
+    # When customer explicitly asks to stop texting/messaging or expresses irritation,
+    # immediately acknowledge politely, provide Sales & Support team numbers, disarm follow-ups, and halt bot.
+    if last_turn.get("wants_stop_messaging") or last_turn.get("intent") == "STOP_MESSAGING":
+        from src.core.kb_loader import format_support_executives_display
+        support_contacts = format_support_executives_display()
+        lang = str(new_state.get("language") or last_turn.get("detected_language") or "Hinglish").lower()
+        is_pure_english = "english" in lang and "hinglish" not in lang
+        if is_pure_english:
+            optout_msg = (
+                "We completely understand and respect your request. We have removed your number from our automated messages, "
+                "and you will not receive any further messages from us. 🙏\n\n"
+                "If you ever have any course-related inquiries in the future, please feel free to reach out directly to our "
+                f"Sales & Customer Support team:\n{support_contacts}\n\n"
+                "Wishing you the very best!"
+            )
+        else:
+            optout_msg = (
+                "Bilkul, hum samajh sakte hain. Humne aapka number automated messages se hata diya hai "
+                "aur aage se aapko koi automated messages nahi aayenge. 🙏\n\n"
+                "Agar future mein aapko kisi bhi course ya class ke baare mein koi jaankari chahiye ho, "
+                f"toh aap directly hamari Sales & Customer Support team se connect kar sakte hain:\n{support_contacts}\n\n"
+                "Wishing you the very best!"
+            )
+
+        clean_optout = _format_for_whatsapp(optout_msg)
+        await send_text_message_async(phone, clean_optout)
+        latency_sec = round(time.time() - start_time, 2)
+        await save_message_async(phone, "assistant", clean_optout, response_time_sec=latency_sec)
+        asyncio.create_task(log_message_async(phone, "ai", clean_optout))
+
+        new_state["next_followup_due_at"] = None
+        new_state["is_escalated"] = True
+        new_state["refusal_stage"] = 3
+        new_state["wants_stop_messaging"] = True
+        mark_escalated(phone)
+        await save_user_state_async(phone, new_state)
+
+        return {"status": "opted_out", "reply": clean_optout}
 
     # ── Refusal / Objection Handling ───────────────────────────────────────
     # When the customer declines or is in an active refusal lifecycle,

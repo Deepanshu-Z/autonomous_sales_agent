@@ -249,8 +249,28 @@ async def evaluate_refusal_async(
             "escalation_reason": None,
         }
 
-    # Quick short-circuit: future start dates / postponed start is NOT a refusal
+    # Quick short-circuit: explicit request to stop sending messages
     lower_t = text.lower().strip()
+    stop_terms = [
+        "stop sending", "stop msg", "stop message", "stop messaging", "dont msg", "don't msg",
+        "dont message", "don't message", "msg mat bhejo", "message mat bhejo", "irritate mat karo",
+        "pareshan mat karo", "bar bar message", "stop texting", "unsubscribe", "remove my number",
+        "dobara message mat", "dobara msg mat", "dimag mat kharab", "shanti se jeene do"
+    ]
+    if any(st in lower_t for st in stop_terms):
+        return {
+            "is_refusal": True,
+            "has_reason": True,
+            "extracted_reason": "Customer explicitly requested to stop sending messages",
+            "has_risk_or_legal": False,
+            "risk_category": "NONE",
+            "solution_viable": False,
+            "resolution_type": "ESCALATE_TO_AGENT",
+            "reply_message": None,
+            "escalation_reason": "Customer opted out / requested to stop messaging",
+        }
+
+    # Quick short-circuit: future start dates / postponed start is NOT a refusal
     future_date_terms = [
         "next month", "agle mahine", "agle month", "next week", "agle hafte",
         "next monday", "din baad", "days later", "from next", "after few days",

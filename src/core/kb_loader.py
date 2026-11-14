@@ -342,11 +342,17 @@ def format_support_executives_display() -> str:
     execs = get_support_executives()
     if not execs:
         return ""
+    lines = []
     for executive in execs:
+        raw_name = str(executive.get("name") or "").strip()
         salutation = str(executive.get("salutation") or "").strip()
-        if salutation and salutation.lower() not in str(executive.get("name") or "").lower():
-            executive["name"] = f"{executive['name']} {salutation}"
-    lines = [f"• {e['name']}: {e['phone']}" for e in execs if e.get("name") and e.get("phone")]
+        phone = str(executive.get("phone") or "").strip()
+        if salutation and salutation.lower() not in raw_name.lower():
+            display_name = f"{raw_name} {salutation}"
+        else:
+            display_name = raw_name
+        if display_name and phone:
+            lines.append(f"• {display_name}: {phone}")
     return "\n".join(lines)
 
 

@@ -1,13 +1,8 @@
 [
   {
-    "name": "Pooja",
+    "name": "Rachna",
     "salutation": "ma'am",
-    "phone": "+91 97174 47734"
-  },
-  {
-    "name": "Monika",
-    "salutation": "ma'am",
-    "phone": "+91 93544 05863"
+    "phone": "+91 88260 57446"
   },
   {
     "name": "Sudesh",
@@ -15,9 +10,9 @@
     "phone": "+91 88105 82411"
   },
   {
-    "name": "Rachna",
+    "name": "Monika",
     "salutation": "ma'am",
-    "phone": "+91 88260 57446"
+    "phone": "+91 93544 05863"
   },
   {
     "name": "Ruchi",

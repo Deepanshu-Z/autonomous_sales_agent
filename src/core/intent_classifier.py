@@ -76,6 +76,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_complaint_or_refund": False,
         "is_out_of_scope": False,
         "preferred_start_date": None,
+        "wants_stop_messaging": False,
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
@@ -248,6 +249,13 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
         This is the customer ANSWERING the objection question! Set "is_disinterested" = true, set "customer_intent" = "DISINTEREST", and set "question_summary" = null! NEVER classify this as "QUESTION" or as a request to see timings/fees!
     - NEGATIVE GUARD: Do NOT set to true for pure informational questions, timing inquiries, or schedule flexibility questions ("timing kya hai?", "fees kitni hai?", "flexible timings", "subah shaam alag timing ho sakti hai?", "can I change batches?") without an explicit rejection/cancellation signal.
 
+11b. "wants_stop_messaging":
+    - boolean: true if the customer indicates, asks, demands, or expresses annoyance/irritation about receiving messages and wants us to STOP sending messages, stop texting them, leave them alone, remove their number, or stop disturbing/spamming them in ANY language, slang, or phrasing (e.g., "stop sending msg", "pls don't text", "msg mat bhejo", "irritate mat karo", "bar bar message kyu kar rahe ho", "leave me alone", "band karo ye messages", "unsubscribe", "remove my number", "dimag mat kharab karo", "shanti se jeene do", "stop", "don't message").
+    - Evaluated strictly by SEMANTIC MEANING in any language (English, Hindi, Hinglish, regional, typos).
+    - When true:
+      • Set "customer_intent" = "STOP_MESSAGING".
+      • Set "is_disinterested" = true.
+
 12. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
 
@@ -257,6 +265,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 13. "customer_intent":
     Must be EXACTLY ONE of:
+    - "STOP_MESSAGING": Customer expresses annoyance/irritation or explicitly asks/demands to stop receiving messages, stop texting them, leave them alone, unsubscribe, or remove their number. When assigned, set "wants_stop_messaging" = true and set "is_disinterested" = true.
     - "OUT_OF_SCOPE": Customer is asking an off-topic or general knowledge question completely unrelated to Sensationz Performing Arts Academy (e.g. coding/programming, syntax errors, recipes, general trivia, homework, jokes, medical advice, politics, general AI tasks). When assigned, set "is_out_of_scope" = true and set "question_summary" = "Off-topic query about [topic]".
     - "QUESTION": Customer is asking an informational question or inquiring about schedule/policies (e.g. "kathak b sikhate ho ?", "fees kitni hai?", "timing kya hai?", "flexible timings", "can I switch batch?", "how to apply?", "what is syllabus?").
       • CRITICAL NEGATIVE GUARD (OBJECTION ANSWERING): If the AI in the recent transcript asked what is holding the customer back, why they are hesitating, or asked if it's timing or fees (e.g. "kya cheez rok rahi hai? Kya timing, fees...?"), and the customer answers by naming an obstacle/topic (e.g. "timings", "timing", "fees", "price", "paise", "cost", "offline", "subah"), this is an OBJECTION REASON ("DISINTEREST"), NOT A "QUESTION"! NEVER output "QUESTION" when the customer is naming what is holding them back!
@@ -366,6 +375,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "claims_payment_or_enrollment": boolean,
   "cannot_access_classes": boolean,
   "preferred_start_date": string | null,
+  "wants_stop_messaging": boolean,
   "timing_ambiguous": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
@@ -474,7 +484,7 @@ async def extract_intent_and_state_changes(
         for bool_key in [
             "wants_trial", "wants_demo_video", "wants_app_link", "requests_qr",
             "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
-            "is_complaint_or_refund", "is_out_of_scope", "wants_resend_video", "claims_payment_or_enrollment",
+            "is_complaint_or_refund", "is_out_of_scope", "wants_stop_messaging", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
             "wants_trial_guide", "wants_trial_video_guide"
         ]:
@@ -490,6 +500,11 @@ async def extract_intent_and_state_changes(
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
         # Sync semantic request flags with customer_intent without raw-text regex overrides
+        if clean.get("customer_intent") == "STOP_MESSAGING" or clean.get("wants_stop_messaging"):
+            clean["wants_stop_messaging"] = True
+            clean["customer_intent"] = "STOP_MESSAGING"
+            clean["is_disinterested"] = True
+
         if clean.get("customer_intent") == "OUT_OF_SCOPE":
             clean["is_out_of_scope"] = True
         elif clean.get("is_out_of_scope") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
@@ -924,7 +939,14 @@ async def extract_intent_and_state_changes(
         if detected_future_date:
             clean["preferred_start_date"] = detected_future_date
 
-        if data.get("is_disinterested") or data.get("customer_intent") == "DISINTEREST":
+        if clean.get("wants_stop_messaging") or data.get("customer_intent") == "STOP_MESSAGING":
+            clean["wants_stop_messaging"] = True
+            clean["customer_intent"] = "STOP_MESSAGING"
+            clean["is_disinterested"] = True
+            clean["selected_timing"] = None
+            clean["selected_teacher"] = None
+            clean["selected_package"] = None
+        elif data.get("is_disinterested") or data.get("customer_intent") == "DISINTEREST":
             if has_contrastive_slot_in_text or clean.get("preferred_start_date"):
                 clean["is_disinterested"] = False
                 if clean.get("selected_timing"):
@@ -1191,6 +1213,11 @@ async def extract_intent_and_state_changes(
                     flags["preferred_start_date"] = m.group(0).strip()
                     flags["is_disinterested"] = False
                     break
+
+            if re.search(r"\b(stop\s*(?:sending)?\s*(?:msg|msgs|message|messages)|don'?t\s*(?:send)?\s*(?:msg|msgs|message|messages|text)|(?:msg|message|messages?)\s*mat\s*(?:bhejo|karo|send)|(?:irritat(?:e|ing)|disturb|pareshan|dimag)\s*mat|stop\s*disturbing|bar\s*bar\s*(?:msg|message)|dobara\s*(?:msg|message)\s*mat|unsubscribe|remove\s*my\s*number|stop\s*texting|please\s*stop)\b", text, re.IGNORECASE):
+                flags["wants_stop_messaging"] = True
+                flags["customer_intent"] = "STOP_MESSAGING"
+                flags["is_disinterested"] = True
 
             if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
@@ -1548,6 +1575,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     if flags.get("preferred_start_date"):
         new_state["preferred_start_date"] = flags["preferred_start_date"]
 
+    if flags.get("wants_stop_messaging"):
+        new_state["wants_stop_messaging"] = True
+
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
 
@@ -1657,6 +1687,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "detected_language": flags.get("detected_language"),
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
         "preferred_start_date": flags.get("preferred_start_date"),
+        "wants_stop_messaging": flags.get("wants_stop_messaging", False),
         "cannot_access_classes": flags.get("cannot_access_classes", False),
         "unoffered_type": flags.get("unoffered_type"),
         "unoffered_value": flags.get("unoffered_value"),

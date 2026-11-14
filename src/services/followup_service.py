@@ -30,7 +30,7 @@ from typing import Optional, Dict, Any, List
 # True  = Legacy Mode (5-min check-in -> 30-min agent handoff in Interakt)
 # False = 24-Hour AI Mode (5-min check-in -> 30m/3h/6h/6h/6h facts & trials -> 24h agent)
 # =========================================================================
-USE_LEGACY_FOLLOWUP: bool = True
+USE_LEGACY_FOLLOWUP: bool = False
 
 
 def is_legacy_mode() -> bool:

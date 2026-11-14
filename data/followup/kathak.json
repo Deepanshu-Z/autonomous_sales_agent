@@ -1,43 +1,147 @@
 {
   "course": "kathak",
   "course_name": "Online Live Interactive Kathak",
-  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
-  "followups": [
-    {
-      "step": 1,
-      "delay_label": "30 min",
-      "trigger_after_minutes": 30,
-      "topic": "12+ Years Experienced Classical Gurus",
-      "message": "Khas baat: Hamari senior faculty Ms. Madhuri mam ke paas 12+ saal ka traditional Kathak repertoire aur Layakari ka deep experience hai. Unke saath Kratika Gontiya, Vibha Mittal aur Sneha Maurya jaisi certified instructors har beginner ko zero se guide karti hain. 🌟\n\nTatkar se lekar Chakkars tak sab kuch step-by-step sikhaya jata hai. Aap kis batch timing mein comfortable rahenge?"
-    },
-    {
-      "step": 2,
-      "delay_label": "3 hours",
-      "trigger_after_minutes": 180,
-      "topic": "Structured Authentic Syllabus",
-      "message": "Sensationz Kathak ka syllabus pure classical authenticity par based hai: 📜✨\n• Tatkar (Footwork & Taal mastery)\n• Hastaks & Mudras (Classical hand gestures)\n• Chakkars & Padhanth (Rhythmic recitation)\n• Bhava & Abhinaya (Expressive storytelling)\n\nChahe aap beginner hon ya pehle seekh chuke hon, batch aapke level ke anusaar milega. Kaunsa time aapke schedule mein fit baithta hai? 😊"
-    },
-    {
-      "step": 3,
-      "delay_label": "+6 hours (9h total)",
-      "trigger_after_minutes": 540,
-      "topic": "Convenient Home Learning",
-      "message": "Did you know? Pehle classical Kathak seekhne ke liye dur-dur tak academy travel karna padta tha. Ab Sensationz App ke 2-way live interactive setup se aap apne ghar ke comfortable space mein authentic classical dance seekh sakte hain — bina kisi travel stress ke! 🏠💃\n\nKya main aapke saath packages aur timing details share karoon?"
-    },
-    {
-      "step": 4,
-      "delay_label": "+6 hours (15h total)",
-      "trigger_after_minutes": 900,
-      "topic": "Discipline, Mind Focus & Confidence",
-      "message": "Kathak ki Taal aur Layakari dimag ko sharp banati hai aur mental focus improve karti hai. Sensationz family mein school students se lekar working women aur mothers tak sabhi shastriya sangeet aur nritya ka anand le rahe hain. 🌸\n\nApne andar ke classical artist ko jagane ka yeh best samay hai. Kya main aapka slot check karoon? 😊"
-    },
-    {
-      "step": 5,
-      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
-      "trigger_after_minutes": 1260,
-      "topic": "Final Offer: 3 Free Live Trial Classes",
-      "is_final_trial_offer": true,
-      "message": "Namaste! 🙏 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul chinta mat kijiye — hum chahte hain ki aap pehle guru ji ki live teaching style ko khud experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero fee\n• Direct live interaction with expert Kathak Guru\n• Complete beginner friendly guidance\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar bhej dijiye aur apna time batayein! 🙏✨"
-    }
-  ]
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "stages": {
+    "30m": [
+      {
+        "id": "kathak_30m_1",
+        "topic": "12+ Years Experienced Classical Faculty",
+        "message": "Namaste! 🙏 Khas baat: Hamari senior faculty Ms. Madhuri mam ke paas 12+ saal ka traditional Kathak repertoire aur Layakari ka deep experience hai. Unke saath Vibha Mittal, Kratika Gontiya aur Sneha Maurya jaisi certified instructors har beginner ko zero se guide karti hain. 🌟\n\nTatkar se lekar Chakkars tak sab kuch step-by-step sikhaya jata hai. Aap kis batch timing mein comfortable rahenge?"
+      },
+      {
+        "id": "kathak_30m_2",
+        "topic": "Structured Authentic Classical Syllabus",
+        "message": "Hello! 📜 Sensationz Kathak ka syllabus pure classical authenticity par based hai: \n• Tatkar (Footwork & Taal mastery)\n• Hastaks & Mudras (Classical hand gestures)\n• Chakkars & Padhanth (Rhythmic recitation)\n• Bhava & Abhinaya (Expressive storytelling)\n\nChahe aap beginner hon ya pehle seekh chuke hon, batch aapke level ke anusaar milega. Kaunsa time aapke schedule mein fit baithta hai? 😊"
+      },
+      {
+        "id": "kathak_30m_3",
+        "topic": "Day-Pair Flexibility (Tue/Thu, Wed/Fri, Sat/Sun)",
+        "message": "Namaste! 🌸 Sensationz Kathak classes weekly 2 days ke structured pairs mein hoti hain:\n• Tuesday & Thursday (4 PM to 9 PM)\n• Wednesday & Friday (4 PM to 9 PM)\n• Saturday & Sunday (5 PM to 9 PM - Weekend Special!)\n\nBusy weekdays hain toh aap weekend batch bhi choose kar sakte hain. Kaunsa day-pair aapke liye best rahega? ✨"
+      },
+      {
+        "id": "kathak_30m_4",
+        "topic": "Beginner Friendly for All Ages (5+ to Adults)",
+        "message": "Kya aapko lagta hai ki classical Kathak seekhna mushkil hai? Bilkul nahi! Sensationz par 5 saal ke bacchon se lekar working women aur mothers tak sabhi basic posture aur footwork se shuru karte hain. Guru ji har mudra live correct karte hain. 🌿\n\nKya main aapke saath batch timings share karoon? 😊"
+      },
+      {
+        "id": "kathak_30m_5",
+        "topic": "Body Balance, Grace & Posture",
+        "message": "Quick classical fact: Kathak nritya karne se spinal posture naturally straight hota hai, body balance behtar hota hai aur rhythmic coordination badhta hai. Ek shastriya kala seekhne ka anand hi alag hai! ✨\n\nAap weekday ya weekend batch mein se kaunsa prefer karenge? 🙏"
+      }
+    ],
+    "3h": [
+      {
+        "id": "kathak_3h_1",
+        "topic": "Convenient Home Learning — Save Travel Stress",
+        "message": "Namaste! 🏠 Pehle traditional Kathak seekhne ke liye dur-dur tak academy travel karna padta tha. Ab Sensationz App ke 2-way live interactive setup se aap apne ghar ke comfortable space mein authentic classical dance seekh sakte hain bina travel stress ke! 💃✨\n\nKya main aapka slot check karoon? Batayein kaunsa time suit karega!"
+      },
+      {
+        "id": "kathak_3h_2",
+        "topic": "Mental Focus & Layakari Discipline",
+        "message": "Kathak ki Taal aur Padhanth recitation dimag ko sharp banati hai aur mental focus improve karti hai. Sensationz family mein classical dance seekhkar students mein confidence aur grace naturally aati hai. 🌸\n\nApne andar ke classical artist ko jagane ke liye kya main timing details share karoon? 😊"
+      },
+      {
+        "id": "kathak_3h_3",
+        "topic": "100% Live 2-Way Interactive on Sensationz App",
+        "message": "Sensationz par har class 100% live hoti hai. Guru ji aapke footwork ka sound aur mudras screen par dekhte hain aur loving feedback dete hain. Yeh recorded courses se bilkul alag aur effective hai! 📱✨\n\nAap 5 PM, 6 PM ya 7 PM mein se kaunsa time slot prefer karenge?"
+      },
+      {
+        "id": "kathak_3h_4",
+        "topic": "Weekend Batches (Saturday & Sunday)",
+        "message": "Working professionals aur school students ke liye hamare paas Saturday & Sunday ke dedicated weekend batches hain (5 PM to 9 PM). Weekdays busy rehte hain toh weekend par 1-1 ghanta classical dance enjoy kijiye! 🌟\n\nKya weekend batch mein aapka slot confirm karoon? 😊"
+      },
+      {
+        "id": "kathak_3h_5",
+        "topic": "Authentic Jaipur & Lucknow Gharana Nuances",
+        "message": "Hamari faculty traditional Gharana repertoire, Tukde, Tihaai aur Bhav presentation authentic tareeqe se train karti hai. Complete classical foundation guaranteed hai. 📜✨\n\nKaunsa batch timing aapke liye best rahega? 🙏"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "kathak_6h1_1",
+        "topic": "Affordable 3 Months Classical Package",
+        "message": "Hello! 🌸 Sensationz Kathak ka 3 Months package Welcome Offer coupon `KATHAK1500` ke saath sirf ₹1500 (+GST) mein available hai. Shastriya sangeet aur nritya itni affordable fee mein seekhna ek golden opportunity hai! ✨\n\nKya main coupon code apply karne mein guide karoon? 😊"
+      },
+      {
+        "id": "kathak_6h1_2",
+        "topic": "Safe, Respectful & Supportive Learning",
+        "message": "Sensationz par har student ko shastriya parampara aur guru-shishya dhyan ke saath sikhaya jata hai. Yahan sabhi students ek encouraging aur positive environment mein grow karte hain. 🌿\n\nAapko Tue/Thu ya Wed/Fri kaunsa pair best lagega?"
+      },
+      {
+        "id": "kathak_6h1_3",
+        "topic": "Expressive Storytelling & Abhinaya",
+        "message": "Kathak ka matlab hi hai 'Katha Kahe So Kathak Kahlaave' — yaani expressions ke zariye kahani sunana. Hamari classes mein aankhon aur chehre ke expressions (Bhava) par special dhyan diya jata hai. 🎭✨\n\nKya main aapka batch timing confirm karoon? 😊"
+      },
+      {
+        "id": "kathak_6h1_4",
+        "topic": "Mother-Daughter Learning Opportunity",
+        "message": "Hamare kai batches mein mothers aur unki daughters saath mein ghar baithe live Kathak seekh rahi hain! Yeh ek beautiful bonding experience banta hai shastriya kala ke saath. 💖\n\nKya aap apne liye ya bacche ke liye slot dekh rahe hain?"
+      },
+      {
+        "id": "kathak_6h1_5",
+        "topic": "Ghungroo & Basic Practice Setup",
+        "message": "Shuru mein kisi heavy setup ya costly ghungroo ki zaroorat nahi hoti! Bas comfortable Indian wear (kurta-leggings) aur floor space chahiye. Guru ji basic footwork pehle soft sikhate hain. 🌟\n\nKaunsa slot aapke routine mein convenient rahega? 🙏"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "kathak_6h2_1",
+        "topic": "Senior Guru Ms. Madhuri's Live Guidance",
+        "message": "Namaste! ✨ Ms. Madhuri mam ke live batches mein sikhne ka mauka limited students ko hi milta hai taaki har student par personal focus rahe. Unka teaching style bahut hi patient aur encouraging hai! 🌟\n\nKya main unke batch mein aapka slot reserve karoon?"
+      },
+      {
+        "id": "kathak_6h2_2",
+        "topic": "1 Month vs 3 Months Options",
+        "message": "Aap pehle 1 Month package se start karke basic footwork test kar sakte hain, ya 3 Months offer select kar sakte hain. Dono options app par easily available hain! 🌸\n\nKya main package details dobara share karoon? 😊"
+      },
+      {
+        "id": "kathak_6h2_3",
+        "topic": "Discipline & Grace for a Lifetime",
+        "message": "Classical dance ka anubhav life bhar aapke walking posture, body language aur confidence mein jhalakta hai. Ek shastriya kala ka gyan hamesha garv deta hai. 🌺\n\nApna learning slot confirm karne ke liye batayein kaunsa time best rahega!"
+      },
+      {
+        "id": "kathak_6h2_4",
+        "topic": "Evening Slots Available (4 PM to 9 PM)",
+        "message": "School ya office ke baad evening 6 PM, 7 PM ya 8 PM ke batches perfect hain relax hone aur classical nritya seekhne ke liye. 🌙✨\n\nKaunsa batch timing aapke din ko suit karega? 😊"
+      },
+      {
+        "id": "kathak_6h2_5",
+        "topic": "Simple 1-Click App Access",
+        "message": "Sensationz App par class join karna bahut simple hai. Video guide aur support team aapko pehle din se complete setup mein help karti hai. 📲\n\nKya main aapko app link ya video guide bhejoon? 🙏"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "kathak_trial_1",
+        "topic": "3 Free Live Trial Classes — Experience Guru Ji's Teaching",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🙏 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul chinta mat kijiye — hum chahte hain ki aap pehle guru ji ki live teaching style ko khud experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero fee\n• Direct live interaction with expert Kathak Guru\n• Complete beginner friendly guidance\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar bhej dijiye aur apna time batayein! 🙏✨"
+      },
+      {
+        "id": "kathak_trial_2",
+        "topic": "3 Free Live Trial Classes — Experience Classical Grace",
+        "is_final_trial_offer": true,
+        "message": "Hello! 🌸 Kathak join karne se pehle live class ka feel lena sabse best decision hai. Isliye hum aapke liye **3 Free Live Interactive Trial Classes** unlock kar rahe hain! 🎁\n\nLive aakar guru ji ke saath basic tatkar aur mudras try kijiye — 100% Free Pass!\n\nKya main kal ke batch mein aapka trial slot confirm karoon? Bas timing bata dijiye! ✨💃"
+      },
+      {
+        "id": "kathak_trial_3",
+        "topic": "3 Free Live Trial Classes — Zero Risk Classical Pass",
+        "is_final_trial_offer": true,
+        "message": "Namaste! ✨ Sensationz App par aapke liye **3 Free Live Classical Kathak Trial Sessions** ready hain! 🎁\n• Senior Guru Ms. Madhuri / Kratika Gontiya ke live batch mein entry\n• Tatkar & basic mudra introduction\n• Zero registration fee\n\nTrial class book karne ke liye bas 'FREE TRIAL' likhein aur batayein weekday ya weekend kaunsa time suit karega! 🌿"
+      },
+      {
+        "id": "kathak_trial_4",
+        "topic": "3 Free Live Trial Classes — Weekend & Weekday Pass",
+        "is_final_trial_offer": true,
+        "message": "Special Invitation: Kathak ki shastriya kala ko ghar baithe live experience kijiye with **3 Free Trial Classes**! 🌟🎁\n\nAgar pasand aaye toh hi aage continue kijiye, koi commitment nahi hai. Chahe weekday ho ya weekend, batch timing aapki pasand ka hoga.\n\nKya main aapka trial slot lock kar doon? Bas 'YES' bhej dijiye! 🙏✨"
+      },
+      {
+        "id": "kathak_trial_5",
+        "topic": "3 Free Live Trial Classes — Final Invitation",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🙏 Yeh aapka final classical pass hai: **3 Free Live Interactive Kathak Sessions** Sensationz App par! 🌺\n\nExpert classical guru se direct live guidance paayein bilkul muft. Limited seats available hain.\n\nKya main aapka trial confirm kar doon? Bas apna preferred timing bata dijiye! 🌟✨"
+      }
+    ]
+  }
 }

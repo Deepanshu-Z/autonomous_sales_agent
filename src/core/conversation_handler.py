@@ -227,6 +227,8 @@ async def handle_incoming_message(
         or session_state.get("awaiting_trial_email")
     )
     user_email = clean_email(user_message, is_awaiting_email=is_awaiting_email)
+    if user_email and any(inv in user_email for inv in ("none@", "null@", "void@", "test@")):
+        user_email = None
 
     if user_email:
         new_state["student_email"] = user_email
@@ -1552,6 +1554,7 @@ async def _handle_conversation_turn_unlocked(
         or new_state.get("timing") != state.get("timing")
         or new_state.get("teacher") != state.get("teacher")
         or new_state.get("package") != state.get("package")
+        or (new_state.get("preferred_start_date") and new_state.get("preferred_start_date") != state.get("preferred_start_date"))
     )
 
     if is_active_selection:

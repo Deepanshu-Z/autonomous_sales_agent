@@ -73,11 +73,11 @@ def test_24h_mode():
     assert d0.action == "SEND_MESSAGE"
     assert "Just checking in" in d0.message
     assert d0.next_count == 1
-    assert d0.next_gap_seconds == 1500  # 25m -> 30m total
-    print("  [PASS] Step 0 sends check-in and sets 1500s (25m) gap")
+    assert d0.next_gap_seconds == 1800  # 30m after 5m checkin
+    print("  [PASS] Step 0 sends check-in and sets 1800s (30m) gap")
 
     # Steps 1 to 5: Factual sequence
-    expected_gaps = {1: 9000, 2: 21600, 3: 21600, 4: 21600, 5: 10800}
+    expected_gaps = {1: 10800, 2: 21600, 3: 21600, 4: 21600, 5: 7200}
     sent = [0]
     for s in range(1, 6):
         d = followup_service.get_followup_decision(
@@ -124,25 +124,27 @@ def test_anti_loop_deduplication():
         course_id="kathak",
         course_name="Online Live Interactive Kathak",
         lead_at_qr=False,
-        sent_steps=[0, 1],  # Steps 0 and 1 were already sent
+        sent_steps=["checkin_5m", "kathak_30m_1"],  # 5m check-in and variation 1 were already sent
     )
-    # It must NOT resend Fact 1! It must automatically send Fact 2!
+    # It must NOT resend variation 1! It must pick variation 2!
     assert d_loop.action == "SEND_MESSAGE"
-    assert "step 2" in d_loop.step_label.lower() or "Fact #2" in d_loop.step_label
-    assert 2 in d_loop.updated_sent_steps
-    print(f"  [PASS] Anti-loop prevented duplicate! Advanced to Step 2: {d_loop.step_label}")
+    assert d_loop.message_id == "kathak_30m_2"
+    assert d_loop.updated_sent_ids is not None
+    print(f"  [PASS] Anti-loop prevented duplicate! Selected variation 2: {d_loop.step_label}")
 
-    # Scenario 2: If user already got all facts 1 through 5 and paused:
+    # Scenario 2: If user already got all 5 variations for 30m:
+    all_30m = [f"kathak_30m_{i}" for i in range(1, 6)]
     d_all_seen = followup_service.get_followup_decision(
         phone="919999999999",
         count=1,
         course_id="kathak",
         course_name="Online Live Interactive Kathak",
         lead_at_qr=False,
-        sent_steps=[0, 1, 2, 3, 4, 5],
+        sent_steps=["checkin_5m"] + all_30m,
     )
-    # Must advance straight to agent escalation
-    assert d_all_seen.action == "ESCALATE_TO_AGENT"
+    # Safely wraps around to variation 1
+    assert d_all_seen.action == "SEND_MESSAGE"
+    assert d_all_seen.message_id == "kathak_30m_1"
     print("  [PASS] Anti-loop with all facts exhausted cleanly escalates to agent")
 
 

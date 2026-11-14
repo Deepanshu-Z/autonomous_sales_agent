@@ -1,43 +1,147 @@
 {
   "course": "face_yoga",
   "course_name": "Online Live Interactive Face Yoga",
-  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
-  "followups": [
-    {
-      "step": 1,
-      "delay_label": "30 min",
-      "trigger_after_minutes": 30,
-      "topic": "Certified Facial Sculpting Experts",
-      "message": "Khas baat: Hamari certified faculty — jaise Parul mam aur Sonali mam — facial anatomy aur non-invasive natural anti-aging ke expert hain. Yahan bina kisi chemical cream ya injections ke, sirf authentic facial exercises aur pressure points se skin rejuvenation sikhaya jata hai. 🌿\n\nAapko kis batch timing mein join karna convenient rahega?"
-    },
-    {
-      "step": 2,
-      "delay_label": "3 hours",
-      "trigger_after_minutes": 180,
-      "topic": "Jawline, Double Chin & Lymphatic Drainage",
-      "message": "Face Yoga sirf glow ke liye nahi hai — isse visible results milte hain: 🌸✨\n• Sharp jawline definition aur double chin reduction\n• Lymphatic drainage massage se morning face puffiness khatam\n• Forehead lines aur smile lines ki natural softening\n• Neck & cheek toning bina kisi machine ke\n\nDaily routine ke hisaab se kaunsa time slot aapko suit karega? 😊"
-    },
-    {
-      "step": 3,
-      "delay_label": "+6 hours (9h total)",
-      "trigger_after_minutes": 540,
-      "topic": "Gua Sha & Jade Roller Techniques",
-      "message": "Did you know? Sensationz Face Yoga syllabus mein traditional hand exercises ke saath-saath Gua Sha, Jade Roller, aur Ice-cube massage techniques live sikhaayi jaati hain jo skin collagen boost karti hain! 💎✨\n\nYeh aapka daily self-care aur relaxation ritual ban jata hai. Kya main aapke saath packages ya batches share karoon?"
-    },
-    {
-      "step": 4,
-      "delay_label": "+6 hours (15h total)",
-      "trigger_after_minutes": 900,
-      "topic": "Safe, Natural & Long-Lasting Results",
-      "message": "Expensive salon facials ka asar 2 din mein chala jata hai, lekin Face Yoga se muscles naturally tone hoti hain jiska result lifelong rehta hai. Sensationz App par hazaron ladies daily apne chehre par natural glow aur confidence la rahi hain. 🌟\n\nApne natural beauty transformation ke liye kya main aapka batch confirm karoon? 😊"
-    },
-    {
-      "step": 5,
-      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
-      "trigger_after_minutes": 1260,
-      "topic": "Final Offer: 3 Free Live Trial Classes",
-      "is_final_trial_offer": true,
-      "message": "Namaste! ✨ Agar aap abhi decide nahi kar pa rahe hain, toh bilkul koi baat nahi — hum chahte hain ki aap pehle face yoga ka refreshing feel khud live class mein dekhein! 🌸\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero cost\n• Live guidance with certified Face Yoga expert\n• Instant fresh glow & relaxation feel\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur batayein kaunsa time suit karega! 🌟🙏"
-    }
-  ]
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "stages": {
+    "30m": [
+      {
+        "id": "face_30m_1",
+        "topic": "57 Facial Muscles & Natural Glow",
+        "message": "Namaste! ✨ Kya aapko pata hai? Hamare chehre par 57 facial muscles hote hain jinki regular exercise na hone se skin loose hoti hai aur dullness aati hai. Sirf 30 minutes ki daily Face Yoga practice se facial blood circulation 40% tak badhta hai aur natural skin glow wapas aata hai! 💆‍♀️\n\nSensationz par hamari classes 100% live aur interactive hoti hain. Kya aap morning ya evening batch timings dekhna chahenge? 😊"
+      },
+      {
+        "id": "face_30m_2",
+        "topic": "Jawline Sculpting & Double Chin Reduction",
+        "message": "Hello! 🌸 Face Yoga sirf glow ke liye nahi hai — isse visible results milte hain:\n• Sharp jawline definition aur double chin toning\n• Lymphatic drainage massage se morning face puffiness khatam\n• Forehead lines aur smile lines ki natural softening\n• Cheeks lifting bina kisi injection ya machine ke!\n\nDaily routine ke hisaab se kaunsa time slot aapko suit karega? 😊"
+      },
+      {
+        "id": "face_30m_3",
+        "topic": "Certified Facial Sculpting Experts",
+        "message": "Namaste! 🌿 Sensationz par hamari certified instructors facial anatomy aur non-invasive natural anti-aging ke experts hain. Yahan bina kisi chemical cream ya expensive salon treatment ke, sirf authentic facial exercises aur pressure points se skin rejuvenation sikhaya jata hai. ✨\n\nAapko morning 7 AM, 8 AM ya evening 5 PM, 6 PM mein se kaunsa time convenient rahega?"
+      },
+      {
+        "id": "face_30m_4",
+        "topic": "Gua Sha & Jade Roller Live Techniques",
+        "message": "Did you know? Sensationz Face Yoga syllabus mein traditional hand exercises ke saath-saath Gua Sha, Jade Roller aur Ice-cube massage techniques live sikhayi jaati hain jo skin collagen ko boost karti hain! 💎✨\n\nYeh aapka daily relaxing self-care ritual ban jata hai. Kya main batch details share karoon? 😊"
+      },
+      {
+        "id": "face_30m_5",
+        "topic": "Zero Side Effects, 100% Natural",
+        "message": "Expensive beauty treatments aur chemical peels ka asar kuch din mein chala jata hai, lekin Face Yoga se facial muscles naturally tone hoti hain jiska result permanent aur safe rehta hai. 🌸\n\nApne skin transformation journey ke liye batayein kaunsa time best rahega! 🙏"
+      }
+    ],
+    "3h": [
+      {
+        "id": "face_3h_1",
+        "topic": "Morning Batches for Fresh Day Start (7 AM & 8 AM)",
+        "message": "Namaste! ☀️ Subah 7:00 AM ya 8:00 AM ka session lene se chehre ki night puffiness aur eye bags instant gayab ho jaate hain. Din bhar chehre par ek fresh, energetic aur radiant look rehta hai! 🌿\n\nKya morning batch mein aapka slot reserve karoon?"
+      },
+      {
+        "id": "face_3h_2",
+        "topic": "100% Live Correction on Sensationz App",
+        "message": "Recorded videos dekh kar galat angle se face khinchne se wrinkles badh sakte hain! Sensationz App par instructor live screen par aapke hand placement aur angle check karke correct karte hain. 📱✨\n\nKaunsa time slot aapke daily routine mein aasan rahega? 😊"
+      },
+      {
+        "id": "face_3h_3",
+        "topic": "Natural Neck & Collarbone Toning",
+        "message": "Tech neck aur double chin aaj kal sabhi ki problem hai. Hamare specially curated exercises neck lines ko smooth karte hain aur collarbone area ko tone karte hain. 🌸\n\nKya main aapke saath packages aur timing share karoon?"
+      },
+      {
+        "id": "face_3h_4",
+        "topic": "Evening Relax & Unwind Batches (5 PM & 6 PM)",
+        "message": "Din bhar laptop screen dekhne se eye strain aur forehead stress ho jata hai? Evening 5:00 PM ya 6:00 PM ka batch face ke tired muscles ko release karta hai aur deep sleep deta hai. 🌙💆‍♀️\n\nKya evening batch mein aapka slot check karoon? 😊"
+      },
+      {
+        "id": "face_3h_5",
+        "topic": "All Ages Welcome (Teens to 60+)",
+        "message": "Sensationz Face Yoga sabhi age groups ke liye suitable hai — college students for glowing skin aur working women & mothers for anti-aging and firmness. 🌺\n\nAap kis slot mein enroll hona chahenge? 🙏"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "face_6h1_1",
+        "topic": "Super Pocket-Friendly Fee (₹6.7/day)",
+        "message": "Hello! ✨ Sensationz Face Yoga ka 3 Months package Welcome Coupon `FACE600` apply karke sirf ₹600 (+GST) mein milta hai — yeh sirf ~₹6.7 per day hai! Ek single salon facial se 10 guna sasta aur 100 guna zyada natural! 🌿\n\nKya main coupon code apply karne mein guide karoon? 😊"
+      },
+      {
+        "id": "face_6h1_2",
+        "topic": "Lymphatic Drainage Detox",
+        "message": "Chehre par sujan ya water retention rehti hai? Face Yoga ki acupressure techniques se face ka lymphatic fluid naturally drain hota hai, jisse cheekbones sharp aur contoured dikhte hain! 💎✨\n\nKya main aapka batch timing confirm karoon?"
+      },
+      {
+        "id": "face_6h1_3",
+        "topic": "Home Convenience — No Parlour Visits Needed",
+        "message": "Har hafte parlour ke chakkar kaatne aur ghanto intezaar karne ki zaroorat nahi. Sensationz App se ghar baithe roz 1 ghanta self-care lijiye bina kisi travel stress ke! 🏠💆‍♀️\n\nAapko morning ya evening mein se kaunsa suit karega? 😊"
+      },
+      {
+        "id": "face_6h1_4",
+        "topic": "Visible Changes in 3 to 4 Weeks",
+        "message": "Regular practice karne par 3 se 4 hafte mein skin texture firm hota hai aur smile lines soft hone lagti hain. Natural beauty ka sabse authentic tarika yahi hai! 🌸\n\nApna slot reserve karne ke liye batayein kaunsa timing best rahega!"
+      },
+      {
+        "id": "face_6h1_5",
+        "topic": "Gentle Routine — No Pain, Only Relief",
+        "message": "Koi painful needle ya harsh suction nahi — sirf relaxing facial strokes, breathing aur muscle activation. Session ke baad mind aur face dono refreshed feel hote hain! 🌿\n\nKaunsa time slot aapke din ko suit karega? 🙏"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "face_6h2_1",
+        "topic": "Certified Instructors Team",
+        "message": "Namaste! 🌟 Sensationz par certified female wellness experts aapse live judkar har mudra aur massage stroke sikhate hain. Unki guidance se result safe aur effective rehta hai! ✨\n\nKya main aapka slot book karoon?"
+      },
+      {
+        "id": "face_6h2_2",
+        "topic": "1 Month vs 3 Months Options",
+        "message": "Aap pehle 1 Month package se start karke exercises seekh sakte hain, ya 3 Months offer select kar sakte hain jo regular habit banane ke liye best hai. 🌸\n\nKya main payment details aapke saath share karoon? 😊"
+      },
+      {
+        "id": "face_6h2_3",
+        "topic": "Boost Skin Collagen Naturally",
+        "message": "Blood circulation badhne se skin cells ko oxygen aur nutrients milte hain, jisse natural collagen production activate hota hai. Pure natural anti-aging! 💎✨\n\nKal se batch start karne ke liye batayein kaunsa time choose karein!"
+      },
+      {
+        "id": "face_6h2_4",
+        "topic": "Daily Self-Care Routine",
+        "message": "Apne liye din ka thoda time nikalna har woman ke liye zaroori hai. Face Yoga aapka favourite daily me-time ban jayega! 🌺\n\nMorning 8 AM ya evening 6 PM mein se kaunsa slot prefer karenge? 😊"
+      },
+      {
+        "id": "face_6h2_5",
+        "topic": "Easy App Onboarding & Help",
+        "message": "Sensationz App use karna bahut simple hai. Video guide aur support team aapko live class join karne mein complete guide karti hai. 📲\n\nKya main aapko app download link ya step guide bhejoon? 🙏"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "face_trial_1",
+        "topic": "3 Free Live Trial Classes — Feel the Refreshing Glow",
+        "is_final_trial_offer": true,
+        "message": "Namaste! ✨ Agar aap abhi decide nahi kar pa rahe hain, toh bilkul koi baat nahi — hum chahte hain ki aap pehle face yoga ka refreshing feel khud live class mein dekhein! 🌸\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero cost\n• Live guidance with certified Face Yoga expert\n• Instant fresh glow & relaxation feel\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur batayein kaunsa time suit karega! 🌟🙏"
+      },
+      {
+        "id": "face_trial_2",
+        "topic": "3 Free Live Trial Classes — Try Live Massage Strokes",
+        "is_final_trial_offer": true,
+        "message": "Hello! 💆‍♀️ Kisi bhi payment se pehle, 3 din hamare certified instructor ke saath live Face Yoga attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki kaise facial muscles relax hoti hain aur jawline par instant light feel hota hai. Pure Free Pass!\n\nKya main kal ke batch mein aapka trial slot confirm karoon? Timing bata dijiye! ✨🌸"
+      },
+      {
+        "id": "face_trial_3",
+        "topic": "3 Free Live Trial Classes — Zero Risk Glow Pass",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 💎 Sensationz App par aapke liye **3 Free Live Interactive Face Yoga Sessions** ready hain! 🎁\n• Certified instructor ke saath live correction\n• Acupressure points & anti-puffiness techniques\n• Zero registration fee\n\nTrial book karne ke liye bas 'FREE TRIAL' likhkar reply karein aur batayein morning 7/8 AM ya evening 5/6 PM kaunsa time suit karega! 🌿"
+      },
+      {
+        "id": "face_trial_4",
+        "topic": "3 Free Live Trial Classes — Experience Natural Rejuvenation",
+        "is_final_trial_offer": true,
+        "message": "Special Pass: Hum aapko invite kar rahe hain hamare exclusive live Face Yoga batch mein with **3 Free Trial Sessions**! 🌸🎁\n\nGhar baithe natural skin care aur relaxation seekhein. Agar pasand aaye toh continue kijiye, koi compulsion nahi hai.\n\nKya main aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+      },
+      {
+        "id": "face_trial_5",
+        "topic": "3 Free Live Trial Classes — Final Invitation",
+        "is_final_trial_offer": true,
+        "message": "Namaste! ✨ Yeh aapka final VIP invite hai: **3 Free Live Interactive Face Yoga Classes** Sensationz App par! 🌟\n\nExpert instructor se direct live guidance paayein bilkul free. Limited trial slots available hain.\n\nKya main aapka free pass activate kar doon? Bas preferred timing bata dijiye! 🙏💆‍♀️"
+      }
+    ]
+  }
 }

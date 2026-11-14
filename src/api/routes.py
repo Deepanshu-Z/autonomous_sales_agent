@@ -89,6 +89,8 @@ def _extract_message_text(message: dict) -> str:
         extracted_text = str(message.get("text") or message.get("body") or "")
 
     extracted_text = (extracted_text or "").strip()
+    if extracted_text.lower() in ("none", "null", "undefined"):
+        extracted_text = ""
 
     # Capture Quoted / Replied message context (when user swipes right / drags to reply)
     quoted_text = ""
@@ -469,7 +471,7 @@ def _extract_whatsapp_cloud_messages(data: dict) -> list[dict]:
     # 2. Simplified raw JSON for developer testing (curl / Postman)
     phone = data.get("phone") or data.get("from") or data.get("wa_id") or data.get("sender")
     text = data.get("text") or data.get("message") or data.get("body")
-    if phone and text:
+    if phone and text and str(text).strip().lower() not in ("none", "null", "undefined"):
         items.append({
             "phone": str(phone),
             "text": str(text).strip(),

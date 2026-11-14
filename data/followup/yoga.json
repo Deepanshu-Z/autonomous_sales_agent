@@ -1,43 +1,147 @@
 {
   "course": "yoga",
   "course_name": "Online Live Interactive Yoga",
-  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
-  "followups": [
-    {
-      "step": 1,
-      "delay_label": "30 min",
-      "trigger_after_minutes": 30,
-      "topic": "Certified Master Instructors",
-      "message": "Ek khas baat: Sensationz Yoga family mein hamare paas certified expert female instructors hain — jaise Mradula mam (13+ years experience in mindful wellness) aur Suman Lata mam (Yoga Therapy & comprehensive wellness specialist). 🧘‍♀️\n\nHar session beginner-friendly pace se start hota hai taaki koi injury ka risk na ho. Aapko kaunsa time slot routine mein fit lagta hai — morning ya evening? 🌟"
-    },
-    {
-      "step": 2,
-      "delay_label": "3 hours",
-      "trigger_after_minutes": 180,
-      "topic": "10 Flexible Batches (5 AM to 8 PM)",
-      "message": "Daily routine busy rehti hai? 🌿 Sensationz par subah 5:00 AM se lekar raat 8:00 PM tak total 10 alag-alag live batch slots available hain (Mon-Fri).\n\nAapko koi fixed rigid schedule follow nahi karna — aap 1 month baad apna timing switch bhi kar sakte hain! Aapke schedule ke hisaab se kaunsa time best rahega? 😊"
-    },
-    {
-      "step": 3,
-      "delay_label": "+6 hours (9h total)",
-      "trigger_after_minutes": 540,
-      "topic": "Holistic Syllabus: Pranayama & Sound Healing",
-      "message": "Did you know? Sensationz Yoga sirf physical exercise nahi hai. Hamare structured syllabus mein Asanas ke saath-saath Pranayama (Anulom Vilom, Kapalbhati, Bhastrika), Sound Healing, aur Guided Meditation shamil hai jo sleep quality aur spine posture ko naturally improve karta hai. 🌿✨\n\nKya aap batch timings ya packages explore karna chahenge?"
-    },
-    {
-      "step": 4,
-      "delay_label": "+6 hours (15h total)",
-      "trigger_after_minutes": 900,
-      "topic": "15,000+ Active Students & Home Convenience",
-      "message": "15,000+ women aur students across India Sensationz App ke live interactive platform se ghar baithe practice karte hain. Travel ka time bachta hai aur studio jaisi personal attention milti hai. 🌟\n\nAapka health transformation bas ek decision door hai! Kya main aapke liye batch timing confirm karoon? 😊"
-    },
-    {
-      "step": 5,
-      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
-      "trigger_after_minutes": 1260,
-      "topic": "Final Offer: 3 Free Live Trial Classes",
-      "is_final_trial_offer": true,
-      "message": "Namaste! 😊 Agar aap abhi decide nahi kar pa rahe hain toh bilkul koi baat nahi — hum chahte hain ki aap pehle khud live class experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul free\n• Live 2-way interactive session with certified teacher\n• Koi commitment nahi\n\nKya main aapka free trial book kar doon? Bas 'YES' reply karein ya batayein kaunsa time suit karega! 🙏✨"
-    }
-  ]
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "stages": {
+    "30m": [
+      {
+        "id": "yoga_30m_1",
+        "topic": "Certified Female Master Instructors",
+        "message": "Namaste! 🙏 Ek khas baat: Sensationz Yoga par hamari sabhi instructors certified aur experienced female teachers hain — jaise Mradula mam (13+ years mindful wellness experience) aur Suman Lata mam. Yahan har beginner ko personal attention milti hai taaki har posture safe aur accurate rahe. 🧘‍♀️\n\nAap morning ya evening batch timing mein se kaunsa prefer karenge? 😊"
+      },
+      {
+        "id": "yoga_30m_2",
+        "topic": "10 Flexible Batches (5 AM to 8 PM)",
+        "message": "Hello! 🌿 Sensationz par aapko rigid routine follow karne ki chinta nahi karni. Subah early 5:00 AM se lekar raat 8:00 PM tak total 10 alag-alag live batches available hain (Mon-Fri). Agar aapka daily schedule busy rehta hai, toh aap apne hisaab se timing choose kar sakte hain!\n\nKaunsa time slot aapke daily routine mein sabse aasan rahega? 🌟"
+      },
+      {
+        "id": "yoga_30m_3",
+        "topic": "Pure Beginner-Friendly Foundation",
+        "message": "Namaste! Agar aapne pehle kabhi yoga nahi kiya hai ya flexibility kam lagti hai, toh bilkul fikar mat kijiye! Hamare batches pure basic foundation se start hote hain jahan asanas slow-pace mein sikhaye jaate hain taaki body bina kisi strain ke naturally open up ho. ✨\n\nKya main aapke saath beginner schedule share karoon? 😊"
+      },
+      {
+        "id": "yoga_30m_4",
+        "topic": "100% 2-Way Live Interactive Classes",
+        "message": "Did you know? Sensationz par koi recorded lecture nahi hota. Hamari classes 100% live aur interactive hoti hain Sensationz App par, jahan teacher aapse directly baat karte hain aur posture galat hone par real-time correct karte hain. 📱✨\n\nAap class mobile ya tablet par attend karna chahenge?"
+      },
+      {
+        "id": "yoga_30m_5",
+        "topic": "Spine Health & Stress Relief",
+        "message": "Quick wellness fact: Sirf 3 hafte ki regular 45-minute live yoga practice se spine alignment improve hoti hai aur daily mental stress significantly drop hota hai! 🌿\n\nApne din ko positive energy aur peace ke saath shuru karne ke liye kya aap morning batch timing dekhna chahenge? 🙏"
+      }
+    ],
+    "3h": [
+      {
+        "id": "yoga_3h_1",
+        "topic": "Holistic Syllabus: Pranayama & Sound Healing",
+        "message": "Namaste! 🌸 Sensationz Yoga sirf physical exercise nahi hai. Hamare structured syllabus mein Asanas ke saath Pranayama (Anulom Vilom, Kapalbhati, Bhastrika), Sound Healing, aur Guided Meditation shamil hai jo sleep quality aur internal wellness ko naturally enhance karta hai. ✨\n\nKya aap holistic syllabus explore karna chahenge? 😊"
+      },
+      {
+        "id": "yoga_3h_2",
+        "topic": "Home Comfort — Save 2 Hours Daily Travel",
+        "message": "Did you know? Kisi local yoga studio travel karne mein roz 1-2 ghante traffic aur preparation mein nikal jaate hain. Sensationz App ke live setup se aap apne drawing room ke comfortable environment mein premium training le sakte hain — zero travel hassle! 🏠🧘‍♀️\n\nKya main aapka preferred slot check karoon?"
+      },
+      {
+        "id": "yoga_3h_3",
+        "topic": "Monthly Batch Switch Flexibility",
+        "message": "Khas feature: Sensationz Yoga par aap 1 month complete hone ke baad apna batch timing easily switch kar sakte hain agar aapke office ya ghar ka routine change ho jata hai! Full flexibility aapke haath mein hai. 🌿\n\nAapko morning 6 AM, 7 AM ya evening 5 PM, 6 PM mein se kaunsa suit karega? 😊"
+      },
+      {
+        "id": "yoga_3h_4",
+        "topic": "15,000+ Satisfied Learners Community",
+        "message": "15,000+ working women, homemakers aur fitness enthusiasts across India and abroad Sensationz live yoga platform se daily judkar practice kar rahe hain with 4.8★ student rating! 🏆\n\nAap bhi hamari healthy family ka part ban sakte hain. Kya main admission details share karoon? ✨"
+      },
+      {
+        "id": "yoga_3h_5",
+        "topic": "Weight Balance & Core Energy",
+        "message": "Regular mindful yoga se metabolism naturally active hota hai aur core strength badhti hai — bina kisi harsh diet ya exhaustion ke! Healthy lifestyle shuru karne ka yeh sabse natural tarika hai. 🌸\n\nKya aap morning ya evening slot mein join karna chahenge? 🙏"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "yoga_6h1_1",
+        "topic": "Budget Friendly Wellness (₹6.7/day)",
+        "message": "Hello! 🌿 Sensationz ka 3 Months Yoga package sirf ₹600 (+GST) mein available hai Welcome Coupon ke saath — yeh sirf ~₹6.7 per day padta hai, jo ek chai ki cost se bhi kam hai! ☕✨\n\nItni affordable price mein certified female instructor se daily live training milti hai. Kya main coupon code apply karne mein help karoon? 😊"
+      },
+      {
+        "id": "yoga_6h1_2",
+        "topic": "Joint Mobility & Neck-Back Care",
+        "message": "Long desk working hours ya daily household work se neck aur lower back stiff ho jaati hai? Hamari female instructors special gentle stretching aur posture-correction techniques sikhate hain jo spine ko relief dete hain. 🧘‍♀️\n\nAapko kis timing mein join karna comfortable rahega?"
+      },
+      {
+        "id": "yoga_6h1_3",
+        "topic": "Zero Commute, 100% Privacy",
+        "message": "Ghar par yoga karne ka sabse bada benefit: 100% privacy aur zero travel stress! Aap bina kisi jhijhak ke apne pace par learn kar sakte hain certified teacher ke direct live guidance mein. 🌸\n\nKya aapko morning 7 AM ya evening 6 PM batch timing suit karega? 😊"
+      },
+      {
+        "id": "yoga_6h1_4",
+        "topic": "Daily Energy & Vitality Boost",
+        "message": "Morning mein bas 45 minute yoga karne se din bhar energy levels double rehte hain aur lethargy door hoti hai. Healthy daily routine build karne ka best time abhi hai! 🌟\n\nKya main aapke liye seat reserve karoon? Bas batayein kaunsa time best rahega! 🙏"
+      },
+      {
+        "id": "yoga_6h1_5",
+        "topic": "Safe Pacing for All Ages (8+ to 60+)",
+        "message": "Sensationz par 8 saal ke bacchon se lekar 60+ saal tak ke seniors comfortable tareeqe se practice karte hain, kyunki instructor har individual ki health limits respect karte hain. 🌿\n\nKya aap apne liye ya family member ke liye timing select karna chahenge? 😊"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "yoga_6h2_1",
+        "topic": "Breathwork for Anxiety & Deep Sleep",
+        "message": "Namaste! ✨ Kya aapko pata hai? Hamari classes mein Pranayama aur Shavasana sound resonance technique se insomnia aur anxiety naturally control hoti hai. Hazaron students ne sleep quality improve hone ka feedback diya hai! 🌙🧘‍♀️\n\nKya aap kal subah se session start karna chahenge?"
+      },
+      {
+        "id": "yoga_6h2_2",
+        "topic": "Personal Teacher Feedback During Live Class",
+        "message": "Sensationz App par teacher aapke posture ko live screen par dekhte hain aur correct karte hain: 'Back seedhi rakhiye', 'Shoulder relax kijiye'. Yeh personal attention recorded apps se 10 guna zyada effective hai! 📱✨\n\nKaunsa batch aapke schedule mein best fit hota hai? 😊"
+      },
+      {
+        "id": "yoga_6h2_3",
+        "topic": "Consistent Daily Habit Builder",
+        "message": "Fitness goal achieve karne mein sabse badi challenge consistency hoti hai. Sensationz App ki live interactive batch structure aapko roz live aane ka motivation deti hai ek supportive group ke saath! 🌟\n\nApna healthy lifestyle journey start karne ke liye kya main slot confirm karoon? 🙏"
+      },
+      {
+        "id": "yoga_6h2_4",
+        "topic": "Affordable 1 Month vs 3 Months Options",
+        "message": "Aap bina kisi risk ke 1 Month package se start kar sakte hain, ya Welcome Offer use karke 3 Months package le sakte hain jo sabse popular hai. 🌿\n\nKya main payment details ya package options dobara share karoon? 😊"
+      },
+      {
+        "id": "yoga_6h2_5",
+        "topic": "Take Charge of Your Wellbeing",
+        "message": "Hamari daily responsibilities mein hum aksar apna health dhyan bhool jaate hain. Din ka bas 1 ghanta aapka apna 'Self-Care' time ho sakta hai! 🌸\n\nKal morning batch mein aapke liye slot hold karoon? Bas batayein! 🙏✨"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "yoga_trial_1",
+        "topic": "3 Free Live Trial Classes Offer — Complete Experience",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 😊 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul tension mat lijiye — hum chahte hain ki aap pehle khud instructor ki live teaching experience karein! 🌟\n\nHum aapko **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero payment\n• Direct live interaction with certified female yoga instructor\n• Koi commitment nahi\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🙏✨"
+      },
+      {
+        "id": "yoga_trial_2",
+        "topic": "3 Free Live Trial Classes Offer — Experience Live Correction",
+        "is_final_trial_offer": true,
+        "message": "Hello! 🌿 Hum jante hain ki online yoga join karne se pehle live environment dekhna kitna zaroori hota hai. Isliye hum aapke liye **3 Free Live Interactive Trial Classes** unlock kar rahe hain! 🎁\n\nAap class attend karke dekhiye ki instructor kaise postures check karte hain aur kitna relaxing feel hota hai. Purely Free — zero charge!\n\nKya main aapka trial slot confirm kar doon? Bas apna timing bata dijiye! 😊✨"
+      },
+      {
+        "id": "yoga_trial_3",
+        "topic": "3 Free Live Trial Classes Offer — Zero Risk Start",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🌸 Koi payment karne se pehle, pehle 3 din bilkul FREE hamare saath live practice kijiye! Sensationz App par aapke liye **3 Free Live Trial Sessions** bilkul ready hain. 🎁\n• Female master instructor ke saath live batch\n• Complete beginner friendly guidance\n• Zero registration fee\n\nTrial book karne ke liye bas 'FREE TRIAL' likhkar reply kijiye aur apna morning ya evening time batayein! 🙏"
+      },
+      {
+        "id": "yoga_trial_4",
+        "topic": "3 Free Live Trial Classes Offer — App Live Pass",
+        "is_final_trial_offer": true,
+        "message": "Special Invitation: Hum aapko invite kar rahe hain hamari certified live yoga class mein with **3 Free Trial Sessions**! 🧘‍♀️🎁\n\nKhud dekhiye ki kaise hazaron women ghar baithe live yoga enjoy karti hain. Agar pasand aaye toh continue kijiye, koi obligation nahi hai!\n\nKya main kal subah ya shaam ke batch mein aapka trial slot book karoon? 😊✨"
+      },
+      {
+        "id": "yoga_trial_5",
+        "topic": "3 Free Live Trial Classes Offer — Final Reminder",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🙏 Yeh aapka final special pass hai: **3 Free Live Interactive Trial Classes** bilkul muft Sensationz App par! 🌟\n\nBina kisi fee ke direct live instructor ke saath asanas aur pranayama seekhein. Yeh offer limited slots ke liye hai.\n\nKya main aapka name aur slot book kar doon? Bas 'YES' bhej dijiye! 🌿✨"
+      }
+    ]
+  }
 }

@@ -1,43 +1,147 @@
 {
   "course": "ladies_dance",
   "course_name": "Online Live Interactive Ladies Bollywood Dance",
-  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
-  "followups": [
-    {
-      "step": 1,
-      "delay_label": "30 min",
-      "trigger_after_minutes": 30,
-      "topic": "Certified Choreographers & Beginner Friendly",
-      "message": "Khas baat: Agar aapne pehle kabhi dance nahi seekha, toh bilkul chinta mat kijiye! Hamare certified choreographers — jaise Aditi Vyas (4+ yrs experience) aur Mansi Pal (expressions & choreography specialist) — har step ko slow motion mein break down karke sikhate hain. 🌟\n\nPure beginner se lekar confident dancer banne ka safar yahan se start hota hai. Kis timing mein aap comfortable rahenge?"
-    },
-    {
-      "step": 2,
-      "delay_label": "3 hours",
-      "trigger_after_minutes": 180,
-      "topic": "7 Batches for Homemakers & Working Women",
-      "message": "Sensationz Ladies Dance batches specially designed hain homemakers aur working women ke schedule ko dhyan mein rakh kar. 🌸\n\nHumare paas Morning (11 AM), Afternoon (12 PM, 1 PM), aur Evening (4 PM, 5 PM, 6 PM, 8 PM) mein total 7 live batch slots hain (Mon-Fri). Aapke routine ke hisaab se kaunsa time sabse convenient rahega? 😊"
-    },
-    {
-      "step": 3,
-      "delay_label": "+6 hours (9h total)",
-      "trigger_after_minutes": 540,
-      "topic": "Grace, Rhythm & Expressions",
-      "message": "Did you know? Hamari classes sirf steps copy karna nahi hain — yahan aap rhythm, stage presence, body coordination aur beautiful facial expressions (abhinaya) seekhte hain jo aapko family functions aur parties mein stand out karwate hain! ✨💃\n\nKya main aapke saath syllabus ya packages share karoon?"
-    },
-    {
-      "step": 4,
-      "delay_label": "+6 hours (15h total)",
-      "trigger_after_minutes": 900,
-      "topic": "Women Community & Judgment-Free Space",
-      "message": "Hazaron ladies Sensationz live platform par regular dance enjoy karti hain ek safe, supportive aur judgment-free atmosphere mein. Live batch mein sabhi saath enjoy karte hain aur confidence boost hota hai! 🌟\n\nAap bhi apni daily routine mein thoda 'me-time' aur fun add kar lijiye. Kya main aapka batch slot confirm karoon? 😊"
-    },
-    {
-      "step": 5,
-      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
-      "trigger_after_minutes": 1260,
-      "topic": "Final Offer: 3 Free Live Trial Classes",
-      "is_final_trial_offer": true,
-      "message": "Hi! 😊 Agar aap decide nahi kar pa rahe hain, toh no problem! Hum chahte hain ki aap pehle class ka fun aur energy khud experience karein! 💃🎉\n\nHum aapke liye **3 Free Live Interactive Trial Classes** de rahe hain Sensationz App par! 🎁\n• 100% Free / Zero commitment\n• Live session with expert female choreographer\n• Ghar baithe live interactive fun\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🌟✨"
-    }
-  ]
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "stages": {
+    "30m": [
+      {
+        "id": "dance_30m_1",
+        "topic": "Certified Choreographers & Beginner Friendly",
+        "message": "Hello! 💃 Khas baat: Agar aapne pehle kabhi dance nahi seekha, toh bilkul fikar mat kijiye! Hamare certified choreographers — jaise Aditi Vyas (4+ yrs experience) aur Mansi Pal (expressions & choreography specialist) — har step ko slow motion mein break down karke sikhate hain. 🌟\n\nPure beginner se lekar confident dancer banne ka safar yahan se start hota hai. Kis timing mein aap comfortable rahenge?"
+      },
+      {
+        "id": "dance_30m_2",
+        "topic": "7 Batches for Homemakers & Working Women",
+        "message": "Hi! 🌸 Sensationz Ladies Bollywood Dance batches specially design kiye gaye hain homemakers aur working women ke schedule ko dhyan mein rakh kar.\n\nHumare paas Morning (11 AM), Afternoon (12 PM, 1 PM), aur Evening (4 PM, 5 PM, 6 PM, 8 PM) mein total 7 live batch slots hain (Mon-Fri). Aapke routine ke hisaab se kaunsa time sabse convenient rahega? 😊"
+      },
+      {
+        "id": "dance_30m_3",
+        "topic": "Daily Class Recordings Provided",
+        "message": "Ek zabardast feature: Agar kisi din aapka live batch miss ho jaye ya aap ghar par step practice karna chahein, toh har class ki recording roz class ke baad provide ki jaati hai! 🎥✨\n\nAap jab chahein recording dekh kar step polish kar sakte hain. Kya main aapke liye batch slot check karoon? 💃"
+      },
+      {
+        "id": "dance_30m_4",
+        "topic": "Burn 400+ Calories with Joyful Dance",
+        "message": "Quick fitness fact: Sirf 1 ghante ki Bollywood Dance class mein 350 se 500 calories naturally burn hoti hain — bina kisi boring gym treadmill ya heavy weights ke! 🎶💃\n\nFitness ke saath fun aur energy ka yeh best combo hai. Aap morning ya evening batch mein se kaunsa prefer karenge? 😊"
+      },
+      {
+        "id": "dance_30m_5",
+        "topic": "Latest Bollywood Songs & Choreography",
+        "message": "Hamari classes mein trending aur popular Bollywood track par new choreography sikhayi jaati hai. Har week naye gaane par step-by-step dance seekhkar aap weddings aur parties mein confident perform kar sakte hain! ✨🎉\n\nKaunsa time slot aapke routine mein fit baithta hai?"
+      }
+    ],
+    "3h": [
+      {
+        "id": "dance_3h_1",
+        "topic": "Rhythm, Coordination & Facial Expressions",
+        "message": "Hello! 💃 Hamari classes sirf steps copy karna nahi hain — yahan aap rhythm sense, stage presence, body coordination aur beautiful facial expressions (abhinaya) seekhte hain jo aapko ek graceful performer banate hain! ✨\n\nKya aap course details aur timing explore karna chahenge? 😊"
+      },
+      {
+        "id": "dance_3h_2",
+        "topic": "Safe, Supportive & Judgment-Free Atmosphere",
+        "message": "Did you know? Sensationz live dance platform par hazaron ladies daily ghar baithe dance enjoy karti hain ek safe aur judgment-free space mein. Yahan koi judge karne wala nahi hota — sab ek saath seekhte aur enjoy karte hain! 🌟\n\nApni daily life mein thoda 'Me-Time' add karne ke liye kya main aapka batch check karoon?"
+      },
+      {
+        "id": "dance_3h_3",
+        "topic": "100% 2-Way Live Interactive on Sensationz App",
+        "message": "Recorded YouTube videos mein koi batane wala nahi hota ki aapka step sahi hai ya nahi. Sensationz App par choreographer aapke steps live screen par dekhte hain aur loving tareeqe se guide karte hain! 📱💃\n\nKya aap evening 5 PM ya 6 PM batch timing dekhna chahenge? 😊"
+      },
+      {
+        "id": "dance_3h_4",
+        "topic": "All Experience Levels Welcome (16+)",
+        "message": "Hamare batches mein college students se lekar homemakers aur working professionals sabhi shamil hain. Age ya experience koi barrier nahi hai — bas dance ka shauk hona chahiye! 🌸\n\nAap kis batch timing mein comfortable rahenge?"
+      },
+      {
+        "id": "dance_3h_5",
+        "topic": "Stress Buster After Busy Daily Routine",
+        "message": "Din bhar ke ghar ya office work ke baad 1 hour Bollywood beats par dance karna best mental detox hai! Stress khatam aur smile wapas. 🎶✨\n\nKal se batch start karne ke liye kya main timing confirm karoon? 😊"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "dance_6h1_1",
+        "topic": "Welcome Offer: 3 Months at ₹6.7/day",
+        "message": "Hi! 💃 Sensationz 3 Months Ladies Dance package par Welcome Coupon `DANCE600` apply karke fee sirf ₹600 (+GST) ho jaati hai — yeh sirf ~₹6.7 per day hai! 🌟\n\nItni pocket-friendly fee mein daily live classes + recordings dono milti hain. Kya main coupon code apply karne mein guide karoon? 😊"
+      },
+      {
+        "id": "dance_6h1_2",
+        "topic": "Zero Studio Travel — Practice from Home",
+        "message": "Local dance academy aane-jaane mein traffic, parking aur safety ka stress rehta hai. Sensationz ke live setup se aap apne bedroom ya hall mein pura studio experience pa sakte hain — fully private aur convenient! 🏠💃\n\nAapko morning 11 AM ya evening 5 PM mein se kaunsa suit karega?"
+      },
+      {
+        "id": "dance_6h1_3",
+        "topic": "Build Unshakable Stage Confidence",
+        "message": "Bahut si ladies batati hain ki Sensationz dance join karne ke baad unka stage fear aur shyness bilkul khatam ho gaya. Next family wedding mein spotlight aap par hi hoga! ✨👗\n\nKya main aapka seat slot check karoon? Bas batayein kaunsa time suit karega! 😊"
+      },
+      {
+        "id": "dance_6h1_4",
+        "topic": "Morning 11 AM & Afternoon Batches",
+        "message": "Agar evening mein family routine ya cooking rehti hai, toh morning 11 AM, 12 PM ya 1 PM ke batches homemakers ke liye perfect hain jab ghar par peaceful time hota hai. 🌸\n\nKya main morning batch mein aapka slot reserve karoon?"
+      },
+      {
+        "id": "dance_6h1_5",
+        "topic": "Full Month Dance Routine & Progress",
+        "message": "Har class mein warm-up, signature hooks, lyrics breakdown aur cool-down hota hai. 1 month mein aap 4-5 hit gaano ki complete choreography master kar leti hain! 🎶\n\nApna learning slot lock karne ke liye batayein kaunsa time best rahega! 🙏"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "dance_6h2_1",
+        "topic": "Expert Female Choreographers Team",
+        "message": "Hello! 🌟 Sensationz par aapko certified choreographers — jaise Aditi Vyas aur Mansi Pal — se direct sikhne ka mauka milta hai. Unki patience aur energetic vibe har class ko exciting bana deti hai! 💃\n\nAap kis slot mein enroll hona chahenge?"
+      },
+      {
+        "id": "dance_6h2_2",
+        "topic": "Missed Class? No Problem with Daily Recordings",
+        "message": "Kabhi guests aa gaye ya urgent kaam pad gaya? Chinta ki koi baat nahi! Har live class ki recording usi din app mein mil jaati hai taaki aapka step kabhi miss na ho. 📱✨\n\nKya main enrollment packages share karoon? 😊"
+      },
+      {
+        "id": "dance_6h2_3",
+        "topic": "Flexible 1 Month vs 3 Months Options",
+        "message": "Aap 1 Month package se start karke test kar sakte hain, ya phir 3 Months Welcome Offer le sakte hain jo sabse popular aur value-for-money hai! 🌸\n\nKya main payment details aapke saath share karoon?"
+      },
+      {
+        "id": "dance_6h2_4",
+        "topic": "Reignite Your Dancing Passion",
+        "message": "Bachpan mein dance ka shauk tha lekin busy life mein chhoot gaya? Apne passion ko dobara jeene ka yeh perfect time hai! Hamare saath 15,000+ ladies apni khushi wapas pa chuki hain. 💖\n\nKal se batch start karne ke liye batayein kaunsa timing choose karein? 😊"
+      },
+      {
+        "id": "dance_6h2_5",
+        "topic": "Easy App Onboarding & Video Guide",
+        "message": "Sensationz App use karna bahut hi aasan hai — Android aur iPhone dono par available hai. Bas 1 click mein class join hoti hai bina kisi technical jhanjhat ke! 📲\n\nKya main aapko app download link ya step-by-step guide bhejoon? 🙏"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "dance_trial_1",
+        "topic": "3 Free Live Trial Classes — Experience the Energy",
+        "is_final_trial_offer": true,
+        "message": "Hi! 😊 Agar aap abhi decide nahi kar pa rahe hain, toh no problem! Hum chahte hain ki aap pehle class ka fun, energy aur instructor ka style khud experience karein! 💃🎉\n\nHum aapke liye **3 Free Live Interactive Trial Classes** de rahe hain Sensationz App par! 🎁\n• 100% Free / Zero commitment\n• Direct live interaction with expert female choreographer\n• Ghar baithe live dance session\n\nKya main aapka free trial book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🌟✨"
+      },
+      {
+        "id": "dance_trial_2",
+        "topic": "3 Free Live Trial Classes — Try Before Enrolling",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🌸 Koi bhi payment karne se pehle, pehle 3 din hamari live Bollywood dance batch attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki choreographer kitne easy steps mein sikhate hain aur kitna maza aata hai. 100% Free Pass!\n\nKya main aapka trial slot book karoon? Apna timing bata dijiye! 💃✨"
+      },
+      {
+        "id": "dance_trial_3",
+        "topic": "3 Free Live Trial Classes — Zero Risk Pass",
+        "is_final_trial_offer": true,
+        "message": "Special Pass for You: Sensationz App par aapke liye **3 Free Live Interactive Trial Classes** unlock ho chuki hain! 🎁\n• Female choreographer ke saath live session\n• Beginner friendly Bollywood beats\n• Zero registration fee\n\nFree trial book karne ke liye bas 'FREE TRIAL' reply kijiye aur batayein morning 11 AM ya evening 5 PM/6 PM kaunsa time suit karega! 🌟"
+      },
+      {
+        "id": "dance_trial_4",
+        "topic": "3 Free Live Trial Classes — Join Live Today",
+        "is_final_trial_offer": true,
+        "message": "Hello! 💃 Don't miss out — hum aapko invite kar rahe hain hamare exclusive live batch mein with **3 Free Trial Sessions**! 🎁\n\nLive aakar dekhiye aur Bollywood beats par full energy enjoy kijiye. Koi card ya commitment ki zaroorat nahi hai.\n\nKya main kal ke batch mein aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+      },
+      {
+        "id": "dance_trial_5",
+        "topic": "3 Free Live Trial Classes — Final Invitation",
+        "is_final_trial_offer": true,
+        "message": "Namaste! ✨ Yeh aapka final VIP invite hai: **3 Free Live Interactive Bollywood Dance Classes** Sensationz App par! 🌟\n\nGhar baithe expert choreographer se step-by-step dance seekhein bilkul free. Limited trial slots available hain.\n\nKya main aapka free pass activate kar doon? Bas timing bata dijiye! 🙏💃"
+      }
+    ]
+  }
 }

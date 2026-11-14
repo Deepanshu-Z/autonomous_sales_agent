@@ -1,43 +1,147 @@
 {
   "course": "general",
   "course_name": "Sensationz Performing Arts Academy",
-  "cadence_description": "30m -> 3h -> 9h (+6h) -> 15h (+6h) -> 21h (+6h with 3 Free Trials)",
-  "followups": [
-    {
-      "step": 1,
-      "delay_label": "30 min",
-      "trigger_after_minutes": 30,
-      "topic": "Certified Master Faculty",
-      "message": "Sensationz par har ek subject ke liye certified master instructors hain jinhe 4 se 13+ saal ka teaching experience hai. Chahe aap complete beginner hon ya experienced, har class zero se systematically sikhayi jaati hai. ✨\n\nKya aap kisi specific batch timing ya instructor ke baare mein jaanna chahte hain?"
-    },
-    {
-      "step": 2,
-      "delay_label": "3 hours",
-      "trigger_after_minutes": 180,
-      "topic": "15,000+ Students & 4.8 Star Satisfaction",
-      "message": "Did you know? Sensationz family mein 15,000+ students India aur abroad se live interactive classes attend karte hain with 4.8★ student rating! 🏆\n\nGhar baithe premium learning ka anand lijiye bina kisi traffic ya travel hassle ke. Kaunsa time slot aapke schedule mein fit baithta hai? 😊"
-    },
-    {
-      "step": 3,
-      "delay_label": "+6 hours (9h total)",
-      "trigger_after_minutes": 540,
-      "topic": "Schedule Flexibility (Morning to Night)",
-      "message": "Hamare paas morning early 5:00 AM se lekar evening 8:00 PM tak wide variety of batches available hain. Saath hi aap 1 month ke baad apna batch timing switch bhi kar sakte hain agar aapka routine change ho! 🌿\n\nKya main aapke saath syllabus aur packages share karoon?"
-    },
-    {
-      "step": 4,
-      "delay_label": "+6 hours (15h total)",
-      "trigger_after_minutes": 900,
-      "topic": "Consistent Daily Habit & Confidence",
-      "message": "Chahe health aur wellness ho ya dance aur creativity — consistency hi sabse bada secret hai. Sensationz App par aapko structured community milti hai jo aapko roz motivate karti hai. 🌟\n\nApna learning journey start karne ke liye kya main aapka slot check karoon? 😊"
-    },
-    {
-      "step": 5,
-      "delay_label": "+6 hours (21h total - FINAL FOLLOWUP)",
-      "trigger_after_minutes": 1260,
-      "topic": "Final Offer: 3 Free Live Trial Classes",
-      "is_final_trial_offer": true,
-      "message": "Namaste! 😊 Agar aap decide nahi kar pa rahe hain, toh koi baat nahi — hum chahte hain ki aap pehle khud class ka standard aur teaching style live experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul Free\n• Live 2-way session with master instructor\n• Zero commitment\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar reply karein aur apna preferred course batayein! 🙏✨"
-    }
-  ]
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "stages": {
+    "30m": [
+      {
+        "id": "general_30m_1",
+        "topic": "100% Live 2-Way Interactive Platform",
+        "message": "Namaste! 🙏 Sensationz Performing Arts mein hamari sabhi classes 100% live aur interactive hoti hain Sensationz App par — yeh koi boring recorded videos nahi hain jahan koi dekhne wala na ho! 🌟\n\nLive session mein certified teacher aapko aamne-saamne dekhte hain aur real-time guidance dete hain. Aap kis course mein interested hain — Yoga, Dance, ya Kathak? 😊"
+      },
+      {
+        "id": "general_30m_2",
+        "topic": "Certified Master Faculty (4 to 13+ Years Experience)",
+        "message": "Hello! ✨ Sensationz par har ek subject ke liye certified master instructors hain jinhe 4 se 13+ saal ka teaching experience hai. Chahe aap complete beginner hon ya experienced, har class zero se systematically sikhayi jaati hai. 🌿\n\nKya aap kisi specific course ya timing ke baare mein jaanna chahte hain?"
+      },
+      {
+        "id": "general_30m_3",
+        "topic": "15,000+ Students & 4.8 Star Satisfaction",
+        "message": "Did you know? Sensationz family mein 15,000+ students India aur abroad se live interactive classes attend karte hain with 4.8★ student rating! 🏆\n\nGhar baithe premium learning ka anand lijiye bina kisi traffic ya travel hassle ke. Kaunsa course aap explore karna chahenge? 😊"
+      },
+      {
+        "id": "general_30m_4",
+        "topic": "Wide Timing Options (5 AM to 9 PM)",
+        "message": "Hamare paas morning early 5:00 AM se lekar evening 9:00 PM tak wide variety of batches available hain across Yoga, Dance aur Classical disciplines. 🌸\n\nAapke daily routine ke hisaab se kaunsa time slot sabse convenient rahega?"
+      },
+      {
+        "id": "general_30m_5",
+        "topic": "Beginner Friendly Environment",
+        "message": "Kya aapko lagta hai ki pehle se experience hona zaroori hai? Bilkul nahi! Sensationz par 90% students complete beginners ke roop mein start karte hain aur teacher step-by-step unka confidence build karte hain. ✨\n\nKya main course options share karoon? 🙏"
+      }
+    ],
+    "3h": [
+      {
+        "id": "general_3h_1",
+        "topic": "Home Comfort — Save 2 Hours Daily Travel",
+        "message": "Namaste! 🏠 Local studio aane-jaane mein roz 1 se 2 ghante traffic aur exhaustion mein nikal jaate hain. Sensationz App se aap apne ghar ke safe aur comfortable space mein live training le sakte hain! 🌟\n\nKya main aapka slot check karoon? Batayein kaunsa subject interest karta hai!"
+      },
+      {
+        "id": "general_3h_2",
+        "topic": "Safe, Respectful & Supportive Learning Space",
+        "message": "Sensationz par har class ek encouraging, positive aur judgment-free atmosphere mein hoti hai. Sabhi students aapas mein judkar motivated rehte hain aur confidence grow hota hai. 💖\n\nApna learning journey shuru karne ke liye batayein kaunsa time suit karega? 😊"
+      },
+      {
+        "id": "general_3h_3",
+        "topic": "Multi-Device Easy Access (App & Web)",
+        "message": "Sensationz platform Android mobile, iPhone, iPad ya laptop sabhi par smoothly chalta hai. Bas 1 click mein class join ho jaati hai! 📱💻\n\nKya main aapko app link ya video guide bhejoon? ✨"
+      },
+      {
+        "id": "general_3h_4",
+        "topic": "Health, Creativity & Mental Detox",
+        "message": "Chahe health aur wellness ke liye Yoga ho, fun cardio ke liye Bollywood Dance, ya shastriya kala ke liye Kathak — din ka 1 ghanta aapke sharir aur man dono ko recharge kar deta hai! 🌿\n\nKaunsa timing aapke schedule mein fit baithta hai? 😊"
+      },
+      {
+        "id": "general_3h_5",
+        "topic": "Flexible Monthly Batch Switching",
+        "message": "Hamari academy par aap 1 month complete hone ke baad apna batch timing easily switch kar sakte hain agar aapka daily routine badalta hai. Full convenience guaranteed hai! 🌸\n\nKya main batch timings aapke saath share karoon? 🙏"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "general_6h1_1",
+        "topic": "Affordable Welcome Offers (~₹6.7/day)",
+        "message": "Hello! 🌟 Sensationz par Welcome Offer coupons ke saath courses sirf ~₹6.7 per day se start hote hain — jo ek cup tea se bhi sasta hai! Pocket-friendly prices mein premium live faculty se seekhein. ☕✨\n\nKya main coupon code apply karne mein help karoon? 😊"
+      },
+      {
+        "id": "general_6h1_2",
+        "topic": "Live Real-Time Instructor Feedback",
+        "message": "Recorded videos aur YouTube tutorials mein aapko koi batane wala nahi hota ki posture sahi hai ya galat. Sensationz live class mein instructor har step par aapse directly baat karte hain! 📱🌿\n\nKaunsa time slot aapke din ko suit karega?"
+      },
+      {
+        "id": "general_6h1_3",
+        "topic": "Family Wellness & Creativity",
+        "message": "Sensationz par school students se lekar working women aur mothers tak sabhi attend karte hain. Kai parivar saath mein practice karke apni fitness aur arts enjoy karte hain! 💖\n\nKya main aapke liye batch timing confirm karoon? 😊"
+      },
+      {
+        "id": "general_6h1_4",
+        "topic": "Consistent Routine Builder",
+        "message": "Life mein consistency sabse zaroori hoti hai. Sensationz App ki live interactive batch structure aapko daily regular rehne ka discipline deti hai. 🌺\n\nApna learning slot reserve karne ke liye batayein kaunsa time best rahega!"
+      },
+      {
+        "id": "general_6h1_5",
+        "topic": "Safe Online Environment",
+        "message": "Aapki privacy aur comfort hamari priority hai. Verified female faculty aur secure app platform par classes conduct ki jaati hain. 🌿\n\nKaunsa batch aap choose karna chahenge? 🙏"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "general_6h2_1",
+        "topic": "Dedicated Customer & App Support",
+        "message": "Namaste! ✨ Sensationz par aapko har kadam par support milta hai. App download karne se lekar live class join karne tak, hamari team aapse judkar help karti hai. 📲\n\nKya aapko koi specific question ya doubt hai?"
+      },
+      {
+        "id": "general_6h2_2",
+        "topic": "Flexible 1 Month vs 3 Months Options",
+        "message": "Aap pehle 1 Month package se start karke test kar sakte hain, ya Welcome Offer ke saath 3 Months package choose kar sakte hain jo regular habit banane ke liye best hai. 🌸\n\nKya main package details dobara share karoon? 😊"
+      },
+      {
+        "id": "general_6h2_3",
+        "topic": "Reignite Your Hobbies & Fitness",
+        "message": "Apne passion aur health ke liye thoda time nikalne ka yeh perfect mauka hai. Sensationz ke saath har din kuch naya seekhein aur khush rahein! 🌟\n\nKal se batch start karne ke liye batayein kaunsa time choose karein!"
+      },
+      {
+        "id": "general_6h2_4",
+        "topic": "Morning to Evening Slots",
+        "message": "Early morning 5 AM, 6 AM se lekar evening 7 PM, 8 PM tak — har routine ke liye perfect batch available hai. 🌙\n\nKaunsa time slot aapke din ko suit karega? 😊"
+      },
+      {
+        "id": "general_6h2_5",
+        "topic": "Simple Onboarding Video Guide",
+        "message": "Sensationz App use karna bahut hi aasan hai. Agar aapko app download karne mein koi difficulty aa rahi hai, toh main aapko 1-minute video guide bhej sakta hoon! 🎥\n\nKya aapko video guide chahiye? 🙏"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "general_trial_1",
+        "topic": "3 Free Live Trial Classes — Experience Sensationz",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 😊 Agar aap decide nahi kar pa rahe hain, toh koi baat nahi — hum chahte hain ki aap pehle khud class ka standard aur teaching style live experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul Free\n• Live 2-way session with master instructor\n• Zero commitment\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar reply karein aur apna preferred course batayein! 🙏✨"
+      },
+      {
+        "id": "general_trial_2",
+        "topic": "3 Free Live Trial Classes — Zero Risk Pass",
+        "is_final_trial_offer": true,
+        "message": "Hello! 🌸 Kisi bhi payment se pehle, 3 din hamari live interactive class attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki certified teachers kitne pyaar aur patience se sikhate hain. 100% Free Pass!\n\nKya main aapka trial slot confirm karoon? Bas timing bata dijiye! ✨🌿"
+      },
+      {
+        "id": "general_trial_3",
+        "topic": "3 Free Live Trial Classes — Multi-Course Pass",
+        "is_final_trial_offer": true,
+        "message": "Special Pass: Sensationz App par aapke liye **3 Free Live Interactive Trial Classes** unlock ho chuki hain! 🎁\n• Yoga, Dance ya Kathak kisi bhi course mein live entry\n• Direct interaction with master faculty\n• Zero registration charge\n\nFree trial book karne ke liye bas 'FREE TRIAL' reply kijiye aur apna preferred time batayein! 🌟"
+      },
+      {
+        "id": "general_trial_4",
+        "topic": "3 Free Live Trial Classes — Join Live from Home",
+        "is_final_trial_offer": true,
+        "message": "Hello! 🏠 Don't miss out — hum aapko invite kar rahe hain hamare exclusive live batch mein with **3 Free Trial Sessions**! 🎁\n\nGhar baithe live interactive learning ka maza lijiye. Agar pasand aaye toh continue kijiye, koi compulsion nahi hai.\n\nKya main kal ke batch mein aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+      },
+      {
+        "id": "general_trial_5",
+        "topic": "3 Free Live Trial Classes — Final VIP Pass",
+        "is_final_trial_offer": true,
+        "message": "Namaste! 🙏 Yeh aapka final VIP invite hai: **3 Free Live Interactive Classes** Sensationz App par! 🌟\n\nCertified master teachers se direct live sikhne ka mauka paayein bilkul muft. Limited seats available hain.\n\nKya main aapka free pass activate kar doon? Bas course aur timing bata dijiye! 🌿✨"
+      }
+    ]
+  }
 }

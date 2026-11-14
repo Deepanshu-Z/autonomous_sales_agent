@@ -15,6 +15,7 @@ Evaluates customer refusals/disinterest:
 """
 
 import os
+import re
 import json
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
@@ -63,7 +64,7 @@ COURSE OFFERINGS & POLICIES SUMMARY:
 - Physical branch addresses are ADMINISTRATIVE OFFICES ONLY. Offline classes or physical studio visits are NOT offered.
 - Cash or offline payments are STRICTLY NOT ACCEPTED.
 - Course fees once paid are non-refundable.
-- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch can be changed after 1 month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch timing can be changed once a month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
 
 
 ANALYSIS CRITERIA:
@@ -92,7 +93,7 @@ ANALYSIS CRITERIA:
 
 4. SOLUTION VIABILITY:
    - Can our system/knowledge base legitimately solve the customer's reason?
-     • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch switch allowed after 1 month, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
+     • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch change allowed once a month, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
      • Temporary / Situational Unavailability: Customer is currently at office/work, in a meeting, driving, traveling, or temporarily occupied. This is SOLVABLE by respecting their time, acknowledging their schedule politely with zero pressure, and letting them know they can connect whenever free (or we can check in later). Set `solution_viable` = true.
      • NOT Solvable: Customer insists on physical offline in-person studio classes, demands 1-on-1 private home tutors, demands cash payment at physical office, refund demand, or has unserviceable demands.
    - If the request cannot be fulfilled by our offerings -> `solution_viable` = false.
@@ -101,6 +102,10 @@ DECISION OUTCOMES:
 - If NOT a refusal (and not awaiting reason) -> `resolution_type` = "NOT_A_REFUSAL".
 - CRITICAL GUARD FOR BATCH / TIMING / TEACHER / PACKAGE SELECTION:
   If the customer is stating, changing, switching, or correcting their preferred timing, batch, instructor, or package duration (e.g. "no i want 5pm", "change to evening", "switch batch", "5pm wala", "subah nahi shaam ko", "no 1 month"), this is a NORMAL SLOT SELECTION / PREFERENCE UPDATE, NOT A REFUSAL!
+  Set `is_refusal` = false, `resolution_type` = "NOT_A_REFUSAL", `reply_message` = null, `escalation_reason` = null.
+- CRITICAL GUARD FOR FUTURE START DATES / POSTPONED JOINING:
+  If the customer wants to join/start classes on a future date, next week, next month, next monday, or after a few days (e.g. "next month se join karunga", "1st dec se start karna hai", "agle mahine se", "after 10 days", "next week se join karna chahta hu"):
+  This is a HIGH-INTENT FUTURE ENROLLMENT, NOT A REFUSAL!
   Set `is_refusal` = false, `resolution_type` = "NOT_A_REFUSAL", `reply_message` = null, `escalation_reason` = null.
 
 1. HIGH RISK / LEGAL / HARASSMENT / ANGER (IMMEDIATE AGENT ESCALATION):
@@ -135,7 +140,7 @@ DECISION OUTCOMES:
             Warmly acknowledge their situation with zero pressure. Let them know they can finish their work and check out the trial or details whenever they are free.
             Example tone (Hinglish): "Bilkul koi baat nahi! 😊 Aap apna office ka kaam complete kar lijiye. Jab bhi aap free hon, tab batayega — hum tab connect kar lenge. Have a productive day at work! 👍"
             Example tone (English): "No problem at all! 😊 Please focus on your work. Feel free to message whenever you are free and we can connect then. Have a great day! 👍"
-          - If doubt about schedule, timing flexibility, or missing classes: Warmly explain that live interactive classes run Mon-Fri (1 session/day) across 10 batch slots (5 AM to 8 PM). While day-to-day switching isn't available, they can switch their batch after 1 month, and full recordings are available in the app if they ever miss a session.
+          - If doubt about schedule, timing flexibility, or missing classes: Warmly explain that live interactive classes run Mon-Fri (1 session/day) across 10 batch slots (5 AM to 8 PM). While day-to-day switching isn't available, they can change their batch once a month, and full recordings are available in the app if they ever miss a session.
           - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
           - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
           - Keep it inviting, empathetic, and friendly.
@@ -232,6 +237,31 @@ async def evaluate_refusal_async(
 
     # Quick pre-filter: if text is empty, ignore
     if not text or not text.strip():
+        return {
+            "is_refusal": False,
+            "has_reason": False,
+            "extracted_reason": None,
+            "has_risk_or_legal": False,
+            "risk_category": "NONE",
+            "solution_viable": True,
+            "resolution_type": "NOT_A_REFUSAL",
+            "reply_message": None,
+            "escalation_reason": None,
+        }
+
+    # Quick short-circuit: future start dates / postponed start is NOT a refusal
+    lower_t = text.lower().strip()
+    future_date_terms = [
+        "next month", "agle mahine", "agle month", "next week", "agle hafte",
+        "next monday", "din baad", "days later", "from next", "after few days",
+        "kal se", "from tomorrow"
+    ]
+    join_terms = [
+        "join", "start", "shuru", "class", "classes", "karna", "karunga",
+        "karni", "lena", "admission", "enroll", "batch"
+    ]
+    has_date_pat = bool(re.search(r"\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|tareekh|tarikh)|tareekh|tarikh)\b", lower_t))
+    if (any(f in lower_t for f in future_date_terms) or has_date_pat) and (any(j in lower_t for j in join_terms) or len(lower_t.split()) <= 6):
         return {
             "is_refusal": False,
             "has_reason": False,

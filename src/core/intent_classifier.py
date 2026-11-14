@@ -75,6 +75,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_disinterested": False,
         "is_complaint_or_refund": False,
         "is_out_of_scope": False,
+        "preferred_start_date": None,
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
@@ -240,6 +241,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - Includes BOTH explicit and CONTEXTUAL/IMPLICIT refusals:
       • Explicit: "not interested", "nahi chahiye", "cancel", "don't message", "nahi lena", "rehne do" (standalone rejections only).
        • CONTRASTIVE SELECTION GUARD (MANDATORY): If the customer says "no" as part of a correction, preference update, or slot selection (e.g. "no i want 5pm", "no 6pm", "no, evening please", "no 1 month", "no change to 5pm", "nahi shaam ko", "nahi dusra timing chahiye"), this is a TIMING/PACKAGE/TEACHER SELECTION, NOT disinterest! "is_disinterested" MUST be false, and "customer_intent" must be the corresponding selection intent (e.g. "TIMING_SELECTION")!
+      • FUTURE START DATE GUARD (CRITICAL): If the customer expresses a desire to join or start from a future date/time (e.g. "next month se karunga", "1st Dec se start karna hai", "agle mahine se", "next week se"): This is a HIGH PURCHASE INTENT ENROLLMENT, NOT disinterest! "is_disinterested" MUST be false!
       • Contextual: Customer explicitly states that an unmet requirement is a dealbreaker preventing enrollment, ONLY AFTER having been informed of our policy (e.g. "then I won't join", "offline nahi hai to rehne do", "fixed schedule nahi ho payega mujhse, cancel karo").
       • Context-aware: If the PREVIOUS AI MESSAGE informed the customer of a policy limitation (e.g. no flexible timings, online only, fixed schedule) AND the customer now expresses dissatisfaction with that limitation or says "no" / declines — this IS disinterest.
       • QUESTION-ANSWER ADJACENCY RULE (CRITICAL): When the AI in the recent transcript asks why the customer is hesitating, declining, or what is holding them back (e.g. "Aapko kya cheez rok rahi hai? Timing, fees, ya kuch aur?"), and the customer answers with an objection topic or obstacle (e.g. "timings", "timing", "fees", "price", "paise", "schedule", "offline", "subah nahi ho payega", "busy", "cost"):
@@ -327,6 +329,10 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 21. "cannot_access_classes":
     - boolean: true if customer states that their course/batch/class is not showing or not visible in the app, or they are unable to see or access their enrolled classes after login or payment ("show nhi hori", "krlia lkn classes show nhi hori", "classes nahi dikh rahi", "batch not showing", "not able to access classes", "kaha se join kare", "cannot see my class"). Otherwise false.
 
+23. "preferred_start_date":
+    - string or null: If the customer mentions or requests a future date, day, week, or month to join or start classes (e.g. "next month", "1st Dec", "from 15th", "next week", "agle mahine", "agle hafte", "kal se", "next monday", "after 10 days", "from 1st december"). Extract the exact stated future start time/date string (e.g. "1st Dec", "next month", "next week"). Otherwise null.
+    - CRITICAL SALES & DISINTEREST GUARD: A customer wanting to start on a future date has HIGH ENROLLMENT INTENT. This is NEVER disinterest! Do NOT set "is_disinterested" = true, and do NOT classify as "DISINTEREST".
+
 22. "conversation_summary":
     - string or null: A concise 1-2 sentence factual English summary of the customer's conversational journey so far based on the chronological transcript. Note what was offered, what was selected, any rejections or objections (e.g. "Customer rejected the available 10 batch timings due to a timing conflict."), and what the customer's current stance is.
 
@@ -359,6 +365,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "wants_resend_video": boolean,
   "claims_payment_or_enrollment": boolean,
   "cannot_access_classes": boolean,
+  "preferred_start_date": string | null,
   "timing_ambiguous": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
@@ -896,8 +903,29 @@ async def extract_intent_and_state_changes(
             or (clean.get("selected_course") and raw_text_course)
         )
 
+        # Future start date detection & disinterest guard
+        text_lower = text.lower().strip()
+        future_date_patterns = [
+            r"\b(?:next\s+month|agle\s+mahine|agle\s+month)\b",
+            r"\b(?:next\s+week|agle\s+hafte|agle\s+week)\b",
+            r"\b(?:next\s+monday|agle\s+somwar)\b",
+            r"\b(?:from\s+)?(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b",
+            r"\b(\d{1,2}\s*(?:tareekh|tarikh|din\s+baad|days?\s+later))\b",
+            r"\b(?:kal\s+se|from\s+tomorrow)\b",
+            r"\b(?:after\s+\d+\s+days?|\d+\s+din\s+baad)\b",
+        ]
+        detected_future_date = clean.get("preferred_start_date")
+        if not detected_future_date:
+            for pat in future_date_patterns:
+                m = re.search(pat, text_lower, re.IGNORECASE)
+                if m:
+                    detected_future_date = m.group(0).strip()
+                    break
+        if detected_future_date:
+            clean["preferred_start_date"] = detected_future_date
+
         if data.get("is_disinterested") or data.get("customer_intent") == "DISINTEREST":
-            if has_contrastive_slot_in_text:
+            if has_contrastive_slot_in_text or clean.get("preferred_start_date"):
                 clean["is_disinterested"] = False
                 if clean.get("selected_timing"):
                     clean["customer_intent"] = "TIMING_SELECTION"
@@ -907,6 +935,8 @@ async def extract_intent_and_state_changes(
                     clean["customer_intent"] = "TEACHER_SELECTION"
                 elif clean.get("selected_course"):
                     clean["customer_intent"] = "COURSE_SELECTION"
+                elif clean.get("preferred_start_date"):
+                    clean["customer_intent"] = "QUESTION"
             else:
                 clean["is_disinterested"] = True
                 clean["customer_intent"] = "DISINTEREST"
@@ -1145,6 +1175,23 @@ async def extract_intent_and_state_changes(
                 flags["selected_days"] = detected_day
                 if flags.get("customer_intent") in ("QUESTION", "OTHER"):
                     flags["customer_intent"] = "DAY_SELECTION"
+            # Future date fallback detection
+            future_date_patterns = [
+                r"\b(?:next\s+month|agle\s+mahine|agle\s+month)\b",
+                r"\b(?:next\s+week|agle\s+hafte|agle\s+week)\b",
+                r"\b(?:next\s+monday|agle\s+somwar)\b",
+                r"\b(?:from\s+)?(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b",
+                r"\b(\d{1,2}\s*(?:tareekh|tarikh|din\s+baad|days?\s+later))\b",
+                r"\b(?:kal\s+se|from\s+tomorrow)\b",
+                r"\b(?:after\s+\d+\s+days?|\d+\s+din\s+baad)\b",
+            ]
+            for pat in future_date_patterns:
+                m = re.search(pat, text.lower(), re.IGNORECASE)
+                if m:
+                    flags["preferred_start_date"] = m.group(0).strip()
+                    flags["is_disinterested"] = False
+                    break
+
             if kb_loader.is_app_link_request_fallback(text):
                 flags["customer_intent"] = "APP_LINK_REQUEST"
             if re.search(r"\b(app guide|app video|download video|how to download|app kaise download|how to install)\b", text, re.IGNORECASE):
@@ -1498,6 +1545,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     elif profile_stated == "denied":
         new_state["profile_created"] = False
 
+    if flags.get("preferred_start_date"):
+        new_state["preferred_start_date"] = flags["preferred_start_date"]
+
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
 
@@ -1606,6 +1656,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "question_summary": flags.get("question_summary"),
         "detected_language": flags.get("detected_language"),
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
+        "preferred_start_date": flags.get("preferred_start_date"),
         "cannot_access_classes": flags.get("cannot_access_classes", False),
         "unoffered_type": flags.get("unoffered_type"),
         "unoffered_value": flags.get("unoffered_value"),

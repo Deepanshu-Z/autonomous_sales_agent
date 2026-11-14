@@ -57,6 +57,14 @@ CONVERSATIONAL_NON_EMAILS = (
     "mere pass email nahi",
 )
 
+# Reject handles that are system artifacts or generic conversational words
+INVALID_LOCAL_HANDLES = {
+    "none", "null", "false", "true", "undefined", "nil", "n/a", "na",
+    "paid", "payment", "done", "screenshot", "screen", "shot", "photo", "image",
+    "slip", "receipt", "check", "admin", "test", "example", "user", "student",
+    "classes", "dance", "yoga", "kathak", "sensationz", "ok", "okay", "thanks"
+}
+
 
 def sanitize_email(
     raw_email: Optional[str],
@@ -72,11 +80,15 @@ def sanitize_email(
     raw_str = str(raw_email).strip()
     s_low = raw_str.lower()
 
-    # Guard 1: Dummy razorpay or test emails
+    # Guard 1: Direct rejection of system/dummy values
+    if s_low in ("none", "null", "undefined", "n/a", "na", "false", "true", ""):
+        return None
+
+    # Guard 2: Dummy razorpay or test emails
     if "razorpay.com" in s_low or "void@" in s_low or "example.com" in s_low:
         return None
 
-    # Guard 2: Conversational refusal or non-email statement
+    # Guard 3: Conversational refusal or non-email statement
     if any(phrase in s_low for phrase in CONVERSATIONAL_NON_EMAILS):
         return None
 
@@ -92,6 +104,10 @@ def sanitize_email(
             domain_part = domain_candidate.strip(".")
 
             if local_part and domain_part:
+                # If domain is just 'gmail', auto-append '.com' (e.g. user@gmail -> user@gmail.com)
+                if domain_part in ("gmail", "yahoo", "hotmail", "outlook", "rediffmail"):
+                    domain_part = f"{domain_part}.com"
+
                 # ── Fast Path O(1) Set Lookup (95%+ of traffic returns in ~3µs)
                 if domain_part in VALID_DOMAINS:
                     clean_domain = "gmail.com" if domain_part == "googlemail.com" else domain_part
@@ -117,40 +133,52 @@ def sanitize_email(
 
                 return _finalize_email(local_part, final_domain)
 
-    # Step 2: Conversational handle with 'gmail' keyword (e.g. "this is my gmail: deepanshupokhriyal07")
+    # Step 2: Explicit email domain without '@' (e.g. "rahul123 gmail.com" or "rahul123.gmail.com")
+    domain_match_no_at = re.search(
+        r"\b([a-z0-9_.+-]{3,35})\s*(?:@|\s+|\.)(gmail\.com|yahoo\.com|yahoo\.co\.in|outlook\.com|hotmail\.com|rediffmail\.com)\b",
+        s_low,
+    )
+    if domain_match_no_at:
+        handle = domain_match_no_at.group(1).strip(" .")
+        dom = domain_match_no_at.group(2).strip()
+        return _finalize_email(handle, dom)
+
+    # Step 3: Conversational handle with explicit 'gmail' keyword (e.g. "this is my gmail: deepanshupokhriyal07")
     handle_match = _GMAIL_PREFIX.search(raw_str)
     if handle_match:
         handle = handle_match.group(1).lower().strip().rstrip(".")
-        if handle not in ("is", "h", "hai", "id", "address", "mera", "meri", "yhi", "yahi"):
+        if handle not in ("is", "h", "hai", "id", "address", "mera", "meri", "yhi", "yahi", "none", "null"):
             if not handle.endswith("@gmail.com"):
                 return _finalize_email(handle, "gmail.com")
-            return handle
+            return _finalize_email(handle.replace("@gmail.com", ""), "gmail.com")
 
-    # Step 3: Bare username during active email fulfillment (e.g. "deepanshupokhriyal07")
-    if is_awaiting_email:
-        words = raw_str.split()
-        if len(words) == 1:
-            clean_handle = re.sub(r"[^a-zA-Z0-9_.+-]", "", words[0])
-            if 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle) and any(c.isdigit() for c in clean_handle):
-                return _finalize_email(clean_handle.lower(), "gmail.com")
-            elif 4 <= len(clean_handle) <= 35 and any(c.isalpha() for c in clean_handle):
-                non_emails = {"okay", "ok", "theek", "accha", "sure", "thanks", "done", "yes", "ha", "nahi", "no", "hello", "hi", "help"}
-                if clean_handle.lower() not in non_emails:
-                    return _finalize_email(clean_handle.lower(), "gmail.com")
-        else:
-            candidates = [re.sub(r"[^a-zA-Z0-9_.+-]", "", w) for w in words]
-            for cand in candidates:
-                if 4 <= len(cand) <= 35 and any(c.isdigit() for cand_c in cand for c in [cand_c]) and any(c.isalpha() for cand_c in cand for c in [cand_c]):
-                    return _finalize_email(cand.lower(), "gmail.com")
-
+    # STRICT POLICY: Under NO circumstances are bare words without '@' or email domain accepted as email!
     return None
 
 
 def _finalize_email(local: str, domain: str) -> Optional[str]:
-    """Applies final test/dummy domain rejection and returns formatted email."""
-    if "@" in local or "@" in domain or "." not in domain:
+    """Applies final validation and dummy/invalid handle rejection."""
+    if not local or not domain:
         return None
-    final_email = f"{local}@{domain}"
-    if final_email.endswith("@razorpay.com") or "void@" in final_email or "example.com" in final_email:
+    local_clean = local.strip().lower()
+    domain_clean = domain.strip().lower()
+
+    if "@" in local_clean or "@" in domain_clean or "." not in domain_clean:
         return None
+
+    # Reject handles that are system artifacts or generic conversational words
+    if local_clean in INVALID_LOCAL_HANDLES:
+        return None
+
+    final_email = f"{local_clean}@{domain_clean}"
+    if (
+        final_email.endswith("@razorpay.com")
+        or "void@" in final_email
+        or "example.com" in final_email
+        or final_email.startswith("none@")
+        or final_email.startswith("null@")
+        or final_email.startswith("test@")
+    ):
+        return None
+
     return final_email

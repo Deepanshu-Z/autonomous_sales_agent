@@ -73,13 +73,17 @@
             "teacher_absence": "Another teacher will conduct the class, or the class will be rescheduled"
         },
         "batch_change": {
-            "allowed_after_months": 1,
-            "allowed_during_first_month": false
+            "allowed": true,
+            "frequency_limit": "once a month",
+            "allowed_during_first_month": true,
+            "rule": "Students are permitted to change their batch timing or time slot once a month if their schedule changes. If they ever miss an individual class, it cannot be rescheduled or carried over, but full session recordings are provided in the Sensationz App to practice anytime at their own pace."
         },
         "flexible_timings": {
-            "allowed_after_months": false,
-            "allowed_during_first_month": false,
-            "substitute_option": "they can shift their batch timing after 1 month of enrollment"
+            "daily_flexible_timings_allowed": false,
+            "fixed_batch_required": true,
+            "batch_change_permitted": true,
+            "frequency_limit": "once a month",
+            "substitute_option": "Classes follow a fixed daily batch schedule, but students are permitted to change their batch timing once a month."
         },
         "multiple_classes_per_day": false,
         "gender_specific_batches": false,

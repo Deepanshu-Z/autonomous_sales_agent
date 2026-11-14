@@ -9,13 +9,14 @@ to switch between:
      - Step 1 (+30 min of silence): Handoff to human agent in Interakt
 
   2. 24-HOUR AI VALUE MODE (False):
-     - Step 0 (+5 min): Friendly check-in reminder
-     - Step 1 (+30 min): Fact #1 from course JSON
-     - Step 2 (+3 hours): Fact #2 from course JSON
-     - Step 3 (+9 hours): Fact #3 from course JSON
-     - Step 4 (+15 hours): Fact #4 from course JSON
-     - Step 5 (+21 hours): 🎁 3 Free Live Trial Classes offer
-     - Step 6 (+24 hours): Final handoff to human agent in Interakt
+     - Cadence: 5m -> 30m -> 3h -> 6h -> 6h -> 6h (Total ~24 hours from last user message)
+     - 5 Message Variations for EACH of the 5 Timestamps:
+         * 30 mins: 5 distinct company & course fact messages
+         * 3 hours: 5 distinct company & course fact messages
+         * 6 hours (step 3): 5 distinct company & course fact messages
+         * 6 hours (step 4): 5 distinct company & course fact messages
+         * 6 hours (step 5): 5 distinct variations of the 3 Free Live Trial Classes offer!
+     - Step 6 (~23.5h continuous silence): Final handoff to human agent in Interakt (inside Meta 24h window).
 """
 
 import json
@@ -26,8 +27,8 @@ from typing import Optional, Dict, Any, List
 
 # =========================================================================
 # FOLLOW-UP SYSTEM MODE TOGGLE (SINGLE POINT OF ENTRY)
-# True  = Legacy Mode (5-min check-in -> 30-min agent handoff)
-# False = 24-Hour AI Mode (5-min check-in -> 30m/3h/9h/15h facts -> 21h trial -> 24h agent)
+# True  = Legacy Mode (5-min check-in -> 30-min agent handoff in Interakt)
+# False = 24-Hour AI Mode (5-min check-in -> 30m/3h/6h/6h/6h facts & trials -> 24h agent)
 # =========================================================================
 USE_LEGACY_FOLLOWUP: bool = True
 
@@ -46,24 +47,32 @@ FOLLOWUP_DIR = os.path.join(
     "followup"
 )
 
-# Gaps in seconds for 24-Hour mode:
-# Step 0 (at 5m): wait 25m (1500s) -> 30m total
-# Step 1 (at 30m): wait 2.5h (9000s) -> 3h total
-# Step 2 (at 3h): wait 6h (21600s) -> 9h total
-# Step 3 (at 9h): wait 6h (21600s) -> 15h total
-# Step 4 (at 15h): wait 6h (21600s) -> 21h total (trial offer)
-# Step 5 (at 21h): wait 3h (10800s) -> 24h total (handoff)
+# Gaps in seconds for 24-Hour mode strictly anchored to silence from last message:
+# Step 0 (at 5m silence): wait 30m (1800s) -> triggers 30m message
+# Step 1 (at 30m silence): wait 3h (10800s) -> triggers 3h message
+# Step 2 (at 3h silence): wait 6h (21600s) -> triggers 6h_step3 message
+# Step 3 (at 6h silence): wait 6h (21600s) -> triggers 6h_step4 message
+# Step 4 (at 6h silence): wait 6h (21600s) -> triggers 6h_step5_trials message (trial offer)
+# Step 5 (at 6h silence): wait 2h (7200s) -> triggers ~23.5h agent handoff inside Meta 24h window
 GAPS_24H_SEC: Dict[int, int] = {
-    0: 1500,
-    1: 9000,
-    2: 21600,
-    3: 21600,
-    4: 21600,
-    5: 10800,
+    0: 1800,   # 30 minutes after 5m message
+    1: 10800,  # 3 hours after 30m message
+    2: 21600,  # 6 hours after 3h message
+    3: 21600,  # 6 hours after 6h_step3 message
+    4: 21600,  # 6 hours after 6h_step4 message (delivers trial offer)
+    5: 7200,   # 2 hours after trial offer (total ~23.5h silence -> agent handoff inside Meta window)
 }
 
 # Gap in seconds for Legacy mode (Step 0 -> Step 1):
 GAP_LEGACY_SEC: int = 1800  # 30 minutes
+
+STAGE_KEYS: Dict[int, str] = {
+    1: "30m",
+    2: "3h",
+    3: "6h_step3",
+    4: "6h_step4",
+    5: "6h_step5_trials",
+}
 
 
 @dataclass
@@ -75,7 +84,8 @@ class FollowupDecision:
     next_gap_seconds: Optional[int] = None # Seconds until next action
     step_label: str = ""            # Label for logging
     is_trial_offer: bool = False    # True if 3 Free Trials offer
-    updated_sent_steps: Optional[List[int]] = None # Updated list of sent steps
+    message_id: Optional[str] = None # ID of the specific message variation sent
+    updated_sent_ids: Optional[List[str]] = None # Updated list of sent message IDs
 
 
 def get_total_steps() -> int:
@@ -112,8 +122,8 @@ def _normalize_course_key(course_id: Optional[str]) -> str:
     return "general"
 
 
-def load_course_followups(course_key: str) -> list:
-    """Loads followup steps from data/followup/{course_key}.json with fallback to general."""
+def load_course_json(course_key: str) -> dict:
+    """Loads course followup configuration from data/followup/{course_key}.json."""
     fname = f"{course_key}.json"
     fpath = os.path.join(FOLLOWUP_DIR, fname)
     if not os.path.exists(fpath):
@@ -121,24 +131,46 @@ def load_course_followups(course_key: str) -> list:
 
     try:
         with open(fpath, "r", encoding="utf-8") as fp:
-            data = json.load(fp)
-            return data.get("followups", [])
+            return json.load(fp)
     except Exception as e:
         print(f"[followup_service] Error reading {fpath}: {e}")
-        return []
+        return {}
 
 
-def get_followup_for_step(course_id: Optional[str], step_index: int) -> Optional[Dict[str, Any]]:
-    """Returns the followup payload dict for the given course and step index (1-5)."""
+def get_variation_for_stage(
+    course_id: Optional[str],
+    step_index: int,
+    sent_ids: List[str],
+) -> Optional[Dict[str, Any]]:
+    """
+    Selects the next unseen variation from the 5 message variations for this stage.
+    If all 5 have already been sent, it safely wraps around to variation 0.
+    """
+    stage_key = STAGE_KEYS.get(step_index)
+    if not stage_key:
+        return None
+
     course_key = _normalize_course_key(course_id)
-    steps = load_course_followups(course_key)
-    if not steps:
-        steps = load_course_followups("general")
+    cdata = load_course_json(course_key)
+    stages = cdata.get("stages", {})
+    variations = stages.get(stage_key, [])
 
-    for s in steps:
-        if s.get("step") == step_index:
-            return s
-    return None
+    if not variations:
+        # Fallback to general course if specific course stage missing
+        gdata = load_course_json("general")
+        variations = gdata.get("stages", {}).get(stage_key, [])
+
+    if not variations:
+        return None
+
+    # Pick the first variation whose ID hasn't been sent yet
+    for v in variations:
+        vid = v.get("id")
+        if vid and vid not in sent_ids:
+            return v
+
+    # If all 5 variations for this timestamp were already seen, wrap around to index 0
+    return variations[0]
 
 
 def get_followup_decision(
@@ -147,43 +179,46 @@ def get_followup_decision(
     course_id: Optional[str],
     course_name: Optional[str],
     lead_at_qr: bool,
-    sent_steps: Optional[List[int]] = None,
+    sent_ids: Optional[List[str]] = None,
+    sent_steps: Optional[Any] = None,
 ) -> FollowupDecision:
     """
     Core single-point-of-entry decision engine.
     Inspects lead state, current count, and active mode (Legacy vs 24-Hour AI),
-    and returns a clean FollowupDecision.
+    and returns a clean FollowupDecision with exact message variations.
     """
     from src.services.agent_handoff import get_next_agent_email
 
-    sent_steps = list(sent_steps or [])
+    sent_ids = list(sent_ids or [])
+    if sent_steps and isinstance(sent_steps, list):
+        for s in sent_steps:
+            if isinstance(s, str) and s not in sent_ids:
+                sent_ids.append(s)
 
     # -------------------------------------------------------------
     # 1. LEGACY MODE (5 min check-in -> 30 min agent handoff)
     # -------------------------------------------------------------
     if is_legacy_mode():
         if count == 0:
-            # Step 0 (+5 min): Send standard check-in, schedule agent handoff in 30 mins (1800s)
             msg = get_checkin_message(course_name)
-            new_sent = list(set(sent_steps + [0]))
+            new_sent = list(set(sent_ids + ["legacy_5m"]))
             return FollowupDecision(
                 action="SEND_MESSAGE",
                 message=msg,
                 next_count=1,
                 next_gap_seconds=GAP_LEGACY_SEC,
                 step_label="5-min reminder (Legacy)",
-                updated_sent_steps=new_sent,
+                message_id="legacy_5m",
+                updated_sent_ids=new_sent,
             )
         else:
-            # Step 1 (+30 min):
             if lead_at_qr:
-                # QR leads stay with owner & AI, skip agent escalation
                 return FollowupDecision(
                     action="SKIP",
                     next_count=1,
                     next_gap_seconds=None,
                     step_label="QR lead — skipping agent handoff, AI stays active",
-                    updated_sent_steps=sent_steps,
+                    updated_sent_ids=sent_ids,
                 )
             else:
                 agent, _ = get_next_agent_email()
@@ -195,71 +230,58 @@ def get_followup_decision(
                     next_count=2,
                     next_gap_seconds=None,
                     step_label="30-min agent escalation (Legacy)",
-                    updated_sent_steps=sent_steps,
+                    updated_sent_ids=sent_ids,
                 )
 
     # -------------------------------------------------------------
-    # 2. 24-HOUR AI VALUE MODE (5m -> 30m -> 3h -> 9h -> 15h -> 21h trial -> 24h agent)
+    # 2. 24-HOUR AI VALUE MODE (5m -> 30m -> 3h -> 6h -> 6h -> 6h trials -> 24h agent)
     # -------------------------------------------------------------
     if count == 0:
-        # Step 0 (+5 min of silence)
-        if 0 not in sent_steps:
-            msg = get_checkin_message(course_name)
-            new_sent = list(set(sent_steps + [0]))
+        # Step 0 (+5 min of silence from last user message)
+        msg = get_checkin_message(course_name)
+        new_sent = list(set(sent_ids + ["checkin_5m"]))
+        return FollowupDecision(
+            action="SEND_MESSAGE",
+            message=msg,
+            next_count=1,
+            next_gap_seconds=GAPS_24H_SEC.get(0, 1800),
+            step_label="5-min check-in (24h Mode)",
+            message_id="checkin_5m",
+            updated_sent_ids=new_sent,
+        )
+
+    if 1 <= count <= 5:
+        # Pull the next unseen variation from the 5 variations for this stage
+        var = get_variation_for_stage(course_id, count, sent_ids)
+        if var and var.get("message"):
+            vid = var.get("id", f"step_{count}")
+            msg = var["message"]
+            gap = GAPS_24H_SEC.get(count, 21600)
+            is_trial = bool(var.get("is_final_trial_offer", False))
+            stage_name = STAGE_KEYS.get(count, f"step_{count}")
+            new_sent = list(set(sent_ids + [vid]))
+
             return FollowupDecision(
                 action="SEND_MESSAGE",
                 message=msg,
-                next_count=1,
-                next_gap_seconds=GAPS_24H_SEC.get(0, 1500),
-                step_label="5-min check-in (24h Mode)",
-                updated_sent_steps=new_sent,
+                next_count=count + 1,
+                next_gap_seconds=gap,
+                step_label=f"24h [{stage_name}] ({vid})",
+                is_trial_offer=is_trial,
+                message_id=vid,
+                updated_sent_ids=new_sent,
             )
         else:
-            # Step 0 was already sent earlier in session and user engaged.
-            # Advance directly to the next unseen factual step (1-5)
-            step_to_send = next((s for s in range(1, 6) if s not in sent_steps), None)
-            if step_to_send is None:
-                # All facts 1-5 already seen -> handoff to agent
-                count = 6
-            else:
-                count = step_to_send
-
-    if 1 <= count <= 5:
-        # Anti-loop check: ensure this step hasn't already been sent
-        step_to_send = count
-        if step_to_send in sent_steps:
-            step_to_send = next((s for s in range(count, 6) if s not in sent_steps), None)
-
-        if step_to_send is None or step_to_send > 5:
             count = 6
-        else:
-            fact = get_followup_for_step(course_id, step_to_send)
-            if fact and fact.get("message"):
-                msg = fact["message"]
-                gap = GAPS_24H_SEC.get(step_to_send, 21600)
-                is_trial = bool(fact.get("is_final_trial_offer", False))
-                lbl = fact.get("delay_label", f"step {step_to_send}")
-                new_sent = list(set(sent_steps + [step_to_send]))
-                return FollowupDecision(
-                    action="SEND_MESSAGE",
-                    message=msg,
-                    next_count=step_to_send + 1,
-                    next_gap_seconds=gap,
-                    step_label=f"24h {lbl} (Fact #{step_to_send})",
-                    is_trial_offer=is_trial,
-                    updated_sent_steps=new_sent,
-                )
-            else:
-                count = 6
 
-    # Step >= 6 (+24 hours total completed)
+    # Step >= 6 (Full 24 hours of continuous silence completed -> Human Agent Handoff)
     if lead_at_qr:
         return FollowupDecision(
             action="SKIP",
             next_count=7,
             next_gap_seconds=None,
             step_label="24h cutoff for QR lead — skipping agent handoff, AI stays active",
-            updated_sent_steps=sent_steps,
+            updated_sent_ids=sent_ids,
         )
 
     agent, _ = get_next_agent_email()
@@ -271,5 +293,5 @@ def get_followup_decision(
         next_count=7,
         next_gap_seconds=None,
         step_label="24-hour final agent escalation",
-        updated_sent_steps=sent_steps,
+        updated_sent_ids=sent_ids,
     )

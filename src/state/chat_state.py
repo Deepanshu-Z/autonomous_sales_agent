@@ -138,6 +138,7 @@ def get_default_state(phone: str) -> dict:
         "selected_days": None,        # Selected batch days (synced with days)
         "days_code": None,            # Standard schedule code (e.g. "TT", "SS", "WF", "MTWTF")
         "selected_duration": None,    # Selected package duration (e.g. "3 Months")
+        "preferred_start_date": None, # Future joining date (e.g. "1st December", "next month")
         "order_id": None,             # Razorpay Order ID / QR ID (e.g. "qr_xxxx")
         "payment_status": "NONE",     # Payment lifecycle: "NONE" | "PENDING" | "PAID"
         "reset_at": int(time.time()), # Epoch timestamp when state was initialized / reset
@@ -209,7 +210,7 @@ def _check_sync_paid_status(phone: str, state: dict) -> dict:
         if entry:
             alt_st = entry[0] if isinstance(entry, tuple) else entry
             if alt_st and alt_st.get("payment_status") == "PAID":
-                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee"]:
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee", "preferred_start_date"]:
                     if alt_st.get(k) is not None:
                         state[k] = alt_st[k]
                 return state
@@ -222,7 +223,7 @@ def _check_sync_paid_status(phone: str, state: dict) -> dict:
                 continue
             alt_st = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
             if isinstance(alt_st, dict) and alt_st.get("payment_status") == "PAID":
-                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee"]:
+                for k in ["payment_status", "stage", "is_enrolled", "paid_amount", "order_id", "payment_id", "payment_method", "course", "selected_timing", "timing", "selected_teacher", "teacher", "days", "selected_days", "days_code", "selected_duration", "package", "fee", "preferred_start_date"]:
                     if alt_st.get(k) is not None:
                         state[k] = alt_st[k]
                 return state

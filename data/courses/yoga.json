@@ -60,11 +60,12 @@
                 "duration": "1 Month",
                 "duration_code": "1M",
                 "base_price": 700,
+                "offer_price": 300,
                 "gst_slab": "5%",
-                "gst_on_base": 35,
-                "total_with_gst": 735,
-                "per_day": "Rs.23.3/day",
-                "note": "No offer on 1 Month. Price is ₹700 + 5% GST = ₹735 at checkout."
+                "coupon_code": "YOGA300",
+                "gst_on_offer": 15,
+                "total_with_gst_offer": 315,
+                "per_day_offer": "Rs.10/day"
             },
             {
                 "duration": "3 Months",

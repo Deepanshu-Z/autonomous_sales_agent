@@ -49,11 +49,12 @@
         "duration": "1 Month",
         "duration_code": "1M",
         "base_price": 500,
+        "offer_price": 300,
         "gst_slab": "18%",
-        "gst_on_base": 90,
-        "total_with_gst": 590,
-        "per_day": "Rs.16.7/day",
-        "note": "No offer on 1 Month. Price is ₹500 + 18% GST = ₹590 at checkout."
+        "coupon_code": "DANCE300",
+        "gst_on_offer": 54,
+        "total_with_gst_offer": 354,
+        "per_day_offer": "Rs.10/day"
       },
       {
         "duration": "3 Months",

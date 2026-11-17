@@ -408,7 +408,10 @@ def detect_course_from_text_fallback(text: str, default_course: Optional[str] = 
 def is_app_link_request_fallback(text: str) -> bool:
     """Deterministic keyword check. FALLBACK ONLY."""
     t = (text or "").lower()
-    return any(w in t for w in ["app link", "download link", "play store", "app store", "send link", "link bhejo", "link do"])
+    return any(w in t for w in [
+        "app link", "download link", "play store", "app store", "send link",
+        "link bhejo", "link do", "which app", "what app", "konsi app", "kaunsi app",
+    ])
 
 
 # Backward-compatible alias for existing test suites and modules

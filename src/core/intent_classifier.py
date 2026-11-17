@@ -1673,6 +1673,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "invalid_timing_candidates": flags.get("invalid_timing_candidates"),
         "wants_trial": flags.get("wants_trial", False),
         "wants_demo": flags.get("wants_demo", False),
+        "wants_app_link": flags.get("wants_app_link", False),
         "wants_app_guide": flags.get("wants_app_guide", False),
         "wants_app_video_guide": flags.get("wants_app_guide", False),
         "wants_trial_guide": flags.get("wants_trial_guide", False),

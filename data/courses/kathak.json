@@ -41,7 +41,8 @@
         "trial_classes_available": true,
         "max_trial_classes": 3,
         "trial_cost": "Free",
-        "important_note": "Physical branches are office addresses only. Online Kathak classes are accessible from anywhere worldwide."
+        "important_note": "Physical branches are office addresses only. Online Kathak classes are accessible from anywhere worldwide.",
+        "certificate_provided": false
     },
     "pricing": {
         "currency": "INR",
@@ -378,13 +379,15 @@
                 "credential": "Degree"
             }
         ],
-        "beyond_1_year_rule": "Yes, we DO offer multi-year courses and tracks (1, 2, 3, 4, 6+ years leading to Junior Diploma, Senior Diploma, Degree). For 1+ year courses or multi-year packages, standard direct app packages are not fixed; the AI must tell the customer that we do offer multi-year courses, and direct them to type 'agent' so a human executive can connect with them to provide the best offer, custom plan, and assistance."
+        "beyond_1_year_rule": "Yes, we DO offer multi-year courses and tracks (1, 2, 3, 4, 6+ years leading to Junior Diploma, Senior Diploma, Degree). For 1+ year courses or multi-year packages, standard direct app packages are not fixed; the AI must tell the customer that we do offer multi-year courses, and direct them to type 'agent' so a human executive can connect with them to provide the best offer, custom plan, and assistance.",
+        "short_term_packages_rule": "Strictly NO certificate or diploma is provided for 1 Month, 3 Months, or 6 Months packages. Certification begins only after completing a minimum 1 full continuous year curriculum and formal examination."
     },
     "enrollment": {
         "batches_start": "Ongoing — enroll anytime (same as Yoga)"
     },
     "not_offered": {
         "other": [
+            "Course completion certificate for short-term packages (1 Month, 3 Months, 6 Months)",
             "1-on-1 private classes",
             "Recordings of live classes",
             "Leave or class pause",

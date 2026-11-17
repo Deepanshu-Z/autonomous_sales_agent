@@ -860,14 +860,103 @@ def _ensure_app_website_links(
         cleaned = "\n".join(lines).strip()
         return re.sub(r"\n{3,}", "\n\n", cleaned)
 
-    # Customer explicitly asked for links: provide official platform links
+    # Customer explicitly asked for links: preserve existing official links and
+    # append any missing entries so a generated reply cannot contain a cropped
+    # or partial platform block.
     t_lower = text.lower()
-    has_links = "play.google.com" in t_lower or "shop.sensationzperformingarts.com" in t_lower
-    if not has_links:
-        from src.core import kb_loader
-        official_links = kb_loader.format_app_links_display()
-        return f"{text.rstrip()}\n\n{official_links}"
+    from src.core import kb_loader
+    official_links = kb_loader.format_app_links_display()
+    required_domains = ("play.google.com", "apps.apple.com")
+    missing_lines = [
+        line for line in official_links.splitlines()
+        if any(domain in line.lower() and domain not in t_lower for domain in required_domains)
+        or ("shop.sensationzperformingarts.com" in line.lower() and "shop.sensationzperformingarts.com" not in t_lower)
+    ]
+    if missing_lines:
+        missing_block = "\n".join(missing_lines)
+        return f"{text.rstrip()}\n\n{missing_block}"
     return text
+
+
+_APP_ACCESS_STAGES = frozenset({
+    "PAYMENT_CONFIRMED",
+    "READY_FOR_APP_LINK",
+    "ENROLLED",
+    "TRIAL_STEPS_SENT",
+})
+
+_APP_HELP_REQUEST_RE = re.compile(
+    r"(?:\b(?:can't|cannot|couldn't|unable|not able|problem|issue|trouble|difficulty|help)"
+    r"\b.{0,40}\b(?:download|install|app|login|log in)\b"
+    r"|\b(?:download|install)\s+(?:the\s+)?(?:sensationz\s+)?app\b)",
+    re.IGNORECASE,
+)
+
+_APP_HELP_OFFER_RE = re.compile(
+    r"(?:app\s+download\s+link|help\s+downloading|assistance\s+downloading|"
+    r"download(?:ing)?\s+the\s+app|download\s+steps|install(?:ing)?\s+the\s+app)",
+    re.IGNORECASE,
+)
+
+_APP_HELP_ACCEPTANCES = frozenset({
+    "yes", "yes please", "yeah", "yep", "sure", "okay", "ok", "please do",
+    "haan", "haan please", "ha", "ji", "ji haan", "send it", "send them",
+})
+
+
+def _recent_assistant_offered_app_help(history: Optional[List[dict]]) -> bool:
+    """Recognize a short affirmative reply to the bot's preceding app-help offer."""
+    if not history:
+        return False
+    for turn in reversed(history):
+        if turn.get("role") not in ("assistant", "ai"):
+            continue
+        return bool(_APP_HELP_OFFER_RE.search(str(turn.get("content") or "")))
+    return False
+
+
+def _should_allow_app_links(
+    *,
+    text: str,
+    state: Dict[str, Any],
+    last_turn: Dict[str, Any],
+    history: Optional[List[dict]],
+) -> bool:
+    """Return whether this turn is an appropriate place to include official app links.
+
+    Explicit requests always win, including repeat requests. Automatic delivery is
+    limited to the first app-access handoff after payment/trial staging, so normal
+    sales and support turns do not repeatedly carry the links.
+    """
+    intent = str(last_turn.get("intent") or last_turn.get("customer_intent") or "").upper()
+    explicit_link_request = bool(
+        intent == "APP_LINK_REQUEST"
+        or last_turn.get("wants_app_link")
+        or kb_loader.is_app_link_request_fallback(text)
+    )
+    if explicit_link_request:
+        return True
+
+    app_help_requested = bool(
+        last_turn.get("wants_app_guide")
+        or last_turn.get("wants_app_video_guide")
+        or _APP_HELP_REQUEST_RE.search(text or "")
+        or (
+            str(text or "").strip().lower() in _APP_HELP_ACCEPTANCES
+            and _recent_assistant_offered_app_help(history)
+        )
+    )
+    if app_help_requested:
+        return True
+
+    app_access_required = bool(
+        state.get("payment_status") == "PAID"
+        or state.get("is_enrolled")
+        or state.get("staged_enrollment")
+        or state.get("staged_trial")
+        or state.get("stage") in _APP_ACCESS_STAGES
+    )
+    return app_access_required and not state.get("app_links_sent", False)
 
 # ── Strict Non-Confirmation Guardrails (Payment, Trial, Enrollment) ───────────
 # The AI MUST NEVER confirm any enrollment, free trial booking, or payment under any circumstances.
@@ -1793,8 +1882,7 @@ async def _handle_conversation_turn_unlocked(
         user_wants_app_guide = False
         user_wants_trial_guide = False
 
-    # App links are allowed when customer explicitly asked for links, clicked platform button, or after enrollment/trial staging
-    unquoted_text = cmd if 'cmd' in locals() else re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip().lower()
+    # Payment state is used both for payment guardrails and the app-access link policy.
     is_client_paid = bool(
         new_state.get("payment_status") == "PAID"
         or new_state.get("is_enrolled")
@@ -1870,10 +1958,13 @@ async def _handle_conversation_turn_unlocked(
         or new_state.get("classes_not_showing")
     )
 
-    allow_app_links = bool(
-        last_turn.get("intent") == "APP_LINK_REQUEST"
-        or last_turn.get("customer_intent") == "APP_LINK_REQUEST"
-        or last_turn.get("wants_app_link")
+    # Keep the zero-spam policy, but do not let the sanitizer crop links from a
+    # legitimate enrollment/access handoff or an app-help request.
+    allow_app_links = _should_allow_app_links(
+        text=text_clean,
+        state=new_state,
+        last_turn=last_turn,
+        history=history,
     )
 
     clean_reply = _strip_trailing_question(_format_for_whatsapp(main_reply), followup=followup_msg) if followup_msg else _format_for_whatsapp(main_reply)
@@ -1892,6 +1983,18 @@ async def _handle_conversation_turn_unlocked(
     )
     allow_video_links = bool(user_asked_demo or will_send_trial_video or will_send_install_video or is_video_guide_request)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=allow_video_links)
+
+    # Record automatic delivery so later unrelated turns remain link-free. An
+    # explicit request still passes through _should_allow_app_links and can
+    # intentionally resend the official links.
+    clean_reply_lower = clean_reply.lower()
+    if allow_app_links and any(
+        domain in clean_reply_lower
+        for domain in ("play.google.com", "apps.apple.com", "shop.sensationzperformingarts.com")
+    ):
+        new_state["app_links_sent"] = True
+        if new_state.get("stage") == "READY_FOR_APP_LINK":
+            new_state["stage"] = "APP_LINK_SENT"
 
     if clean_followup:
         clean_followup = _format_for_whatsapp(clean_followup)

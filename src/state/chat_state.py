@@ -157,6 +157,7 @@ def get_default_state(phone: str) -> dict:
         "is_escalated": False,        # Escalation flag to hand off to human agent
         "course": None,               # Active course context (e.g. "yoga", "kathak", None until selected)
         "welcome_sent": False,        # Flag to ensure initial campaign welcome flow fires only once on 1st message
+        "welcome_video_sent": False,  # Flag to ensure initial course welcome video fires only once on 1st message
         "app_download_video_sent": False,  # Prevents redundant/spam sends of the app download/install video guide
         "app_links_sent": False,      # Tracks automatic app-link delivery; explicit requests may still resend them
         "trial_video_sent": False,         # Prevents redundant/spam sends of the trial booking video guide

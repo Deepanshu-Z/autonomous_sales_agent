@@ -155,3 +155,26 @@ def get_campaign_buttons(campaign: Optional[Dict[str, Any]], language: Optional[
 
     return ["Fees", "Timings", "Talk to Agent"]
 
+
+def get_welcome_video(campaign: Optional[Dict[str, Any]], course_id: Optional[str] = None) -> Optional[str]:
+    """
+    Extracts the welcome raw MP4 video URL from campaign data or course knowledge base.
+    """
+    if campaign and campaign.get("welcome_video_url"):
+        return campaign["welcome_video_url"]
+
+    cid = course_id or (campaign.get("course") if campaign else None)
+    if cid:
+        try:
+            from src.core import kb_loader
+            c_data = kb_loader.get_course_data(cid)
+            if c_data:
+                overview = c_data.get("course_overview", {})
+                return overview.get("welcome_raw_video_url") or c_data.get("welcome_raw_video_url")
+        except Exception as e:
+            print(f"[campaign_loader] Error fetching course welcome video for {cid}: {e}")
+
+    return None
+
+
+

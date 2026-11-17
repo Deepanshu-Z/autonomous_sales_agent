@@ -1,6 +1,7 @@
 [
   {
     "course": "yoga",
+    "welcome_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1794899864/AQME-nBg5AGObtZf64ndjXyLi87yHM_1YhoUMj7_mjw5_x3WVYirQrcYrdidK5wz8IyreXJYLis5i-FmlwGsHBiF3ZBFcB94sXqoyKY_ufdmbh.mp4",
     "ad_ids": [
       "120251036038770010"
     ],
@@ -16,6 +17,7 @@
   },
   {
     "course": "kathak",
+    "welcome_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1794899902/AQN_Y0x6wP6MOONeuNZ2xlRtlmGkN7A7tYHXFC9PGCDTT7e5HvGssk-PWs99tOK9G8IpdbaHhlAQU_gDy3NoJiXJ_ddnpp2.mp4",
     "ad_ids": [
       "120248530286600010",
       "120247631445010010",
@@ -33,6 +35,7 @@
   },
   {
     "course": "face_yoga",
+    "welcome_video_url": null,
     "ad_ids": [],
     "welcome_messages": {
       "message_1": "Hi, Yes! 😊 We currently have a ₹600 / 3-month offer.\n\n💆 Live Face Yoga Classes\n📅 Monday–Friday\n👩🏫 Certified instructors\n💰 3 months — ₹600 (1 month — ₹300)\n💻 Online classes",
@@ -46,6 +49,7 @@
   },
   {
     "course": "ladies_dance",
+    "welcome_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1794899806/AQOFmS1bb40gdtZ3IKVbAqD3gl4bMQMmuBm9NwN1VLm50MmwycEfOMU55SGwJg8FkCggjV-f7ua0UkOrNLh4fmwlmEGC-tx3Y0ZNnWY_yx5nng.mp4",
     "ad_ids": [
       "120251036740780010"
     ],

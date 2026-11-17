@@ -725,13 +725,26 @@ async def handle_ai_reply_async(phone: str, text: str, history: list, start_time
         welcome_msgs = campaign_loader.get_welcome_messages(campaign)
         msg1 = welcome_msgs.get("message_1")
         msg2 = welcome_msgs.get("message_2")
+        welcome_video = campaign_loader.get_welcome_video(campaign, matched_course)
 
         if msg1:
             await send_text_message_async(phone, msg1)
             latency_sec = round(time.time() - start_time, 2) if start_time else None
             asyncio.create_task(save_message_async(phone, "assistant", msg1, response_time_sec=latency_sec))
             asyncio.create_task(log_message_async(phone, "ai", msg1))
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(1.2)
+
+        if welcome_video and not state.get("welcome_video_sent"):
+            from src.services.interakt import send_video_message_async
+            try:
+                sent_vid = await send_video_message_async(phone, welcome_video, caption="")
+                if sent_vid:
+                    state["welcome_video_sent"] = True
+                    asyncio.create_task(save_message_async(phone, "assistant", f"[VIDEO] {welcome_video}"))
+                    asyncio.create_task(log_message_async(phone, "ai", f"[VIDEO] {welcome_video}"))
+            except Exception as e:
+                print(f"[tasks] {phone}: Error dispatching welcome video: {e}")
+            await asyncio.sleep(1.2)
 
         if msg2:
             await send_text_message_async(phone, msg2)

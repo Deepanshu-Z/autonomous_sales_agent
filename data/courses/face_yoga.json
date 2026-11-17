@@ -43,7 +43,9 @@
         "max_trial_classes": 3,
         "trial_cost": "Free",
         "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
-        "important_note": "Not provided"
+        "important_note": "Not provided",
+        "welcome_raw_video_url": null,
+        "class_raw_video_url": null
     },
     "pricing": {
         "currency": "INR",

@@ -443,14 +443,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
   * STRICT NO-COUPON-CODE RULE: Do NOT output, mention, or display any coupon codes (such as *YOGA70*). The discount is already pre-applied directly to their offer price and payment QR!
 
 ════════════════════════════════════════
-5. ACTIVE CUSTOMER SESSION CONTEXT
-════════════════════════════════════════
-{state_context}
-
-════════════════════════════════════════
-6. OFFICIAL COURSE DATA (SOURCE OF TRUTH — ACTIVE COURSE: {course_id_title})
+5. OFFICIAL COURSE DATA (SOURCE OF TRUTH — ACTIVE COURSE: {course_id_title})
 ════════════════════════════════════════
 {course_data}
+
+════════════════════════════════════════
+6. ACTIVE CUSTOMER SESSION CONTEXT (DYNAMIC — CURRENT TURN ONLY)
+════════════════════════════════════════
+{state_context}
 """
 
 

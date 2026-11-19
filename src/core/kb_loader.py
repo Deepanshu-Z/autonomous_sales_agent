@@ -83,10 +83,14 @@ def get_course_catalog() -> List[Dict[str, Any]]:
 
 def get_catalog_entry(course_id: str) -> Optional[Dict[str, Any]]:
     cid = (course_id or "").lower().strip()
+    cid_norm = cid.replace('_', ' ').replace('-', ' ').strip()
     # Check id OR name OR aliases (e.g. 'zumba' -> matches 'fitness' catalog entry)
     return next(
         (c for c in get_course_catalog() 
-         if c.get("id") == cid or cid == c.get("name", "").lower() or cid in [a.lower() for a in c.get("aliases", [])]), 
+         if c.get("id") in (cid, cid_norm.replace(' ', '_'))
+         or cid == c.get("name", "").lower()
+         or cid_norm == c.get("name", "").lower()
+         or any(a.lower() in (cid, cid_norm) or a.lower().replace(' ', '_') == cid for a in c.get("aliases", []))), 
         None
     )
 

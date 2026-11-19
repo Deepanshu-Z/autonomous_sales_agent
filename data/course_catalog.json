@@ -7,12 +7,21 @@
                 "kathak dance",
                 "classical dance",
                 "indian classical dance",
-                "tatkar"
+                "tatkar",
+                "kids kathak",
+                "kathak for kids",
+                "children kathak",
+                "junior kathak",
+                "bachon ka kathak",
+                "kids classical dance",
+                "kathak for children",
+                "kathak for daughter",
+                "kathak for kids beginners"
             ],
             "has_full_kb": true,
             "kb_file": "data/courses/kathak.json",
             "gst_percentage": 18,
-            "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire."
+            "description": "Traditional Kathak dance training from foundational footwork (Tatkar) to certified repertoire for both kids and adults."
         },
         {
             "id": "kids_bollywood_dance",
@@ -65,21 +74,6 @@
             "has_full_kb": false,
             "gst_percentage": 18,
             "description": "Graceful blend of Indian classical dance movements with contemporary and Bollywood expressions."
-        },
-        {
-            "id": "kids_kathak",
-            "name": "Kids Kathak",
-            "aliases": [
-                "kids kathak",
-                "kathak for kids",
-                "children kathak",
-                "junior kathak",
-                "bachon ka kathak",
-                "kids classical dance"
-            ],
-            "has_full_kb": false,
-            "gst_percentage": 18,
-            "description": "Foundational Kathak training crafted for children, covering postures, footwork, and rhythm."
         },
         {
             "id": "wedding_dance",

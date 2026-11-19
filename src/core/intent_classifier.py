@@ -386,6 +386,65 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
 }"""
 
 
+EXTRACTOR_SYSTEM_PROMPT_COMPACT = """You are a silent semantic state extractor for a WhatsApp course counsellor.
+Analyze the latest customer message together with the supplied session context and transcript.
+Return ONLY one valid JSON object. Never write a customer-facing reply. Never invent catalog values.
+
+Rules:
+- Use the exact canonical course, timing, teacher, day, and package values supplied in context.
+- A broad period such as morning/evening is not an exact timing. Keep selected_timing null and set requested_timing_period.
+- A bare hour is ambiguous when both AM and PM exist. Keep selected_timing null and set timing_ambiguous.
+- An unavailable timing, teacher, package, or course stays null and sets unoffered_type and unoffered_value.
+- Informational questions are not selections. Casual acknowledgements are OTHER.
+- A future start date is purchase intent, not disinterest.
+- STOP_MESSAGING, COMPLAINT, AGENT_REQUEST, PHONE_CALL_REQUEST, PAYMENT_CLAIM, and PAYMENT_REQUEST must be distinguished carefully.
+- PAYMENT_REQUEST means asking how to pay or asking for QR/link. PAYMENT_CLAIM means saying payment was already completed.
+- Demo-video requests are not tutorial-video requests. App and trial guide requests are separate from teacher demos.
+- Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
+- Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
+
+Return exactly this schema, using null for unknown strings and false for unknown booleans:
+{
+  "app_installed_stated": "confirmed" | "denied" | "unmentioned",
+  "profile_created_stated": "confirmed" | "denied" | "unmentioned",
+  "selected_timing": string | null,
+  "requested_start_24h": string | null,
+  "requested_end_24h": string | null,
+  "requested_timing_period": string | null,
+  "timing_period": string | null,
+  "selected_teacher": string | null,
+  "selected_days": string | null,
+  "selected_package": string | null,
+  "selected_course": string | null,
+  "wants_trial": boolean,
+  "wants_demo_video": boolean,
+  "wants_app_link": boolean,
+  "requests_qr": boolean,
+  "requests_human_agent": boolean,
+  "wants_phone_call": boolean,
+  "is_coupon_requested": boolean,
+  "is_disinterested": boolean,
+  "is_complaint_or_refund": boolean,
+  "is_out_of_scope": boolean,
+  "customer_intent": string,
+  "question_summary": string | null,
+  "detected_language": string,
+  "explicit_language_request": string | null,
+  "wants_resend_video": boolean,
+  "claims_payment_or_enrollment": boolean,
+  "cannot_access_classes": boolean,
+  "preferred_start_date": string | null,
+  "wants_stop_messaging": boolean,
+  "timing_ambiguous": boolean,
+  "wants_app_guide": boolean,
+  "wants_trial_guide": boolean,
+  "unoffered_type": "TIMING" | "PACKAGE" | "TEACHER" | "COURSE" | null,
+  "unoffered_value": string | null,
+  "unoffered_timing_mentioned": string | null,
+  "conversation_summary": string | null
+}"""
+
+
 async def extract_intent_and_state_changes(
     text: str,
     state: Optional[Dict[str, Any]] = None,
@@ -467,8 +526,16 @@ async def extract_intent_and_state_changes(
 
     try:
         llm = _get_classifier_llm()
+        compact_prompt_enabled = os.getenv("PROMPT_OPTIMIZATION_V2", "false").lower() in {
+            "1", "true", "yes", "on"
+        }
+        extractor_prompt = (
+            EXTRACTOR_SYSTEM_PROMPT_COMPACT
+            if compact_prompt_enabled
+            else EXTRACTOR_SYSTEM_PROMPT
+        )
         response = await llm.ainvoke([
-            SystemMessage(content=EXTRACTOR_SYSTEM_PROMPT),
+            SystemMessage(content=extractor_prompt),
             HumanMessage(content=context_prompt),
         ])
         raw = response.content.strip().strip("`").replace("json\n", "").strip()

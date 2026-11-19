@@ -1457,10 +1457,12 @@ async def dispatch_class_demo_video_async(
     state: dict,
     video_url: str,
     caption: str = "",
-    force_resend: bool = False,
+    force_resend: bool = True,
 ) -> bool:
     """Send a course live-class MP4 natively, with a text fallback on failure."""
-    if not video_url or (state.get("class_demo_video_sent") and not force_resend):
+    if not video_url:
+        return False
+    if state.get("class_demo_video_sent") and not force_resend:
         return False
 
     from src.services.interakt import send_video_message_async
@@ -1933,16 +1935,9 @@ async def _handle_conversation_turn_unlocked(
     course_overview_active = course_data_active.get("course_overview") or {}
     class_demo_video_url = course_overview_active.get("class_raw_video_url")
     active_course_title = course_overview_active.get("name") or str(active_cid or "").replace("_", " ").title() or "Live class"
-    is_resend_kw = any(w in text_clean.lower() for w in [
-        "again", "resend", "dobara", "phir se", "fir se", "nahi aayi", "nahi aaya",
-        "not received", "didn't get", "send video", "send videos", "class video", "practice video"
-    ])
-    demo_force_resend = bool(last_turn.get("wants_resend_video") or is_resend_kw)
-    send_native_demo_video = bool(
-        explicit_demo_request
-        and class_demo_video_url
-        and (demo_force_resend or not new_state.get("class_demo_video_sent"))
-    )
+    # When the customer explicitly asks to see/send the class or demo video, ALWAYS send it!
+    # Never let a past 'class_demo_video_sent' flag suppress an explicit user request.
+    send_native_demo_video = bool(explicit_demo_request and class_demo_video_url)
     wants_resend = bool(last_turn.get("wants_resend_video", False) or is_video_guide_request)
 
     user_wants_app_guide = bool(

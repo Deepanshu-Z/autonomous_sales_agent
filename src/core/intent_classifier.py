@@ -611,7 +611,8 @@ async def extract_intent_and_state_changes(
         if is_preview_inquiry:
             clean["wants_demo"] = True
             clean["wants_demo_video"] = True
-            clean["wants_resend_video"] = False
+            is_resend_kw = any(w in text_lower for w in ["again", "resend", "dobara", "phir se", "fir se", "nahi aayi", "nahi aaya", "not received", "didn't get"])
+            clean["wants_resend_video"] = bool(clean.get("wants_resend_video") or is_resend_kw)
             clean["wants_app_guide"] = False
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False

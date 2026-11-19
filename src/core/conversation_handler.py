@@ -1464,11 +1464,13 @@ async def dispatch_class_demo_video_async(
         return False
 
     from src.services.interakt import send_video_message_async
+    from src.state.chat_history import save_message_async
 
     delivered = await send_video_message_async(phone, video_url, caption=caption)
     if delivered:
         state["class_demo_video_sent"] = True
         print(f"[conversation_handler] Native class demo video sent for {phone}")
+        asyncio.create_task(save_message_async(phone, "assistant", f"[VIDEO] {video_url}"))
         return True
 
     # Keep the customer's access to the video if the media provider rejects the MP4.
@@ -1483,6 +1485,7 @@ async def dispatch_class_demo_video_async(
     )
     if fallback_sent:
         state["class_demo_video_sent"] = True
+        asyncio.create_task(save_message_async(phone, "assistant", fallback))
     print(f"[conversation_handler] Native class demo video failed for {phone}; text fallback sent={fallback_sent}")
     return False
 
@@ -1930,7 +1933,11 @@ async def _handle_conversation_turn_unlocked(
     course_overview_active = course_data_active.get("course_overview") or {}
     class_demo_video_url = course_overview_active.get("class_raw_video_url")
     active_course_title = course_overview_active.get("name") or str(active_cid or "").replace("_", " ").title() or "Live class"
-    demo_force_resend = bool(last_turn.get("wants_resend_video"))
+    is_resend_kw = any(w in text_clean.lower() for w in [
+        "again", "resend", "dobara", "phir se", "fir se", "nahi aayi", "nahi aaya",
+        "not received", "didn't get", "send video", "send videos", "class video", "practice video"
+    ])
+    demo_force_resend = bool(last_turn.get("wants_resend_video") or is_resend_kw)
     send_native_demo_video = bool(
         explicit_demo_request
         and class_demo_video_url
@@ -2152,7 +2159,7 @@ async def _handle_conversation_turn_unlocked(
             new_state,
             class_demo_video_url,
             caption=f"🎬 {active_course_title} live class practice video",
-            force_resend=demo_force_resend,
+            force_resend=True,
         )
 
     # Dispatch media guide alongside Message 1 if applicable

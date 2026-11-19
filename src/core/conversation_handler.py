@@ -878,14 +878,30 @@ def _ensure_app_website_links(
     return text
 
 
-def _remove_native_media_url_lines(text: str, media_urls: list[str]) -> str:
-    """Remove lines for media that will be delivered as native attachments."""
-    urls = [str(url).strip() for url in media_urls if str(url).strip()]
-    if not text or not urls:
+def _remove_native_media_url_lines(text: str, media_urls: Optional[list[str]] = None) -> str:
+    """Remove raw media URLs (Cloudinary / MP4 files) from text delivered as native attachments."""
+    if not text:
         return text
+    urls = [str(url).strip() for url in (media_urls or []) if str(url).strip()]
 
-    lines = [line for line in text.splitlines() if not any(url in line for url in urls)]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    lines = []
+    for line in text.splitlines():
+        has_media_url = any(u in line for u in urls) or ("res.cloudinary.com" in line and ".mp4" in line)
+        if has_media_url:
+            for u in urls:
+                pattern = rf"(?:(?:here|yahan|watch)?\s*[:\-–]?\s*)?{re.escape(u)}[.,]?"
+                line = re.sub(pattern, "", line, flags=re.IGNORECASE)
+            cloudinary_pattern = r"(?:(?:here|yahan|watch)?\s*[:\-–]?\s*)?https?://res\.cloudinary\.com/[^\s)]+\.mp4[.,]?"
+            line = re.sub(cloudinary_pattern, "", line, flags=re.IGNORECASE)
+
+            cleaned_line = line.strip()
+            if re.match(r"^[\s•\-*]*(?:live\s+class\s+(?:practice\s+)?video)?[\s:\-–]*$", cleaned_line, re.IGNORECASE):
+                continue
+        lines.append(line)
+
+    text = "\n".join(lines)
+    text = re.sub(r"[ \t]+", " ", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 _APP_ACCESS_STAGES = frozenset({
@@ -2078,10 +2094,10 @@ async def _handle_conversation_turn_unlocked(
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=allow_video_links)
 
     # The raw class video is delivered as a native attachment below. Keep only
-    # instructor YouTube/demo links in the text reply.
-    if send_native_demo_video:
-        clean_reply = _remove_native_media_url_lines(clean_reply, [class_demo_video_url])
-        clean_followup = _remove_native_media_url_lines(clean_followup, [class_demo_video_url])
+    # instructor YouTube/demo links in the text reply; strip raw Cloudinary / MP4 URLs.
+    clean_reply = _remove_native_media_url_lines(clean_reply, [class_demo_video_url] if class_demo_video_url else None)
+    if clean_followup:
+        clean_followup = _remove_native_media_url_lines(clean_followup, [class_demo_video_url] if class_demo_video_url else None)
 
     # Strict Zero Follow-up on Payment Claim (only for unverified/unpaid users)
     # Note: Asking how to pay, requesting QR code, or choosing to pay online is PAYMENT_REQUEST, NOT a claim of having already paid.

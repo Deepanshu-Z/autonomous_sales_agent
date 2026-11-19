@@ -290,7 +290,11 @@ def format_demo_videos_display(course_id: Optional[str] = None) -> str:
     # Check for official live class session recording
     class_video = data.get("course_overview", {}).get("class_raw_video_url")
     if class_video:
-        lines.append(f"• Live Class Practice Video: {class_video}")
+        lines.append(
+            "• Live Class Practice Video: AVAILABLE (Delivered natively as a playable video file in WhatsApp chat. "
+            "DO NOT print any raw cloudinary.com or .mp4 URL in your text message! "
+            "Simply state that you have sent the live class practice video above)."
+        )
 
     # Check for instructor demo videos
     demos = dict(data.get("trial_class", {}).get("demo_videos") or {})

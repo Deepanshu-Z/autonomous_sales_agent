@@ -599,13 +599,14 @@ async def extract_intent_and_state_changes(
 
         # Class preview and instructor demo inquiries must never trigger tutorial guides or trial requests
         text_lower = text.lower()
+        is_missed_class_inquiry = any(w in text_lower for w in ["missed", "miss ho", "chhoot", "backup"])
         is_preview_inquiry = bool(
             clean.get("wants_demo_video")
             or any(w in text_lower for w in [
                 "demo", "sample", "preview", "teaching style", "want to see", "i want to see",
-                "video", "videos", "dekhna", "dikhao", "kaisa hota hai", "kaisa sikhate",
-                "class recording", "dance class video"
+                "dekhna", "dikhao", "kaisa hota hai", "kaisa sikhate", "dance class video"
             ])
+            or (any(w in text_lower for w in ["video", "videos", "class recording"]) and not is_missed_class_inquiry)
         )
         if is_preview_inquiry:
             clean["wants_demo"] = True

@@ -2056,14 +2056,22 @@ async def _handle_conversation_turn_unlocked(
         or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
         or last_turn.get("wants_trial")
     )
-    if not is_trial_unlocked and clean_followup:
-        if re.search(r"\b(trial\s*(?:class|book|enrollment)?|फ्री\s*ट्रायल)\b", clean_followup, re.IGNORECASE):
+    if not is_trial_unlocked:
+        if clean_followup and re.search(r"\b(trial|trials|ट्रायल)\b", clean_followup, re.IGNORECASE):
             logger.warning(f"[guardrails] Proactive trial followup intercepted and replaced: {clean_followup}")
             is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
             if is_eng:
                 clean_followup = "Which batch timing suits your daily routine best — morning or evening? 😊"
             else:
                 clean_followup = "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+
+        if clean_reply and re.search(r"\b(trial|trials|ट्रायल)\b", clean_reply, re.IGNORECASE):
+            clean_reply = re.sub(
+                r"(?:kya\s+aap\s+trial\s+class\s+book\s+karna\s+chahenge\??|aapko\s+trial\s+class\s+book\s+karne\s+ke\s+liye\s+sensationz\s+app\s+ka\s+istemal\s+karna\s+hoga[.?]?|would\s+you\s+like\s+to\s+book\s+a\s+free\s+trial\??)[^.\n]*[.?]?",
+                "",
+                clean_reply,
+                flags=re.IGNORECASE
+            ).strip()
     clean_reply, clean_followup = _sanitize_out_of_scope_guardrails(
         reply=clean_reply,
         followup=clean_followup,

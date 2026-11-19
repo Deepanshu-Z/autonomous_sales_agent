@@ -216,6 +216,23 @@ def send_text_message(phone: str, message: str):
         return None
 
 
+def _ensure_whatsapp_compatible_video_url(url: str) -> str:
+    """
+    Guarantees raw video URLs stay strictly under Meta's 16MB WhatsApp file limit (Error 131053).
+    For Cloudinary video URLs, dynamically injects 720p / auto compression / H.264 transcoding
+    if not already transformed.
+    """
+    if not url or "res.cloudinary.com" not in url:
+        return url
+    if any(param in url for param in ["q_auto", "vc_h264", "w_"]):
+        return url
+    if "/video/upload/" in url:
+        return url.replace("/video/upload/", "/video/upload/w_720,q_auto:eco,vc_h264/")
+    if "/upload/" in url:
+        return url.replace("/upload/", "/upload/w_720,q_auto:eco,vc_h264/")
+    return url
+
+
 async def send_video_message_async(phone: str, video_url: str, caption: str = "") -> bool:
     """
     Sends a native playable video file (MP4) to WhatsApp via Interakt or to Meta DMs via Graph API.
@@ -223,6 +240,7 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
     """
     if not video_url:
         return False
+    video_url = _ensure_whatsapp_compatible_video_url(video_url)
     clean_phone = str(phone or "").strip()
     if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
         from src.services.meta_client import send_media_message_async

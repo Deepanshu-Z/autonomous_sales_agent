@@ -878,6 +878,16 @@ def _ensure_app_website_links(
     return text
 
 
+def _remove_native_media_url_lines(text: str, media_urls: list[str]) -> str:
+    """Remove lines for media that will be delivered as native attachments."""
+    urls = [str(url).strip() for url in media_urls if str(url).strip()]
+    if not text or not urls:
+        return text
+
+    lines = [line for line in text.splitlines() if not any(url in line for url in urls)]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 _APP_ACCESS_STAGES = frozenset({
     "PAYMENT_CONFIRMED",
     "READY_FOR_APP_LINK",
@@ -1426,6 +1436,41 @@ async def dispatch_media_guide_async(
     return False
 
 
+async def dispatch_class_demo_video_async(
+    phone: str,
+    state: dict,
+    video_url: str,
+    caption: str = "",
+    force_resend: bool = False,
+) -> bool:
+    """Send a course live-class MP4 natively, with a text fallback on failure."""
+    if not video_url or (state.get("class_demo_video_sent") and not force_resend):
+        return False
+
+    from src.services.interakt import send_video_message_async
+
+    delivered = await send_video_message_async(phone, video_url, caption=caption)
+    if delivered:
+        state["class_demo_video_sent"] = True
+        print(f"[conversation_handler] Native class demo video sent for {phone}")
+        return True
+
+    # Keep the customer's access to the video if the media provider rejects the MP4.
+    fallback = f"{caption}\n{video_url}" if caption else f"🎬 Live class practice video:\n{video_url}"
+    fallback_result = await send_text_message_async(phone, fallback)
+    fallback_sent = (
+        isinstance(fallback_result, dict)
+        and "error" not in fallback_result
+    ) or (
+        fallback_result is not None
+        and getattr(fallback_result, "status_code", 500) < 300
+    )
+    if fallback_sent:
+        state["class_demo_video_sent"] = True
+    print(f"[conversation_handler] Native class demo video failed for {phone}; text fallback sent={fallback_sent}")
+    return False
+
+
 async def dispatch_payment_qr_async(
     phone: str,
     state: dict,
@@ -1857,9 +1902,23 @@ async def _handle_conversation_turn_unlocked(
             and not is_video_guide_request
         )
     )
+    # Only an explicit demo request should trigger native class-video delivery.
+    # This avoids sending a video merely because the generated reply mentions one.
+    explicit_demo_request = bool(
+        last_turn.get("wants_demo")
+        or last_turn.get("wants_demo_video")
+    )
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
     course_data_active = kb_loader.get_course_data(active_cid)
+    course_overview_active = course_data_active.get("course_overview") or {}
+    class_demo_video_url = course_overview_active.get("class_raw_video_url")
+    demo_force_resend = bool(last_turn.get("wants_resend_video"))
+    send_native_demo_video = bool(
+        explicit_demo_request
+        and class_demo_video_url
+        and (demo_force_resend or not new_state.get("class_demo_video_sent"))
+    )
     wants_resend = bool(last_turn.get("wants_resend_video", False) or is_video_guide_request)
 
     user_wants_app_guide = bool(
@@ -2017,6 +2076,12 @@ async def _handle_conversation_turn_unlocked(
         clean_followup = _format_for_whatsapp(clean_followup)
         clean_followup = _ensure_app_website_links(clean_followup, user_asked_for_links=False, allow_demo_links=allow_video_links)
 
+    # The raw class video is delivered as a native attachment below. Keep only
+    # instructor YouTube/demo links in the text reply.
+    if send_native_demo_video:
+        clean_reply = _remove_native_media_url_lines(clean_reply, [class_demo_video_url])
+        clean_followup = _remove_native_media_url_lines(clean_followup, [class_demo_video_url])
+
     # Strict Zero Follow-up on Payment Claim (only for unverified/unpaid users)
     # Note: Asking how to pay, requesting QR code, or choosing to pay online is PAYMENT_REQUEST, NOT a claim of having already paid.
     is_asking_to_pay = bool(
@@ -2055,6 +2120,15 @@ async def _handle_conversation_turn_unlocked(
         latency_sec = round(time.time() - start_time, 2)
         await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
         asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+
+    if send_native_demo_video:
+        await dispatch_class_demo_video_async(
+            phone,
+            new_state,
+            class_demo_video_url,
+            caption=f"🎬 {active_title} live class practice video",
+            force_resend=demo_force_resend,
+        )
 
     # Dispatch media guide alongside Message 1 if applicable
     if will_send_trial_video:

@@ -1913,6 +1913,7 @@ async def _handle_conversation_turn_unlocked(
     course_data_active = kb_loader.get_course_data(active_cid)
     course_overview_active = course_data_active.get("course_overview") or {}
     class_demo_video_url = course_overview_active.get("class_raw_video_url")
+    active_course_title = course_overview_active.get("name") or str(active_cid or "").replace("_", " ").title() or "Live class"
     demo_force_resend = bool(last_turn.get("wants_resend_video"))
     send_native_demo_video = bool(
         explicit_demo_request
@@ -2126,7 +2127,7 @@ async def _handle_conversation_turn_unlocked(
             phone,
             new_state,
             class_demo_video_url,
-            caption=f"🎬 {active_title} live class practice video",
+            caption=f"🎬 {active_course_title} live class practice video",
             force_resend=demo_force_resend,
         )
 

@@ -1846,13 +1846,16 @@ async def _handle_conversation_turn_unlocked(
                 break
 
     user_asked_demo = bool(
-        (
-            last_turn.get("wants_demo")
-            or "demo" in (last_turn.get("question_summary") or "").lower()
-            or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
-            or any(w in main_reply.lower() for w in ("demo video", "teaching style", "sample video", "instructor video"))
+        last_turn.get("wants_demo")
+        or last_turn.get("wants_demo_video")
+        or (
+            (
+                "demo" in (last_turn.get("question_summary") or "").lower()
+                or any(d in main_reply.lower() for d in ("youtube.com", "youtu.be", "instagram.com"))
+                or any(w in main_reply.lower() for w in ("demo video", "teaching style", "sample video", "instructor video"))
+            )
+            and not is_video_guide_request
         )
-        and not is_video_guide_request
     )
     # Dynamic Media Configuration for Trial and App Download/Install
     active_cid = active_course or state.get("course") or ""
@@ -1971,6 +1974,21 @@ async def _handle_conversation_turn_unlocked(
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(
         clean_reply, followup_msg, language=new_state.get("language"), state=new_state
     )
+    # Layer 2 Guard: Sanitize proactive trial pushes in followup when trial mode is LOCKED
+    is_trial_unlocked = bool(
+        new_state.get("wants_trial")
+        or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
+        or last_turn.get("wants_trial")
+    )
+    if not is_trial_unlocked and clean_followup:
+        import re
+        if re.search(r"\b(trial\s*(?:class|book|enrollment)?|फ्री\s*ट्रायल)\b", clean_followup, re.IGNORECASE):
+            logger.warning(f"[guardrails] Proactive trial followup intercepted and replaced: {clean_followup}")
+            is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
+            if is_eng:
+                clean_followup = "Which batch timing suits your daily routine best — morning or evening? 😊"
+            else:
+                clean_followup = "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
     clean_reply, clean_followup = _sanitize_out_of_scope_guardrails(
         reply=clean_reply,
         followup=clean_followup,

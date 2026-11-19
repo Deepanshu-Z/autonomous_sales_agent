@@ -215,10 +215,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
      • Set unoffered_type to "COURSE", set unoffered_value to the requested course name, and set customer_intent to "QUESTION".
 
 8. "wants_trial":
-   - boolean: true if customer asks for demo class, trial class, free trial, or wanting to try a live class before enrolling.
+   - boolean: true ONLY if customer explicitly asks for a free trial or demo class (e.g. "free trial chahiye", "can I get a trial session", "trial class attend karni hai", "trial book karna hai").
+   - STRICT NEGATIVE GUARD: Asking to SEE a class, see a video, preview teaching style, or asking "I want to see", "video dikhao", "class video", "plz see", "sample dikhao", "video bhejo" is NEVER a trial request! Set "wants_trial" = false and set "wants_demo_video" = true!
 
 8a. "wants_demo_video":
-   - boolean: true if customer asks to see an instructor demo, dance/yoga sample video, teacher performance preview, or wants to see how a teacher teaches before enrolling (e.g. "demo video", "madhuri mam video dikhao", "dance video", "sample video", "teacher preview", "demo dikhao", "teaching video"). Otherwise false.
+   - boolean: true if customer asks to see a class video, live class recording, instructor demo, sample preview, or simply wants to see how classes are taught before enrolling (e.g. "I want to see", "want to see", "videos of dance class", "send video", "class video", "dekhna hai", "kaisa hota hai", "demo video", "sample video", "teacher preview", "demo dikhao", "teaching video", "video bhejo", "plz send video", "preview").
+   - When true, set customer_intent = "QUESTION" and set question_summary = "Request to see class/instructor preview video".
 
 8b. "wants_app_link":
    - boolean: true if customer asks to receive or resend the app download link or website link, OR chooses/taps an app store platform button (e.g. "android app", "ios app", "app link", "download link", "play store", "app store", "send link", "link bhejo", "link do", "konsi app", "which app"). Otherwise false.
@@ -595,14 +597,26 @@ async def extract_intent_and_state_changes(
         elif clean.get("wants_app_link") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
             clean["customer_intent"] = "APP_LINK_REQUEST"
 
-        # Teacher demo inquiries must never trigger tutorial or install video guides
-        if clean.get("wants_demo_video") or any(w in text.lower() for w in ["demo", "sample", "preview", "teaching style"]):
+        # Class preview and instructor demo inquiries must never trigger tutorial guides or trial requests
+        text_lower = text.lower()
+        is_preview_inquiry = bool(
+            clean.get("wants_demo_video")
+            or any(w in text_lower for w in [
+                "demo", "sample", "preview", "teaching style", "want to see", "i want to see",
+                "video", "videos", "dekhna", "dikhao", "kaisa hota hai", "kaisa sikhate",
+                "class recording", "dance class video"
+            ])
+        )
+        if is_preview_inquiry:
             clean["wants_demo"] = True
+            clean["wants_demo_video"] = True
             clean["wants_resend_video"] = False
             clean["wants_app_guide"] = False
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False
             clean["wants_trial_video_guide"] = False
+            # Asking to see videos/previews must never unlock trial mode
+            clean["wants_trial"] = False
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
         is_timing_settled = bool(

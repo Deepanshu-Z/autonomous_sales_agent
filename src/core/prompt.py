@@ -241,10 +241,14 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
       * Message #1: Politely explain that a recorded demo video is currently not available for that instructor, but you can share demo videos of other instructors who do have recorded previews, or they can attend live teaching via a trial class on the app.
       * Message #2 (followup): Ask if they would like to explore demo videos of other instructors, or proceed with selecting a package duration (e.g. "Would you like to explore demo videos of our other instructors, or select a package to get started? 😊").
       * CRITICAL ANTI-PUSHINESS GUARD: NEVER jump immediately to package duration ("Which package duration would you like to start with — 1 Month or 3 Months?") right after telling a customer their instructor has no demo video! If a customer asked for a demo video, they want to verify teaching quality first before committing to a paid package!
+  • WHEN PREVIEW / DEMO VIDEOS ARE AVAILABLE for the active course (listed in ACTIVE COURSE INSTRUCTOR DEMO VIDEOS in session context):
+    - Share the official Live Class Practice Video or instructor demo link directly in Message #1! Do NOT withhold links.
+    - In Message #2 (followup), steer directly toward batch timing preference (e.g. "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊").
+    - NEVER proactively offer free trial classes when sharing videos!
   • WHEN DEMO VIDEOS ARE NOT AVAILABLE for the active course:
-    - If no demo video links exist for the active course in ACTIVE COURSE INSTRUCTOR DEMO VIDEOS, inform the customer that recorded demo videos are currently not available for this course.
-    - Inform them that they can book and attend up to 3 free live interactive trial classes directly on the Sensationz App to experience their teaching style firsthand.
-    - NEVER invent demo video links or borrow teachers from other courses!
+    - If no demo video links exist for the active course in ACTIVE COURSE INSTRUCTOR DEMO VIDEOS, warmly inform the customer that live interactive classes are conducted Monday to Friday with certified faculty.
+    - In Message #2 (followup), ask which batch timing (Morning or Evening) suits their routine best to get started.
+    - STRICT PROACTIVE TRIAL BAN: You are STRICTLY FORBIDDEN from offering or suggesting free trial classes here!
 
 ════════════════════════════════════════
 0d. STRICT ENROLLMENT, TRIAL & PAYMENT NON-CONFIRMATION GUARDRAILS (CRITICAL & NON-NEGOTIABLE)
@@ -645,6 +649,12 @@ def format_system_prompt(
         or s.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
         or (s.get("_last_turn") or {}).get("wants_trial")
     )
+    if not is_trial_path:
+        state_context += (
+            "- ⛔ TRIAL MODE: LOCKED (Customer has NOT explicitly demanded a free trial class. "
+            "Under NO circumstances mention 'trial class', 'free trial', '3 free trials', or ask 'Kya aap trial class book karna chahenge?'. "
+            "Keep the conversation strictly focused on the enrollment funnel: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.)\n"
+        )
 
     # ── Deterministic Slot State Engine (Order-Independent & Centralized) ──
     from src.core.helpers.slot_engine import evaluate_enrollment_slots

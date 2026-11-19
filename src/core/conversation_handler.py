@@ -1981,7 +1981,6 @@ async def _handle_conversation_turn_unlocked(
         or last_turn.get("wants_trial")
     )
     if not is_trial_unlocked and clean_followup:
-        import re
         if re.search(r"\b(trial\s*(?:class|book|enrollment)?|फ्री\s*ट्रायल)\b", clean_followup, re.IGNORECASE):
             logger.warning(f"[guardrails] Proactive trial followup intercepted and replaced: {clean_followup}")
             is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())

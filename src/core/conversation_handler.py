@@ -2066,6 +2066,51 @@ async def _handle_conversation_turn_unlocked(
     clean_reply, clean_followup = _sanitize_confirmation_guardrails(
         clean_reply, followup_msg, language=new_state.get("language"), state=new_state
     )
+
+    # Rule B: Post-Demo-Video Follow-up & Strict Trial Lockdown
+    # When a demo video is shared, strictly enforce that Message #2 asks for the package duration
+    # (or batch timing if missing), and never offers a trial.
+    clean_reply_lower = (clean_reply or "").lower()
+    is_demo_video_shared = bool(
+        send_native_demo_video
+        or explicit_demo_request
+        or user_asked_demo
+        or any(d in clean_reply_lower for d in ("youtube.com", "youtu.be", "instagram.com"))
+        or any(w in clean_reply_lower for w in (
+            "demo video", "practice video", "sample video", "upar send kar diya", "teaching style"
+        ))
+    )
+    if is_demo_video_shared:
+        new_state["wants_trial"] = False
+        last_turn["wants_trial"] = False
+        if new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]:
+            new_state["stage"] = "TIMING_SELECTED" if (new_state.get("timing") or new_state.get("selected_timing")) else "COURSE_CONFIRMED"
+
+        # Never offer a trial in reply when demo video is shared
+        if clean_reply and re.search(r"\b(trial|trials|ट्रायल)\b", clean_reply, re.IGNORECASE):
+            clean_reply = re.sub(
+                r"(?:kya\s+aap\s+trial\s+class\s+book\s+karna\s+chahenge\??|aapko\s+trial\s+class\s+book\s+karne\s+ke\s+liye\s+sensationz\s+app\s+ka\s+istemal\s+karna\s+hoga[.?]?|would\s+you\s+like\s+to\s+book\s+a\s+free\s+trial\??)[^.\n]*[.?]?",
+                "",
+                clean_reply,
+                flags=re.IGNORECASE
+            ).strip()
+
+        # Enforce Message #2 follow-up asking for package duration (or batch timing if missing)
+        is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
+        has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
+        if has_timing:
+            clean_followup = (
+                "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
+                if is_eng else
+                "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
+            )
+        else:
+            clean_followup = (
+                "Which batch timing suits your daily routine best — morning or evening? 😊"
+                if is_eng else
+                "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+            )
+
     # Layer 2 Guard: Sanitize proactive trial pushes in followup when trial mode is LOCKED
     is_trial_unlocked = bool(
         new_state.get("wants_trial")
@@ -2076,10 +2121,19 @@ async def _handle_conversation_turn_unlocked(
         if clean_followup and re.search(r"\b(trial|trials|ट्रायल)\b", clean_followup, re.IGNORECASE):
             logger.warning(f"[guardrails] Proactive trial followup intercepted and replaced: {clean_followup}")
             is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
-            if is_eng:
-                clean_followup = "Which batch timing suits your daily routine best — morning or evening? 😊"
+            has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
+            if has_timing:
+                clean_followup = (
+                    "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
+                    if is_eng else
+                    "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
+                )
             else:
-                clean_followup = "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+                clean_followup = (
+                    "Which batch timing suits your daily routine best — morning or evening? 😊"
+                    if is_eng else
+                    "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+                )
 
         if clean_reply and re.search(r"\b(trial|trials|ट्रायल)\b", clean_reply, re.IGNORECASE):
             clean_reply = re.sub(
@@ -2098,6 +2152,23 @@ async def _handle_conversation_turn_unlocked(
     clean_reply, clean_followup = _sanitize_state_grounded_replies(
         clean_reply, clean_followup, state=new_state, last_turn=last_turn, active_cid=active_cid
     )
+
+    # Rule B downstream guarantee: ensure clean_followup is strictly preserved after demo video delivery
+    if is_demo_video_shared:
+        has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
+        is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
+        if has_timing:
+            clean_followup = (
+                "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
+                if is_eng else
+                "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
+            )
+        else:
+            clean_followup = (
+                "Which batch timing suits your daily routine best — morning or evening? 😊"
+                if is_eng else
+                "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
+            )
     allow_video_links = bool(user_asked_demo or will_send_trial_video or will_send_install_video or is_video_guide_request)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=allow_video_links)
 

@@ -215,11 +215,11 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
      • Set unoffered_type to "COURSE", set unoffered_value to the requested course name, and set customer_intent to "QUESTION".
 
 8. "wants_trial":
-   - boolean: true ONLY if customer explicitly asks for a free trial or demo class (e.g. "free trial chahiye", "can I get a trial session", "trial class attend karni hai", "trial book karna hai").
-   - STRICT NEGATIVE GUARD: Asking to SEE a class, see a video, preview teaching style, or asking "I want to see", "video dikhao", "class video", "plz see", "sample dikhao", "video bhejo" is NEVER a trial request! Set "wants_trial" = false and set "wants_demo_video" = true!
+   - boolean: true ONLY if customer explicitly demands an interactive live trial class session (e.g. "free trial chahiye", "can I get a trial session", "trial class attend karni hai", "trial book karna hai").
+   - STRICT DEMO-VIDEO PREVIEW RULE (RULE A): Asking for "demo class", "demo chahiye", "sample video", "sample class", "give demo", "pls give demo", "1 demo", or asking to SEE a class/video/preview/teaching style is NEVER a trial request! You MUST set "wants_trial" = false and set "wants_demo_video" = true!
 
 8a. "wants_demo_video":
-   - boolean: true if customer asks to see a class video, live class recording, instructor demo, sample preview, or simply wants to see how classes are taught before enrolling (e.g. "I want to see", "want to see", "videos of dance class", "send video", "class video", "dekhna hai", "kaisa hota hai", "demo video", "sample video", "teacher preview", "demo dikhao", "teaching video", "video bhejo", "plz send video", "preview").
+   - boolean: true if customer asks for "demo class", "demo chahiye", "sample video", "sample class", asks to see a class video, live class recording, instructor demo, sample preview, or simply wants to see how classes are taught before enrolling (e.g. "demo class", "demo chahiye", "sample video", "sample class", "pls give demo class", "I want to see", "want to see", "videos of dance class", "send video", "class video", "dekhna hai", "kaisa hota hai", "demo video", "teacher preview", "demo dikhao", "teaching video", "video bhejo", "plz send video", "preview").
    - When true, set customer_intent = "QUESTION" and set question_summary = "Request to see class/instructor preview video".
 
 8b. "wants_app_link":
@@ -597,15 +597,17 @@ async def extract_intent_and_state_changes(
         elif clean.get("wants_app_link") and clean.get("customer_intent") not in ("DISINTEREST", "COMPLAINT", "AGENT_REQUEST", "PHONE_CALL_REQUEST"):
             clean["customer_intent"] = "APP_LINK_REQUEST"
 
-        # Class preview and instructor demo inquiries must never trigger tutorial guides or trial requests
+        # Class preview and instructor demo inquiries must never trigger tutorial guides or trial requests (Rule A)
         text_lower = text.lower()
         is_missed_class_inquiry = any(w in text_lower for w in ["missed", "miss ho", "chhoot", "backup"])
+        demo_kws = [
+            "demo class", "demo chahiye", "sample video", "sample class", "give demo", "pls give demo",
+            "give me demo", "ek demo", "1 demo", "demo", "sample", "preview", "teaching style",
+            "want to see", "i want to see", "dekhna", "dikhao", "kaisa hota hai", "kaisa sikhate", "dance class video"
+        ]
         is_preview_inquiry = bool(
             clean.get("wants_demo_video")
-            or any(w in text_lower for w in [
-                "demo", "sample", "preview", "teaching style", "want to see", "i want to see",
-                "dekhna", "dikhao", "kaisa hota hai", "kaisa sikhate", "dance class video"
-            ])
+            or any(w in text_lower for w in demo_kws)
             or (any(w in text_lower for w in ["video", "videos", "class recording"]) and not is_missed_class_inquiry)
         )
         if is_preview_inquiry:
@@ -617,7 +619,7 @@ async def extract_intent_and_state_changes(
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False
             clean["wants_trial_video_guide"] = False
-            # Asking to see videos/previews must never unlock trial mode
+            # Rule A: Asking for "demo class", "demo chahiye", "sample video" strictly sets wants_trial = False
             clean["wants_trial"] = False
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
@@ -1663,6 +1665,8 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     if flags.get("wants_trial"):
         new_state["wants_trial"] = True
+    elif flags.get("wants_demo_video") or flags.get("wants_demo"):
+        new_state["wants_trial"] = False
 
     if flags.get("claims_payment_or_enrollment"):
         new_state["claims_payment"] = True

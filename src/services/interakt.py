@@ -43,6 +43,11 @@ def _split_phone(phone_with_country_code: str):
         return "+91", clean_phone
     if len(clean_phone) == 12 and clean_phone.startswith("91"):
         return "+91", clean_phone[2:]
+    for cc3 in ("966", "971", "974", "965", "968", "973", "256", "353", "358"):
+        if clean_phone.startswith(cc3) and len(clean_phone) > len(cc3):
+            return "+" + cc3, clean_phone[len(cc3):]
+    if clean_phone.startswith("1") and len(clean_phone) == 11:
+        return "+1", clean_phone[1:]
     country_code = "+" + clean_phone[:2]
     number = clean_phone[2:]
     return country_code, number

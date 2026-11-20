@@ -859,15 +859,33 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     # Check escalation
     if await is_escalated_async(phone):
-        print(f"[3] 👤 ACTION   : {phone} -> Already escalated to agent (AI staying out)")
-        print("="*80 + "\n")
-        log_lead_action(
-            lead_no=phone,
-            lead_details=lead_details,
-            action_taken="IGNORED",
-            reason="Already escalated to human agent (AI staying out)",
+        is_target_ad_inquiry = bool(
+            (referral and (referral.get("ad_id") or referral.get("source_id") or referral.get("ad_tag")))
+            or any(kw in (text or "").lower() for kw in ["can i get more info", "offer?", "offer ?", "600 for 3 months", "1500 online kathak"])
         )
-        return
+        is_trial_acceptance = bool(
+            re.search(r"^\s*(yes|haan|ha|sure|yeah|free trial|yes free trial|yes\. free trial)\s*$", (text or "").strip(), re.IGNORECASE)
+            and any(
+                "trial" in (m.get("message") or "").lower()
+                for m in (history or [])[-3:]
+                if m.get("role") == "assistant"
+            )
+        )
+        if is_target_ad_inquiry or is_trial_acceptance:
+            from src.state.chat_state import clear_escalation_async
+            await clear_escalation_async(phone)
+            state["is_escalated"] = False
+            print(f"[3] 🔓 ACTION   : {phone} -> Auto-unescalated (new ad inquiry or trial acceptance)")
+        else:
+            print(f"[3] 👤 ACTION   : {phone} -> Already escalated to agent (AI staying out)")
+            print("="*80 + "\n")
+            log_lead_action(
+                lead_no=phone,
+                lead_details=lead_details,
+                action_taken="IGNORED",
+                reason="Already escalated to human agent (AI staying out)",
+            )
+            return
 
     # Initial lead assignment to Supreme Owner for monitoring (Interakt only)
     if not state.get("already_assigned") and state.get("payment_status") != "PAID":

@@ -370,6 +370,23 @@ def format_support_executives_display() -> str:
     return "\n".join(lines)
 
 
+def get_support_executive_for_phone(phone: str) -> Dict[str, str]:
+    """
+    Returns a customer support executive from data/support_executives.json
+    using consistent rotational assignment based on phone number.
+    Ensures every customer gets a dedicated support contact while distributing load.
+    """
+    execs = get_support_executives()
+    if not execs:
+        return {"name": "Customer Support", "salutation": "", "phone": "+91 88260 57446"}
+    clean_digits = "".join(c for c in str(phone or "") if c.isdigit())
+    if clean_digits:
+        idx = int(clean_digits[-4:]) % len(execs)
+    else:
+        idx = 0
+    return execs[idx]
+
+
 # ── Fallback-only utilities ─────────────────────────────────────────────
 # Deterministic keyword/fuzzy matching. These exist SOLELY as a resilience
 # fallback for when the semantic LLM extractor (intent_classifier.py) fails

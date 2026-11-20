@@ -570,6 +570,52 @@ async def is_at_qr_stage_async(state_or_phone) -> bool:
     return is_at_qr_stage(state)
 
 
+def is_protected_from_agent_assignment(state: dict) -> tuple[bool, str]:
+    """
+    Checks if a lead is strictly protected from agent assignment / human escalation.
+    Agent assignment is strictly prohibited for:
+    - Paid / Enrolled leads (returns (True, "PAID"))
+    - QR Sent / Payment Pending leads (returns (True, "QR_SENT"))
+    Returns (False, "") for standard pre-QR leads.
+    """
+    if not isinstance(state, dict):
+        return False, ""
+
+    # 1. Paid / Enrolled leads
+    if (
+        state.get("payment_status") == "PAID"
+        or state.get("stage") == "ENROLLED"
+        or state.get("is_enrolled") is True
+    ):
+        return True, "PAID"
+
+    # 2. QR Sent leads
+    if (
+        is_at_qr_stage(state)
+        or state.get("qr_code_sent") is True
+        or state.get("is_qr_sent") is True
+        or bool(state.get("qr_id"))
+        or str(state.get("order_id") or "").startswith("qr_")
+        or str(state.get("last_qr_id") or "").startswith("qr_")
+        or state.get("stage") in ("PAYMENT_QR_SENT", "QR_SENT", "PAYMENT_PENDING")
+        or "ORDER:qr_" in str(state.get("last_topic") or "")
+    ):
+        return True, "QR_SENT"
+
+    return False, ""
+
+
+async def is_protected_from_agent_assignment_async(state_or_phone) -> tuple[bool, str]:
+    """Non-blocking async wrapper to check if lead is protected from agent assignment."""
+    if isinstance(state_or_phone, str):
+        state = await get_user_state_async(state_or_phone)
+    elif isinstance(state_or_phone, dict):
+        state = state_or_phone
+    else:
+        return False, ""
+    return is_protected_from_agent_assignment(state)
+
+
 
 class AsyncPhoneRLock:
     """

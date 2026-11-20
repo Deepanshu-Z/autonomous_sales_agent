@@ -173,6 +173,29 @@ def get_variation_for_stage(
     return variations[0]
 
 
+def get_qr_followup_message(course_name: Optional[str] = None, count: int = 0) -> str:
+    """Returns tailored payment assistance follow-up messages for leads who received a QR code."""
+    cname = course_name or "classes"
+    if count == 0:
+        return (
+            f"Hi again! 😊 Just checking in to see if you needed any assistance completing your "
+            f"payment via the UPI QR code sent above? Once done, your {cname} seat and live batch "
+            f"will be immediately confirmed and activated!"
+        )
+    elif count == 1:
+        return (
+            f"Namaste! ✨ Just a gentle follow-up regarding your {cname} enrollment. "
+            f"You can easily scan and pay via any UPI app (GPay, PhonePe, Paytm) using the QR code above. "
+            f"Feel free to reply here if you have any questions before completing it! 👍"
+        )
+    else:
+        return (
+            f"Hello! 🌟 Your {cname} batch reservation is still open. "
+            f"If you'd like to proceed, please complete payment via the QR code above, or let us know if "
+            f"you'd like to adjust your timing or duration. We are always happy to help! 😊"
+        )
+
+
 def get_followup_decision(
     phone: str,
     count: int,
@@ -194,6 +217,56 @@ def get_followup_decision(
         for s in sent_steps:
             if isinstance(s, str) and s not in sent_ids:
                 sent_ids.append(s)
+
+    # -------------------------------------------------------------
+    # 0. QR SENT LEAD SPECIALIZED FOLLOW-UP
+    # Follow-ups allowed for payment assistance, but agent assignment is strictly prohibited.
+    # -------------------------------------------------------------
+    if lead_at_qr:
+        if count == 0:
+            msg = get_qr_followup_message(course_name, 0)
+            new_sent = list(set(sent_ids + ["qr_followup_5m"]))
+            return FollowupDecision(
+                action="SEND_MESSAGE",
+                message=msg,
+                next_count=1,
+                next_gap_seconds=1800,
+                step_label="QR 5-min payment assistance follow-up",
+                message_id="qr_followup_5m",
+                updated_sent_ids=new_sent,
+            )
+        elif count == 1:
+            msg = get_qr_followup_message(course_name, 1)
+            new_sent = list(set(sent_ids + ["qr_followup_30m"]))
+            return FollowupDecision(
+                action="SEND_MESSAGE",
+                message=msg,
+                next_count=2,
+                next_gap_seconds=7200,
+                step_label="QR 30-min payment assistance follow-up",
+                message_id="qr_followup_30m",
+                updated_sent_ids=new_sent,
+            )
+        elif count == 2:
+            msg = get_qr_followup_message(course_name, 2)
+            new_sent = list(set(sent_ids + ["qr_followup_2h"]))
+            return FollowupDecision(
+                action="SEND_MESSAGE",
+                message=msg,
+                next_count=3,
+                next_gap_seconds=None,
+                step_label="QR final payment reminder",
+                message_id="qr_followup_2h",
+                updated_sent_ids=new_sent,
+            )
+        else:
+            return FollowupDecision(
+                action="SKIP",
+                next_count=count,
+                next_gap_seconds=None,
+                step_label="QR lead — all follow-ups sent, skipping agent handoff (AI stays active)",
+                updated_sent_ids=sent_ids,
+            )
 
     # -------------------------------------------------------------
     # 1. LEGACY MODE (5 min check-in -> 30 min agent handoff)

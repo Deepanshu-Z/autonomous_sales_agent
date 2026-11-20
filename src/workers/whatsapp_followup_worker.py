@@ -159,6 +159,21 @@ async def process_single_lead(row: dict, now_ts: float):
                     print(f"[whatsapp_followup] {phone}: Sent [{decision.step_label}] — next due in {next_gap}s")
 
         elif decision.action == "ESCALATE_TO_AGENT":
+            from src.state.chat_state import is_protected_from_agent_assignment
+            is_prot, _ = is_protected_from_agent_assignment(state)
+            if is_prot or lead_at_qr:
+                print(f"[whatsapp_followup] {phone}: Agent escalation STRICTLY PROHIBITED for protected lead ({'QR' if lead_at_qr else 'PAID'}). AI stays active.")
+                await asyncio.to_thread(
+                    lambda: supabase.table("user_session_state").update({
+                        "next_followup_due_at": None,
+                        "is_escalated": False,
+                    }).eq("phone", phone).execute()
+                )
+                state["next_followup_due_at"] = None
+                state["is_escalated"] = False
+                await asyncio.to_thread(save_user_state, phone, state)
+                return
+
             agent = decision.agent_email
             reply = decision.message
             if agent:

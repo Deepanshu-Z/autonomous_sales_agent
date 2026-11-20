@@ -25,6 +25,7 @@ from src.state.chat_state import (
     is_escalated_async,
     mark_escalated_async,
     get_user_state_async,
+    mark_lead_activity,
     save_user_state_async,
     extract_and_update_slots,
     matches_any,
@@ -581,6 +582,7 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
 
     try:
         state = await get_user_state_async(phone)
+        mark_lead_activity(state)
         if not state.get("is_target_ad"):
             state["is_target_ad"] = True
         if referral and isinstance(referral, dict):

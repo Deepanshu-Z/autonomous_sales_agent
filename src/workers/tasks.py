@@ -18,7 +18,7 @@ import asyncio
 import json
 from dotenv import load_dotenv
 from src.services.interakt import send_text_message_async, assign_chat_to_agent_async
-from src.state.chat_state import reset_follow_up_timer, arm_followup_timer
+from src.state.chat_state import reset_follow_up_timer, arm_followup_timer, mark_lead_activity
 
 from src.state.chat_history import (
     save_message, get_recent_history,
@@ -787,6 +787,7 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
     # Persist target flag and ad details in state
     try:
         state = await get_user_state_async(phone)
+        mark_lead_activity(state)
         if not state.get("is_target_ad"):
             state["is_target_ad"] = True
         if referral and isinstance(referral, dict):
@@ -796,11 +797,13 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
             ad_tag = referral.get("ad_tag") or referral.get("tag") or referral.get("headline")
             if ad_tag:
                 state["ad_tag"] = str(ad_tag)
+        reset_follow_up_timer(state)
         await save_user_state_async(phone, state)
     except Exception as e:
+        # Never persist an empty dict here: save_user_state would write course/timing/
+        # package/teacher as NULL and wipe the lead's selections.
+        print(f"[tasks] {phone}: state load/save failed, skipping persist: {e}")
         state = {}
-    reset_follow_up_timer(state)
-    await save_user_state_async(phone, state)
 
     # Re-extract lead details with populated state
     lead_details = extract_lead_details(referral, state=state, phone=phone)

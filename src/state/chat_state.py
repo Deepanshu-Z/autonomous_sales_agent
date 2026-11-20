@@ -171,6 +171,12 @@ def get_default_state(phone: str) -> dict:
     }
 
 
+def mark_lead_activity(state: dict):
+    """Call ONLY when the lead sends a message: stamps updated_at (persisted by save_user_state)."""
+    from datetime import datetime, timezone
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+
 def reset_follow_up_timer(state: dict):
     state["next_follow_up_due_at"] = None
     state["next_followup_due_at"] = None
@@ -434,10 +440,11 @@ def save_user_state(phone: str, state: dict):
             db_state["course"] = course_val
             db_state["teacher"] = teacher_val
 
-            # Fresh UTC timestamp on every write
-            from datetime import datetime, timezone
-            now_iso = datetime.now(timezone.utc).isoformat()
-            db_state["updated_at"] = now_iso
+            # updated_at = last inbound lead message. It is stamped into state only by the
+            # inbound pipelines (mark_lead_activity); bot-side writes (follow-ups, handoff,
+            # webhooks) must not move it. Absent key => upsert leaves the DB value untouched.
+            if not state.get("updated_at"):
+                db_state.pop("updated_at", None)
 
             is_qr = bool(state.get("qr_code_sent") or state.get("is_qr_sent"))
             qr_id_val = state.get("last_qr_id") or state.get("qr_id") or state.get("order_id") or state.get("payment_id") or None
@@ -447,10 +454,12 @@ def save_user_state(phone: str, state: dict):
             db_state["qr_id"] = str(qr_id_val) if qr_id_val else None
             db_state["requests_qr"] = bool(state.get("requests_qr"))
 
-            if state.get("qr_sent_at"):
-                db_state["qr_sent_at"] = state["qr_sent_at"]
-            elif is_qr:
-                db_state["qr_sent_at"] = now_iso
+            # qr_sent_at is set exactly once, by dispatch_payment_qr_async when a QR is really
+            # delivered. Never synthesize it here: the old `elif is_qr: now` fallback re-stamped
+            # it on every save for any lead whose state lacked the key (cached state, payment_id
+            # / order_id prefixes, backfilled rows), making it track updated_at.
+            if not state.get("qr_sent_at"):
+                db_state.pop("qr_sent_at", None)
 
             amt_val = state.get("last_qr_amount") or state.get("paid_amount") or state.get("amount") or state.get("fee")
             if amt_val is not None:

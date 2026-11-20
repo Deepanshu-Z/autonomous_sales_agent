@@ -21,7 +21,7 @@ from src.services.meta_client import (
 )
 from src.workers.tasks import is_complaint_or_refund
 from src.workers.batching import add_message_to_batch_async
-from src.state.chat_state import get_user_state_async, save_user_state_async, arm_followup_timer
+from src.state.chat_state import get_user_state_async, save_user_state_async, arm_followup_timer, mark_lead_activity
 from src.state.chat_history import save_message_async
 
 router = APIRouter(prefix="/meta", tags=["Meta Automation"])
@@ -112,6 +112,7 @@ async def _handle_comment_async(
     # 4. Mark user session as active target lead with welcome_sent=True
     try:
         state = await get_user_state_async(user_key)
+        mark_lead_activity(state)
         from src.core import kb_loader
         detected_course = kb_loader.detect_course_from_text(comment_text) if comment_text else None
         resolved_course = detected_course or post_cfg.get("course")

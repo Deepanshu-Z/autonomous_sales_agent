@@ -404,7 +404,8 @@ def save_user_state(phone: str, state: dict):
                 "profile_created", "coupon_sent", "is_escalated", "is_target_ad",
                 "low_confidence_count", "already_assigned",
                 "follow_up_count", "next_followup_due_at", "last_topic",
-                "is_qr_sent", "requests_qr", "course", "teacher", "qr_id", "payable_amount"
+                "is_qr_sent", "requests_qr", "course", "teacher", "qr_id", "payable_amount",
+                "updated_at", "qr_sent_at"
             }
             db_state = {k: v for k, v in state.items() if k in SUPABASE_STATE_COLUMNS}
 
@@ -433,6 +434,11 @@ def save_user_state(phone: str, state: dict):
             db_state["course"] = course_val
             db_state["teacher"] = teacher_val
 
+            # Fresh UTC timestamp on every write
+            from datetime import datetime, timezone
+            now_iso = datetime.now(timezone.utc).isoformat()
+            db_state["updated_at"] = now_iso
+
             is_qr = bool(state.get("qr_code_sent") or state.get("is_qr_sent"))
             qr_id_val = state.get("last_qr_id") or state.get("qr_id") or state.get("order_id") or state.get("payment_id") or None
             if qr_id_val and any(str(qr_id_val).startswith(prefix) for prefix in ("qr_", "order_", "pay_")):
@@ -440,6 +446,11 @@ def save_user_state(phone: str, state: dict):
             db_state["is_qr_sent"] = is_qr
             db_state["qr_id"] = str(qr_id_val) if qr_id_val else None
             db_state["requests_qr"] = bool(state.get("requests_qr"))
+
+            if state.get("qr_sent_at"):
+                db_state["qr_sent_at"] = state["qr_sent_at"]
+            elif is_qr:
+                db_state["qr_sent_at"] = now_iso
 
             amt_val = state.get("last_qr_amount") or state.get("paid_amount") or state.get("amount") or state.get("fee")
             if amt_val is not None:

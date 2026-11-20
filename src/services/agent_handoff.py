@@ -107,17 +107,20 @@ async def execute_agent_handoff_async(
 
     state = await get_user_state_async(phone)
     from src.state.chat_state import is_protected_from_agent_assignment
-    from src.core.kb_loader import get_support_executive_for_phone
+    from src.core.kb_loader import format_support_executives_display
     from src.core.lead_logger import log_lead_action
 
     is_protected, stage_type = is_protected_from_agent_assignment(state)
     if is_protected:
-        print(f"[agent_handoff] 🛡️ Agent assignment STRICTLY PROHIBITED for {phone} ({stage_type}). Routing to customer support executive.")
-        exec_info = get_support_executive_for_phone(phone)
-        exec_name = str(exec_info.get("name") or "Customer Support").strip()
-        sal = str(exec_info.get("salutation") or "").strip()
-        display_exec = f"{exec_name} {sal}".strip() if sal and sal.lower() not in exec_name.lower() else exec_name
-        exec_phone = str(exec_info.get("phone") or "+91 88260 57446").strip()
+        print(f"[agent_handoff] 🛡️ Agent assignment STRICTLY PROHIBITED for {phone} ({stage_type}). Providing all customer support executives.")
+        support_contacts = format_support_executives_display()
+        if not support_contacts:
+            support_contacts = (
+                "• Rachna ma'am: +91 88260 57446\n"
+                "• Sudesh ma'am: +91 88105 82411\n"
+                "• Monika ma'am: +91 93544 05863\n"
+                "• Ruchi ma'am: +91 88003 48485"
+            )
 
         lang = str((state or {}).get("language") or "").lower()
         is_pure_english = "english" in lang and "hinglish" not in lang
@@ -126,30 +129,30 @@ async def execute_agent_handoff_async(
             if is_pure_english:
                 support_reply = (
                     "Your classes are already confirmed! 🎉 For any class onboarding, schedule, or technical assistance, "
-                    f"you can directly connect with {display_exec} from our customer support team:\n"
-                    f"📞 {exec_phone}\n\n"
+                    "you can directly connect with our Customer Support team:\n\n"
+                    f"{support_contacts}\n\n"
                     "We are always here to help you! 😊"
                 )
             else:
                 support_reply = (
                     "Aapki classes already confirmed hain! 🎉 Kisi bhi class onboarding, schedule ya assistance ke liye "
-                    f"aap hamari customer support team se directly connect kar sakte hain:\n"
-                    f"📞 {display_exec}: {exec_phone}\n\n"
+                    "aap hamari Customer Support team se directly connect kar sakte hain:\n\n"
+                    f"{support_contacts}\n\n"
                     "Hum aapki poori madad karenge! 😊"
                 )
         else:  # QR_SENT
             if is_pure_english:
                 support_reply = (
                     "If you have any questions regarding your batch timing, classes, or payment, you can connect directly "
-                    f"with {display_exec} from our customer support team:\n"
-                    f"📞 {exec_phone}\n\n"
+                    "with our Customer Support team:\n\n"
+                    f"{support_contacts}\n\n"
                     "You can also complete your payment via the UPI QR code sent above to immediately confirm your seat! 😊"
                 )
             else:
                 support_reply = (
-                    "Agar aapko class timing, batch ya payment se related koi bhi sawaal hai, toh aap hamari customer support team "
-                    f"se directly connect kar sakte hain:\n"
-                    f"📞 {display_exec}: {exec_phone}\n\n"
+                    "Agar aapko class timing, batch ya payment se related koi bhi sawaal hai, toh aap hamari Customer Support team "
+                    "se directly connect kar sakte hain:\n\n"
+                    f"{support_contacts}\n\n"
                     "Aap upar diye gaye UPI QR code se payment complete karke bhi apni seat instantly confirm kar sakte hain! 😊"
                 )
 
@@ -164,8 +167,7 @@ async def execute_agent_handoff_async(
             if not state:
                 state = await get_user_state_async(phone)
             state["is_escalated"] = False
-            state["support_executive_provided"] = display_exec
-            state["support_executive_phone"] = exec_phone
+            state["support_executives_provided"] = True
             await save_user_state_async(phone, state)
         except Exception as exc:
             print(f"[agent_handoff] Non-fatal state update error for protected lead {phone}: {exc}")
@@ -174,7 +176,7 @@ async def execute_agent_handoff_async(
             lead_no=phone,
             lead_details=f"Protected ({stage_type})",
             action_taken="SUPPORT_PROVIDED",
-            reason=f"Agent assignment blocked for {stage_type}. Support contact given: {display_exec} ({exec_phone})",
+            reason=f"Agent assignment blocked for {stage_type}. All support contacts given.",
         )
         return True
 

@@ -77,7 +77,7 @@ def create_dynamic_qr_code(
     teacher: Optional[str] = None,
     days: Optional[str] = None,
     student_name: Optional[str] = None,
-    close_by_minutes: int = 30,
+    close_by_minutes: int = 1440,
     client: Optional[razorpay.Client] = None,
 ) -> Dict[str, Any]:
     """
@@ -102,7 +102,7 @@ def create_dynamic_qr_code(
         timing: Selected batch timing (e.g. '5:00 PM to 6:00 PM').
         teacher: Selected instructor name (e.g. 'Ms. Madhuri').
         student_name: Student name if known.
-        close_by_minutes: Minutes until QR code expires (default: 30 mins). Must be >= 2 mins.
+        close_by_minutes: Minutes until QR code expires (default: 1440 mins / 24 hours). Must be >= 2 mins.
         client: Optional pre-configured razorpay.Client instance.
 
     Returns:
@@ -233,7 +233,7 @@ async def create_dynamic_qr_code_async(
     teacher: Optional[str] = None,
     days: Optional[str] = None,
     student_name: Optional[str] = None,
-    close_by_minutes: int = 30,
+    close_by_minutes: int = 1440,
     client: Optional[razorpay.Client] = None,
 ) -> Dict[str, Any]:
     """Non-blocking async wrapper to generate dynamic UPI QR code via worker thread pool."""

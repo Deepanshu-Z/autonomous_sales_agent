@@ -130,53 +130,61 @@ def assign_chat_to_agent(phone: str, agent_email: str) -> bool:
         return False
 
 
-async def assign_chat_to_agent_async(phone: str, agent_email: str) -> bool:
+# Outcomes of an Interakt chat assignment (see assign_chat_to_agent_detailed_async).
+ASSIGNED = "assigned"                      # chat now belongs to the agent
+NOT_INTERAKT_CHANNEL = "not_interakt"      # Instagram / Facebook: no Interakt assignment exists
+AGENT_NOT_FOUND = "agent_not_found"        # this agent email doesn't exist in Interakt -> try another agent
+CUSTOMER_NOT_FOUND = "customer_not_found"  # Interakt doesn't know this customer -> no agent will work
+ASSIGN_FAILED = "failed"                   # timeout / 5xx / unknown error
+
+
+async def assign_chat_to_agent_detailed_async(phone: str, agent_email: str) -> str:
+    """Assign the chat in Interakt and say WHY it failed, so callers can pick another agent."""
     clean_phone = str(phone or "").strip()
     if clean_phone.startswith("wa_"):
         clean_phone = clean_phone[3:]
     if clean_phone.startswith("ig_") or clean_phone.startswith("fb_"):
-        # Meta channels do not use Interakt agent assignment
-        return True
+        return NOT_INTERAKT_CHANNEL
 
-    digits_only = re.sub(r"\D", "", clean_phone)
-    if len(digits_only) < 10:
-        return True
+    if len(re.sub(r"\D", "", clean_phone)) < 10:
+        return CUSTOMER_NOT_FOUND
 
     payload = {"user_phone_number": clean_phone, "agent_email": agent_email}
     t0 = time.perf_counter()
     try:
-        client = _get_async_client()
-        response = await client.post(
-            f"{BASE_URL}/assignment/",
-            headers=_headers(),
-            json=payload,
-        )
+        response = await _get_async_client().post(f"{BASE_URL}/assignment/", headers=_headers(), json=payload)
         elapsed = time.perf_counter() - t0
         print(f"[interakt] assign_chat_to_agent_async({agent_email}): {response.status_code} ({elapsed:.2f}s)")
 
         if response.status_code == 200:
-            return True
+            return ASSIGNED
+        body = response.text.lower()
         if response.status_code == 400:
-            body = response.text.lower()
             if "already assigned to same agent" in body:
-                print(f"[interakt] {agent_email} was already assigned -- treating as success.")
-                return True
+                return ASSIGNED
+            if "agent with email not found" in body:
+                print(f"[interakt] Agent {agent_email} does not exist in Interakt")
+                return AGENT_NOT_FOUND
             if "customer matching query does not exist" in body:
-                print(f"[interakt] Customer {phone} not yet in Interakt -- assignment skipped (non-fatal).")
-                return False
+                print(f"[interakt] Customer {phone} not yet in Interakt -- cannot assign.")
+                return CUSTOMER_NOT_FOUND
             print(f"[interakt] Assignment 400 error: {response.text}")
-            return False
-
+            return ASSIGN_FAILED
         print(f"[interakt] Assignment failed: {response.status_code} {response.text}")
-        return False
+        return ASSIGN_FAILED
     except httpx.TimeoutException:
-        elapsed = time.perf_counter() - t0
-        print(f"[interakt] assign_chat_to_agent_async TIMEOUT after {elapsed:.2f}s")
-        return False
+        print(f"[interakt] assign_chat_to_agent_async TIMEOUT after {time.perf_counter() - t0:.2f}s")
+        return ASSIGN_FAILED
     except Exception as e:
-        elapsed = time.perf_counter() - t0
-        print(f"[interakt] assign_chat_to_agent_async error ({elapsed:.2f}s): {e}")
-        return False
+        print(f"[interakt] assign_chat_to_agent_async error ({time.perf_counter() - t0:.2f}s): {e}")
+        return ASSIGN_FAILED
+
+
+async def assign_chat_to_agent_async(phone: str, agent_email: str) -> bool:
+    """Boolean wrapper kept for existing callers (owner monitoring assignment, Meta workers).
+    For handoffs use agent_handoff.assign_lead_to_available_agent_async, which skips bad agents."""
+    result = await assign_chat_to_agent_detailed_async(phone, agent_email)
+    return result in (ASSIGNED, NOT_INTERAKT_CHANNEL)
 
 
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:

@@ -18,7 +18,7 @@
     "name": "Shafia Delhi",
     "phone": "+917683058869",
     "email": "sensationzdance252@gmail.com",
-    "active": true
+    "active": false
   },
   {
     "id": 4,
@@ -109,7 +109,7 @@
     "name": "Dolly Palariya",
     "phone": "+919218071389",
     "email": "sensationzperforming92180@gmail.com",
-    "active": true
+    "active": false
   },
   {
     "id": 17,
@@ -130,7 +130,7 @@
     "name": "Babita",
     "phone": "+917683058959",
     "email": "sensationzdance97@gmail.com",
-    "active": true
+    "active": false
   },
   {
     "id": 20,
@@ -179,7 +179,7 @@
     "name": "Priyanka Verma",
     "phone": "+918448059236",
     "email": "dsensationz40@gmail.com",
-    "active": true
+    "active": false
   },
   {
     "id": 27,
@@ -221,6 +221,6 @@
     "name": "Surbhi",
     "phone": "+919354620445",
     "email": "sensationzarub@gmail.com",
-    "active": true
+    "active": false
   }
 ]

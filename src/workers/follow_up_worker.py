@@ -158,11 +158,14 @@ async def process_single_lead(row: dict, now_ts: float):
                     pass
                 return
 
-            # 2nd consecutive unanswered follow-up -> escalate to human agent
-            agent, agent_index = get_next_agent_email()
+            # 2nd consecutive unanswered follow-up -> escalate to human agent.
+            # Assign FIRST; promise "connecting" only if someone really owns the chat.
+            from src.services.agent_handoff import assign_lead_to_available_agent_async
+            agent = await assign_lead_to_available_agent_async(phone)
+            if not agent:
+                print(f"[followup_worker] ❌ {phone}: no agent could be assigned — not escalating")
+                return
             reply = "Connecting you with our team now. Someone will be with you shortly!"
-            if agent:
-                await assign_chat_to_agent_async(phone, agent)
             await send_text_message_async(phone, reply)
             await mark_escalated_async(phone)
             await save_message_async(phone, "assistant", reply)

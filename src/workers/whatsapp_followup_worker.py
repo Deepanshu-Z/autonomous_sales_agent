@@ -28,7 +28,8 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
 
-from src.services.interakt import send_text_message_async, send_video_message_async, assign_chat_to_agent_async
+from src.services.interakt import send_text_message_async, send_video_message_async
+from src.services.agent_handoff import assign_lead_to_available_agent_async
 from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state
 from src.state.payment_status import is_payment_verified
 from src.state.chat_history import save_message_async, get_recent_history
@@ -185,34 +186,44 @@ async def process_single_lead(row: dict, now_ts: float):
                 await asyncio.to_thread(save_user_state, phone, state)
                 return
 
-            agent = decision.agent_email
+            # Assign FIRST (skipping agents Interakt doesn't know, owner as fallback);
+            # "Connecting you…" is sent only if someone really owns the chat now.
+            agent = await assign_lead_to_available_agent_async(phone, preferred_agent=decision.agent_email)
+            escalated = bool(agent)
             reply = decision.message
-            if agent:
-                await assign_chat_to_agent_async(phone, agent)
-            if reply:
-                res = await send_text_message_async(phone, reply)
-                is_failed = isinstance(res, dict) and "error" in res
-                if not is_failed:
-                    await save_message_async(phone, "assistant", reply)
-                    await log_message_async(phone, "agent", reply)
-            await mark_escalated_async(phone)
+            if escalated:
+                await mark_escalated_async(phone)
+                if reply:
+                    res = await send_text_message_async(phone, reply)
+                    is_failed = isinstance(res, dict) and "error" in res
+                    if not is_failed:
+                        await save_message_async(phone, "assistant", reply)
+                        await log_message_async(phone, "agent", reply)
 
             await asyncio.to_thread(
                 lambda: supabase.table("user_session_state").update({
                     "follow_up_count": decision.next_count,
                     "next_followup_due_at": None,
-                    "is_escalated": True,
+                    "is_escalated": escalated,
                 }).eq("phone", phone).execute()
             )
 
             state["follow_up_count"] = decision.next_count
             state["next_followup_due_at"] = None
-            state["is_escalated"] = True
+            state["is_escalated"] = escalated
+            if escalated:
+                state["assigned_agent_email"] = agent
+                state["already_assigned"] = True
+                state["assigned_at"] = int(time.time())
             if decision.updated_sent_ids is not None:
                 state["sent_followup_ids"] = decision.updated_sent_ids
             await asyncio.to_thread(save_user_state, phone, state)
 
-            print(f"[whatsapp_followup] {phone}: [{decision.step_label}] — escalated to human agent ({agent})")
+            if escalated:
+                print(f"[whatsapp_followup] {phone}: [{decision.step_label}] — escalated to human agent ({agent})")
+            else:
+                print(f"[whatsapp_followup] ❌ {phone}: [{decision.step_label}] — NO agent could be assigned; "
+                      f"no 'connecting' message sent, AI stays active")
 
     except Exception as e:
         print(f"[whatsapp_followup] Error processing {phone}: {e}")

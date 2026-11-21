@@ -17,8 +17,22 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 
-from src.services.interakt import send_text_message_async, assign_chat_to_agent_async
-from src.state.chat_state import mark_escalated_async, get_user_state_async, save_user_state_async
+from typing import Optional
+
+from src.services.interakt import (
+    send_text_message_async,
+    assign_chat_to_agent_detailed_async,
+    ASSIGNED,
+    NOT_INTERAKT_CHANNEL,
+    AGENT_NOT_FOUND,
+    CUSTOMER_NOT_FOUND,
+)
+from src.state.chat_state import (
+    mark_escalated_async,
+    clear_escalation_async,
+    get_user_state_async,
+    save_user_state_async,
+)
 from src.state.chat_history import save_message_async
 from src.state.csv_logger import log_message_async
 from src.services.redis_client import get_redis_connection
@@ -88,6 +102,84 @@ def get_next_agent_email() -> tuple:
     return agent.get("email"), index
 
 
+# ── Agent availability (an email Interakt rejected is skipped for a while) ────
+AGENT_UNAVAILABLE_TTL_SEC = int(os.getenv("AGENT_UNAVAILABLE_TTL_SEC", str(6 * 3600)))
+
+
+def _unavailable_key(email: str) -> str:
+    return f"agent_unavailable:{email.strip().lower()}"
+
+
+def mark_agent_unavailable(email: str, reason: str) -> None:
+    """Skip this agent in the rotation for AGENT_UNAVAILABLE_TTL_SEC (e.g. Interakt: agent not found)."""
+    print(f"[agent_handoff] ❌ ERROR: agent {email} unavailable ({reason}) — skipped for {AGENT_UNAVAILABLE_TTL_SEC // 3600}h. "
+          f"Fix or deactivate it in data/agents.json.")
+    try:
+        redis_conn.setex(_unavailable_key(email), AGENT_UNAVAILABLE_TTL_SEC, reason)
+    except Exception as exc:
+        print(f"[agent_handoff] Could not mark {email} unavailable in Redis: {exc}")
+
+
+def is_agent_available(email: Optional[str]) -> bool:
+    """True if the agent is active in data/agents.json and not marked unavailable."""
+    if not email:
+        return False
+    if email.strip().lower() not in {e.strip().lower() for e in AGENT_POOL}:
+        return False
+    try:
+        return not redis_conn.exists(_unavailable_key(email))
+    except Exception:
+        return True  # Redis down: don't block assignments; Interakt will still tell us if it's bad
+
+
+MAX_AGENT_ATTEMPTS = 2  # agents tried before falling back to the owner (bounds handoff latency)
+
+
+def _next_available_agent(exclude: set) -> Optional[str]:
+    """Next agent in the round-robin that is active, available and not already tried."""
+    for _ in range(len(ALL_AGENTS)):
+        email, _ = get_next_agent_email()
+        if email and email not in exclude and is_agent_available(email):
+            return email
+    return None
+
+
+async def assign_lead_to_available_agent_async(phone: str, preferred_agent: Optional[str] = None) -> Optional[str]:
+    """
+    Assign the chat to someone who actually exists in Interakt; return who, or None if nobody could be.
+
+    Order: preferred agent (only if still active + available) → next agents in the round-robin
+    → the owner as last resort. An agent Interakt reports as not found is marked unavailable
+    and the next agent is tried immediately. Instagram/Facebook chats have no Interakt
+    assignment (their inbox shows every chat): the chosen agent is returned as-is.
+    """
+    tried: set = set()
+    agent = preferred_agent if is_agent_available(preferred_agent) else _next_available_agent(tried)
+
+    for _ in range(MAX_AGENT_ATTEMPTS):
+        if not agent:
+            break
+        tried.add(agent)
+        result = await assign_chat_to_agent_detailed_async(phone, agent)
+        if result in (ASSIGNED, NOT_INTERAKT_CHANNEL):
+            return agent
+        if result == CUSTOMER_NOT_FOUND:
+            print(f"[agent_handoff] ❌ ERROR: {phone} is not an Interakt customer — cannot assign anyone")
+            return None
+        if result == AGENT_NOT_FOUND:
+            mark_agent_unavailable(agent, "Interakt: agent with email not found")
+        agent = _next_available_agent(tried)
+
+    if OWNER_EMAIL not in tried:
+        result = await assign_chat_to_agent_detailed_async(phone, OWNER_EMAIL)
+        if result in (ASSIGNED, NOT_INTERAKT_CHANNEL):
+            print(f"[agent_handoff] ⚠️ {phone}: assigned to OWNER as fallback (agents tried: {sorted(tried)})")
+            return OWNER_EMAIL
+
+    print(f"[agent_handoff] ❌ ERROR: {phone}: no agent (incl. owner) accepted the assignment")
+    return None
+
+
 async def execute_agent_handoff_async(
     phone: str,
     user_reply_text: str,
@@ -107,20 +199,12 @@ async def execute_agent_handoff_async(
 
     state = await get_user_state_async(phone)
     from src.state.chat_state import is_protected_from_agent_assignment
-    from src.core.kb_loader import format_support_executives_display
     from src.core.lead_logger import log_lead_action
 
     is_protected, stage_type = is_protected_from_agent_assignment(state)
     if is_protected:
         print(f"[agent_handoff] 🛡️ Agent assignment STRICTLY PROHIBITED for {phone} ({stage_type}). Providing all customer support executives.")
-        support_contacts = format_support_executives_display()
-        if not support_contacts:
-            support_contacts = (
-                "• Rachna ma'am: +91 88260 57446\n"
-                "• Sudesh ma'am: +91 88105 82411\n"
-                "• Monika ma'am: +91 93544 05863\n"
-                "• Ruchi ma'am: +91 88003 48485"
-            )
+        support_contacts = _support_contacts()
 
         lang = str((state or {}).get("language") or "").lower()
         is_pure_english = "english" in lang and "hinglish" not in lang
@@ -180,37 +264,55 @@ async def execute_agent_handoff_async(
         )
         return True
 
-    # Check if already assigned a human sales agent previously
-    assigned_email = state.get("assigned_agent_email") if state else None
-
-    # If currently assigned to supreme owner (monitoring), or not yet assigned,
-    # assign to next sales agent in round-robin sequence.
-    if assigned_email and assigned_email.strip().lower() != OWNER_EMAIL.strip().lower():
-        agent = assigned_email
-        agent_index = 0
-    else:
-        agent, agent_index = get_next_agent_email()
-
-    # 2. Mark state escalated first to prevent race conditions
+    # 1. Mark escalated first so the AI can't answer in parallel while we assign.
     await mark_escalated_async(phone)
+
+    # 2. Assign to an agent who really exists BEFORE promising anything to the customer.
+    #    A previous sales agent is reused only if still active and available.
+    previous_agent = (state or {}).get("assigned_agent_email")
+    preferred_agent = (
+        previous_agent
+        if previous_agent and previous_agent.strip().lower() != OWNER_EMAIL.strip().lower()
+        else None
+    )
+    agent = await assign_lead_to_available_agent_async(phone, preferred_agent=preferred_agent)
+
+    if not agent:
+        # Nobody could take the chat: never say "connecting you". Keep the AI active and
+        # give the customer the support numbers instead.
+        await clear_escalation_async(phone)
+        fallback_reply = _handoff_failed_reply(state)
+        await send_text_message_async(phone, fallback_reply)
+        latency_sec = round(time.time() - start_time, 2) if start_time else None
+        asyncio.create_task(save_message_async(phone, "assistant", fallback_reply, response_time_sec=latency_sec))
+        asyncio.create_task(log_message_async(phone, "support_contact", fallback_reply))
+        log_lead_action(
+            lead_no=phone,
+            lead_details="Handoff failed",
+            action_taken="SUPPORT_PROVIDED",
+            reason=f"No agent could be assigned in Interakt. Reason for handoff: {escalation_reason}",
+        )
+        return False
+
+    # 3. Persist who owns the chat (reload: mark_escalated_async saved a newer copy).
     try:
-        if not state:
-            state = await get_user_state_async(phone)
+        state = await get_user_state_async(phone)
         state["is_escalated"] = True
         state["escalation_reason"] = escalation_reason
-        if agent:
-            state["assigned_agent_email"] = agent
-            state["already_assigned"] = True
+        state["assigned_agent_email"] = agent
+        state["already_assigned"] = True
+        state["assigned_at"] = int(time.time())
         await save_user_state_async(phone, state)
     except Exception as e:
         print(f"[agent_handoff] Error updating state for {phone}: {e}")
+    print(f"[agent_handoff] ✅ {phone} assigned to {agent}")
 
     HANDOFF_CONNECTING_MESSAGE = (
         "Connecting you with one of our team members now! 🙏\n\n"
         "Aapki request humari team tak pahunch gayi hai. Someone from our team will be with you shortly 😊"
     )
 
-    # 3. Deliver customer notification message
+    # 4. Only now — the chat really has an owner — tell the customer.
     if user_reply_text and user_reply_text.strip():
         await send_text_message_async(phone, user_reply_text.strip())
         latency_sec = round(time.time() - start_time, 2) if start_time else None
@@ -239,16 +341,33 @@ async def execute_agent_handoff_async(
         asyncio.create_task(save_message_async(phone, "assistant", HANDOFF_CONNECTING_MESSAGE, response_time_sec=latency_sec))
         asyncio.create_task(log_message_async(phone, "agent_handoff", HANDOFF_CONNECTING_MESSAGE))
 
-    # 4. Assign chat in Interakt (native Interakt WhatsApp leads only)
-    is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
-    if agent and is_interakt:
-        assignment_success = await assign_chat_to_agent_async(phone, agent)
-        print(f"[agent_handoff] Interakt assignment to {agent}: {assignment_success}")
-
-        # Summary sending to agents has been disabled as requested:
-        # from src.services.agent_summary import send_agent_summary_async
-        # asyncio.create_task(
-        #     send_agent_summary_async(phone, agent_index, escalation_reason=escalation_reason)
-        # )
-
     return True
+
+
+_DEFAULT_SUPPORT_CONTACTS = (
+    "• Rachna ma'am: +91 88260 57446\n"
+    "• Sudesh ma'am: +91 88105 82411\n"
+    "• Monika ma'am: +91 93544 05863\n"
+    "• Ruchi ma'am: +91 88003 48485"
+)
+
+
+def _support_contacts() -> str:
+    from src.core.kb_loader import format_support_executives_display
+    return format_support_executives_display() or _DEFAULT_SUPPORT_CONTACTS
+
+
+def _handoff_failed_reply(state: Optional[dict]) -> str:
+    """Sent when no agent could be assigned: honest, with direct support numbers."""
+    lang = str((state or {}).get("language") or "").lower()
+    if "english" in lang and "hinglish" not in lang:
+        return (
+            "Our team members are busy right now. 🙏 You can reach our Customer Support team directly:\n\n"
+            f"{_support_contacts()}\n\n"
+            "Meanwhile, I'm happy to help you here with any question! 😊"
+        )
+    return (
+        "Abhi humari team ke members busy hain. 🙏 Aap hamari Customer Support team se directly baat kar sakte hain:\n\n"
+        f"{_support_contacts()}\n\n"
+        "Tab tak aapka koi bhi sawaal ho toh main yahin madad karne ke liye hoon! 😊"
+    )

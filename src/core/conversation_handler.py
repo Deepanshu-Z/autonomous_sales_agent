@@ -1974,6 +1974,9 @@ async def _handle_conversation_turn_unlocked(
             if resolution == "ESCALATE_TO_AGENT":
                 from src.state.chat_state import is_protected_from_agent_assignment
                 is_prot, stage_type = is_protected_from_agent_assignment(new_state)
+                # Save this turn's state BEFORE the handoff: the handoff reloads it and adds the
+                # escalation / assigned agent. (Saving new_state AFTER it used to wipe both.)
+                await save_user_state_async(phone, new_state)
                 if is_prot:
                     await execute_agent_handoff_async(
                         phone,
@@ -1983,26 +1986,17 @@ async def _handle_conversation_turn_unlocked(
                         start_time=start_time,
                         send_connecting_notice=False,
                     )
-                    await save_user_state_async(phone, new_state)
                     return {"status": "support_provided_refusal", "reply": ""}
 
-                escalation_notice = _format_for_whatsapp(_ESCALATION_NOTICE)
-                await send_text_message_async(phone, escalation_notice)
-                latency_sec = round(time.time() - start_time, 2)
-                await save_message_async(phone, "assistant", escalation_notice, response_time_sec=latency_sec)
-                asyncio.create_task(log_message_async(phone, "ai", escalation_notice))
-                # BUG A FIX: Do NOT pass clean_reply as user_reply_text —
-                # execute_agent_handoff_async sends it to the customer again, causing a duplicate.
-                # We already sent it above. Pass None so handoff is internal-only.
+                # The notice is sent BY the handoff, and only once an agent really owns the chat.
                 await execute_agent_handoff_async(
                     phone,
-                    user_reply_text=None,
+                    user_reply_text=_format_for_whatsapp(_ESCALATION_NOTICE),
                     escalation_reason=(eval_res or {}).get("escalation_reason")
                     or f"Refusal escalation: {text_clean[:50]}",
                     start_time=start_time,
                     send_connecting_notice=False,
                 )
-                await save_user_state_async(phone, new_state)
                 return {"status": "handed_off_refusal", "reply": clean_reply}
 
     # ── Separate Message #1 and Message #2 (Strict JSON with fallback) ───────

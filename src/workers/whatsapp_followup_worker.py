@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
 
-from src.services.interakt import send_text_message_async, assign_chat_to_agent_async
+from src.services.interakt import send_text_message_async, send_video_message_async, assign_chat_to_agent_async
 from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state
 from src.state.chat_history import save_message_async, get_recent_history
 from src.state.csv_logger import log_message_async
@@ -107,6 +107,7 @@ async def process_single_lead(row: dict, now_ts: float):
             course_name=course_name,
             lead_at_qr=lead_at_qr,
             sent_ids=sent_ids,
+            class_video_already_sent=bool(state.get("class_demo_video_sent")),
         )
 
         # 4. Handle Decision
@@ -124,8 +125,17 @@ async def process_single_lead(row: dict, now_ts: float):
 
         elif decision.action == "SEND_MESSAGE":
             reply = decision.message
-            res = await send_text_message_async(phone, reply)
-            is_failed = isinstance(res, dict) and "error" in res
+            # 3h step: raw video only (no caption/link). On failure fall back to the 3h text.
+            video_ok = bool(decision.video_url) and await send_video_message_async(phone, decision.video_url, caption="")
+            if video_ok:
+                reply = f"[VIDEO] {decision.video_url}"  # history/log only, never sent as text
+                state["class_demo_video_sent"] = True
+                is_failed = False
+            else:
+                if decision.video_url:
+                    print(f"[whatsapp_followup] {phone}: 3h class video failed — falling back to text")
+                res = await send_text_message_async(phone, reply)
+                is_failed = isinstance(res, dict) and "error" in res
 
             if is_failed:
                 print(f"[whatsapp_followup] ⚠️ Send failed for {phone}: {res.get('error')}")

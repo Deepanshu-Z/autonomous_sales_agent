@@ -86,6 +86,19 @@ class FollowupDecision:
     is_trial_offer: bool = False    # True if 3 Free Trials offer
     message_id: Optional[str] = None # ID of the specific message variation sent
     updated_sent_ids: Optional[List[str]] = None # Updated list of sent message IDs
+    video_url: Optional[str] = None # 3h step: raw class MP4 sent INSTEAD of `message` (message = fallback)
+
+
+def get_class_video_url(course_id: Optional[str]) -> Optional[str]:
+    """Course's raw live-class MP4 from data/courses/<course>.json, or None."""
+    if not course_id:
+        return None
+    from src.core import kb_loader
+    try:
+        return (kb_loader.get_course_data(course_id).get("course_overview") or {}).get("class_raw_video_url") or None
+    except Exception as e:
+        print(f"[followup_service] class video lookup failed for {course_id}: {e}")
+        return None
 
 
 def get_total_steps() -> int:
@@ -204,6 +217,7 @@ def get_followup_decision(
     lead_at_qr: bool,
     sent_ids: Optional[List[str]] = None,
     sent_steps: Optional[Any] = None,
+    class_video_already_sent: bool = False,
 ) -> FollowupDecision:
     """
     Core single-point-of-entry decision engine.
@@ -334,7 +348,14 @@ def get_followup_decision(
             stage_name = STAGE_KEYS.get(count, f"step_{count}")
             new_sent = list(set(sent_ids + [vid]))
 
+            # 3h step: send the raw class video instead of text (the text stays as fallback
+            # for: no video for this course, video already sent in chat, or video send failure).
+            video_url = None
+            if stage_name == "3h" and not class_video_already_sent:
+                video_url = get_class_video_url(course_id)
+
             return FollowupDecision(
+                video_url=video_url,
                 action="SEND_MESSAGE",
                 message=msg,
                 next_count=count + 1,

@@ -297,4 +297,7 @@ async def main_loop():
 if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # httpx/httpcore log every HTTP call at INFO (5 lines per follow-up, with client phone numbers).
+    for noisy in ("httpx", "httpcore", "hpack"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     asyncio.run(main_loop())

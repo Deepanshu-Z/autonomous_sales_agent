@@ -340,6 +340,10 @@
         "Stable Internet Connection",
         "Open Space to Move"
     ],
+    "ghungroo_guidance": {
+        "rule": "Whenever the customer asks about ghungroo / ghungroos / ghunghroo / ghungru / bells / payal for Kathak, give THIS answer. Reply in the language the customer has selected for the conversation (English, Hindi or Hinglish), translating the answer below while keeping its meaning exactly. Do not recommend any brand, price or link, and never say ghungroos are not needed at all.",
+        "answer": "At the beginning level you can start without ghungroos, but after 6 months ghungroos become compulsory. Your teacher will guide you in class on which ghungroos to purchase. Ghungroos are easily available on Amazon, Flipkart, etc. 🙏"
+    },
     "trial_class": {
         "available": true,
         "cost": "Free",

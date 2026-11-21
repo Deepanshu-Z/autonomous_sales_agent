@@ -718,7 +718,8 @@ async def fulfill_razorpay_payment_async(
         if ledger_source:
             from src.services.payment_ledger import schedule_payment_record
             schedule_payment_record(
-                payment_entity, qr_entity, phone, ledger_source,
+                # payment.captured events carry no qr_code entity: pass the qr_id resolved above
+                payment_entity, qr_entity or {"id": qr_id}, phone, ledger_source,
                 course_id=course_id, package=duration,
                 timing=state.get("selected_timing") or state.get("timing"),
                 teacher=state.get("selected_teacher") or state.get("teacher"),

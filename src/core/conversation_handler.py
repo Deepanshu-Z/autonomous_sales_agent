@@ -1637,7 +1637,7 @@ async def dispatch_payment_qr_async(
             customer_phone=phone,
             name=f"Sensationz - {course_name}"[:40],
             description=f"{course_name} ({pkg}) Enrollment"[:255],
-            close_by_minutes=int(os.getenv("QR_EXPIRE_MINUTES", "1440")),
+            close_by_minutes=int(os.getenv("QR_EXPIRE_MINUTES", "0")),
         )
     except RazorpayServiceError as rze:
         logger.error(f"[conversation_handler] Razorpay QR generation failed: {rze}")

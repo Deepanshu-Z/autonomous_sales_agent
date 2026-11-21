@@ -24,7 +24,9 @@ from src.state.chat_state import (
     save_user_state_async,
     advance_stage,
     phone_concurrency_lock,
+    get_sent_qr_ids,
 )
+from src.state.payment_status import is_payment_verified
 from src.services.interakt import send_text_message_async
 from src.state.chat_history import save_message_async
 from src.state.csv_logger import log_message_async
@@ -496,8 +498,12 @@ async def format_onboarding_confirmation_async(
 async def fulfill_razorpay_payment_async(
     event_payload: Dict[str, Any],
     send_notification: bool = True,
+    ledger_source: Optional[str] = "webhook",
 ) -> Dict[str, Any]:
     """
+    `ledger_source` tags the row written to the `payments` ledger ("webhook" / "claim_lookup" /
+    "reconciler"); None skips the ledger (developer test endpoint: fake payments never recorded).
+
     Subtask 6.2: Reconciles verified Razorpay payment webhook events (payment.captured, qr_code.credited).
 
     1. Extracts payment entity, qr_code entity, amount, and embedded metadata notes.
@@ -528,6 +534,12 @@ async def fulfill_razorpay_payment_async(
         if isinstance(payload.get("qr_code"), dict)
         else {}
     )
+
+    # Only a CAPTURED payment may make a client PAID (shared guard for webhook + QR lookup).
+    payment_state = payment_entity.get("status")
+    if payment_state and payment_state != "captured":
+        logger.warning(f"[razorpay_service] Ignoring non-captured payment {payment_entity.get('id')} (status={payment_state})")
+        return {"status": "ignored", "reason": f"payment_not_captured:{payment_state}", "payment_id": payment_entity.get("id")}
 
     payment_id = payment_entity.get("id") or qr_entity.get("id") or ""
     amount_paise = payment_entity.get("amount") or qr_entity.get("payment_amount") or 0
@@ -573,7 +585,7 @@ async def fulfill_razorpay_payment_async(
                         break
 
         # Idempotency check: prevent duplicate fulfillment or duplicate WhatsApp messaging
-        if state.get("payment_status") == "PAID":
+        if is_payment_verified(state):
             if state.get("payment_id") == payment_id or (qr_id and state.get("order_id") == qr_id):
                 logger.info(
                     f"[razorpay_service] Duplicate webhook for {phone}: already fulfilled with payment_id={state.get('payment_id')}"
@@ -702,6 +714,17 @@ async def fulfill_razorpay_payment_async(
         state["next_follow_up_due_at"] = None
         await save_user_state_async(phone, state)
 
+        # Permanent payments ledger: fire-and-forget, never delays the confirmation or the webhook.
+        if ledger_source:
+            from src.services.payment_ledger import schedule_payment_record
+            schedule_payment_record(
+                payment_entity, qr_entity, phone, ledger_source,
+                course_id=course_id, package=duration,
+                timing=state.get("selected_timing") or state.get("timing"),
+                teacher=state.get("selected_teacher") or state.get("teacher"),
+                student_email=state.get("student_email"),
+            )
+
         # Format localized onboarding confirmation template
         lang = state.get("language") or "Hinglish"
         confirmation_msg = await format_onboarding_confirmation_async(
@@ -750,83 +773,88 @@ async def fulfill_razorpay_payment_async(
         }
 
 
-async def verify_and_sync_payment_async(
+PAYMENT_LOOKUP_COOLDOWN_SEC = int(os.getenv("PAYMENT_LOOKUP_COOLDOWN_SEC", "30"))
+
+
+async def _is_payment_lookup_allowed(phone: str) -> bool:
+    """At most one Razorpay lookup per client per cooldown, so a client repeating
+    "I paid" ten times doesn't trigger ten API calls. Fails open: the lookup is read-only."""
+    try:
+        from src.services.redis_client import get_async_redis_connection
+        redis = get_async_redis_connection()
+        return bool(await redis.set(f"payment_lookup:{phone}", "1", nx=True, ex=PAYMENT_LOOKUP_COOLDOWN_SEC))
+    except Exception as exc:
+        logger.warning(f"[razorpay_service] Payment lookup rate-limit check failed for {phone}: {exc}")
+        return True
+
+
+def _find_captured_qr_payment(
+    rzp_client: razorpay.Client, qr_id: str
+) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
+    """
+    Returns (qr_entity, payment_entity) for a payment on THIS QR that is `captured` AND equals
+    the QR's fixed amount; otherwise None. Created / authorized / failed payments never count.
+    """
+    qr_entity = rzp_client.qrcode.fetch(qr_id)
+    expected_paise = qr_entity.get("payment_amount")
+    if not expected_paise:
+        return None
+    payments = (rzp_client.qrcode.fetch_all_payments(qr_id) or {}).get("items", [])
+    for payment in payments:
+        if payment.get("status") == "captured" and payment.get("amount") == expected_paise:
+            return qr_entity, payment
+    return None
+
+
+async def reconcile_claimed_payment_async(
     phone: str,
     state: Optional[Dict[str, Any]] = None,
     client: Optional[razorpay.Client] = None,
     send_notification: bool = False,
 ) -> Tuple[bool, Dict[str, Any]]:
     """
-    On-demand real-time verification of customer payment via Razorpay API.
-    Reconciles payment immediately when customer claims they paid or asks about payment,
-    even if the webhook was delayed or dropped.
+    Run when a client SAYS they paid: asks Razorpay about the QR codes WE sent this client
+    and fulfills a payment only if it is captured, for the exact QR amount, on one of those QRs.
+    Covers delayed / dropped webhooks. Every QR is single_use and created per client, so a
+    payment on it can only be this client's. There is deliberately NO matching by phone
+    number (that matched other people's payments). Returns (is_paid, state).
     """
-    from src.state.chat_state import get_user_state_async, get_phone_variants
-
     if state is None:
         state = await get_user_state_async(phone)
-
-    if state.get("payment_status") == "PAID":
+    if is_payment_verified(state):
         return True, state
+
+    qr_ids = get_sent_qr_ids(state)
+    if not qr_ids:
+        return False, state  # we never sent this client a QR: nothing of ours to check
+    if not await _is_payment_lookup_allowed(phone):
+        logger.info(f"[razorpay_service] Payment lookup for {phone} skipped (cooldown {PAYMENT_LOOKUP_COOLDOWN_SEC}s)")
+        return False, state
 
     try:
         rzp_client = client or get_razorpay_client()
     except Exception as exc:
-        logger.warning(f"[razorpay_service] Cannot verify payment, Razorpay client error: {exc}")
+        logger.warning(f"[razorpay_service] Cannot look up payment, Razorpay client error: {exc}")
         return False, state
 
-    # 1. Check by active QR code ID in user state
-    qr_id = state.get("order_id") or state.get("last_qr_id")
-    if qr_id and str(qr_id).startswith("qr_"):
+    for qr_id in qr_ids:
         try:
-            qr_data = await asyncio.to_thread(rzp_client.qrcode.fetch, qr_id)
-            if (
-                qr_data.get("payments_amount_received", 0) > 0
-                or qr_data.get("status") == "closed"
-                or qr_data.get("close_reason") == "paid"
-            ):
-                qr_payments = await asyncio.to_thread(rzp_client.qrcode.fetch_all_payments, qr_id)
-                items = qr_payments.get("items", [])
-                captured = [p for p in items if p.get("status") == "captured"]
-                payment_entity = captured[0] if captured else (items[0] if items else {})
-                if payment_entity:
-                    payload = {
-                        "event": "payment.captured",
-                        "payload": {
-                            "payment": {"entity": payment_entity},
-                            "qr_code": {"entity": qr_data},
-                        },
-                    }
-                    await fulfill_razorpay_payment_async(payload, send_notification=send_notification)
-                    updated_state = await get_user_state_async(phone)
-                    return True, updated_state
+            match = await asyncio.to_thread(_find_captured_qr_payment, rzp_client, qr_id)
         except Exception as exc:
-            logger.debug(f"[razorpay_service] Direct QR check failed for {qr_id}: {exc}")
-
-    # 2. Check recent Razorpay captured payments matching phone variants
-    try:
-        variants = get_phone_variants(phone)
-        recent_payments = await asyncio.to_thread(rzp_client.payment.all, {"count": 20})
-        for p in recent_payments.get("items", []):
-            if p.get("status") != "captured":
-                continue
-            created_at = p.get("created_at", 0)
-            reset_at = state.get("reset_at", 0)
-            if reset_at and created_at < reset_at:
-                continue
-            p_phone = str(p.get("notes", {}).get("phone") or p.get("contact") or "").strip()
-            if any(v and (v == p_phone or v in p_phone or p_phone in v) for v in variants):
-                payload = {
-                    "event": "payment.captured",
-                    "payload": {
-                        "payment": {"entity": p},
-                        "qr_code": {"entity": {"id": p.get("notes", {}).get("qr_id") or p.get("order_id") or ""}},
-                    },
-                }
-                await fulfill_razorpay_payment_async(payload, send_notification=send_notification)
-                updated_state = await get_user_state_async(phone)
-                return True, updated_state
-    except Exception as exc:
-        logger.debug(f"[razorpay_service] Phone payment check failed for {phone}: {exc}")
+            logger.warning(f"[razorpay_service] QR payment lookup failed for {qr_id}: {exc}")
+            continue
+        if not match:
+            continue
+        qr_entity, payment_entity = match
+        result = await fulfill_razorpay_payment_async(
+            {"event": "payment.captured",
+             "payload": {"payment": {"entity": payment_entity}, "qr_code": {"entity": qr_entity}}},
+            send_notification=send_notification,
+            ledger_source="claim_lookup",
+        )
+        if result.get("status") in ("fulfilled", "already_fulfilled"):
+            logger.info(f"[razorpay_service] ✅ Claimed payment verified for {phone} on {qr_id} ({payment_entity.get('id')})")
+            return True, await get_user_state_async(phone)
+        logger.warning(f"[razorpay_service] Captured payment on {qr_id} not fulfilled for {phone}: {result}")
 
     return False, state

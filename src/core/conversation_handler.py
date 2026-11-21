@@ -63,7 +63,9 @@ from src.state.chat_state import (
     arm_followup_timer,
     reset_follow_up_timer,
     phone_concurrency_lock,
+    track_sent_qr,
 )
+from src.state.payment_status import is_payment_verified
 
 _reply_llm = None
 
@@ -119,21 +121,27 @@ async def handle_incoming_message(
     flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
 
-    # Real-time payment verification: If user claims payment or had a QR code sent, check Razorpay directly
+    # ── Payment claims: Razorpay is the ONLY source of truth ──────────────────
+    # A client saying "I paid" never makes them PAID and never reaches the LLM. We look for a
+    # captured payment on a QR we sent them; if there is none, a FIXED reply goes out, so the
+    # answer is identical every time and cannot be argued into a false confirmation.
     phone_key = session_state.get("phone") or new_state.get("phone") or ""
-    if phone_key and new_state.get("payment_status") != "PAID":
-        is_payment_query = bool(
-            flags.get("claims_payment_or_enrollment")
-            or flags.get("customer_intent") == "PAYMENT_CLAIM"
-            or session_state.get("qr_code_sent")
-            or new_state.get("qr_code_sent")
+    if _is_payment_claim(flags) and not is_payment_verified(new_state):
+        from src.services.razorpay_service import reconcile_claimed_payment_async
+        is_paid_now, verified_state = (
+            await reconcile_claimed_payment_async(phone_key, new_state) if phone_key else (False, new_state)
         )
-        if is_payment_query:
-            from src.services.razorpay_service import verify_and_sync_payment_async
-            is_verified, verified_state = await verify_and_sync_payment_async(phone_key, new_state)
-            if is_verified:
-                new_state = verified_state
-                session_state.update(verified_state)
+        if is_paid_now:
+            new_state = verified_state  # verified by Razorpay: normal flow confirms it below
+            session_state.update(verified_state)
+        else:
+            new_state["payment_claimed"] = True
+            return {
+                "reply": build_payment_not_received_reply(new_state.get("language") or session_state.get("language")),
+                "followup": None,
+                "buttons": [],
+                "new_state": new_state,
+            }
 
     # A customer can switch topics mid-conversation ("what about Kathak
     # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
@@ -204,7 +212,7 @@ async def handle_incoming_message(
             session_state["gst_percentage"] = None
 
             # Course-specific enrollment isolation
-            if session_state.get("payment_status") == "PAID" and not session_state.get("paid_course"):
+            if is_payment_verified(session_state) and not session_state.get("paid_course"):
                 session_state["paid_course"] = norm_old_course
                 new_state["paid_course"] = norm_old_course
             paid_c = session_state.get("paid_course")
@@ -223,12 +231,36 @@ async def handle_incoming_message(
         or session_state.get("awaiting_email_fulfillment")
         or new_state.get("classes_not_showing")
         or session_state.get("classes_not_showing")
-        or (new_state.get("payment_status") == "PAID" and not (new_state.get("student_email") or session_state.get("student_email")))
+        or (is_payment_verified(new_state) and not (new_state.get("student_email") or session_state.get("student_email")))
         or new_state.get("wants_trial")
         or session_state.get("awaiting_trial_email")
     )
     user_email = clean_email(user_message, is_awaiting_email=is_awaiting_email)
     if user_email and any(inv in user_email for inv in ("none@", "null@", "void@", "test@")):
+        user_email = None
+
+    # Captured BEFORE overwriting: the staging checks below used to compare against the
+    # already-overwritten value, so a NEW email was never re-staged yet the bot said "Linked".
+    prev_email = new_state.get("student_email") or session_state.get("student_email")
+    already_staged = bool(
+        new_state.get("staged_enrollment") or session_state.get("staged_enrollment")
+        or new_state.get("staged_trial") or session_state.get("staged_trial")
+    )
+    if not user_email and is_awaiting_email and "@" in user_message:
+        # Looks like an attempt at an email we couldn't parse safely ("abc def @gmail.com",
+        # two addresses, ...). Ask for a clean retype instead of guessing a wrong address.
+        lang_r = str(new_state.get("language") or session_state.get("language") or "Hinglish").lower()
+        if "english" in lang_r and "hinglish" not in lang_r:
+            retype = ("I couldn't read that Gmail ID clearly. 🙏 Please type it again as one word, "
+                      "without spaces, e.g. *yourname@gmail.com* 😊")
+        else:
+            retype = ("Gmail ID clear nahi padh paaye. 🙏 Kripya apna Gmail ID ek baar phir bina space ke "
+                      "type karein, jaise *yourname@gmail.com* 😊")
+        return {"reply": retype, "followup": None, "buttons": [], "new_state": new_state}
+
+    if user_email and user_email == prev_email and already_staged:
+        # Client re-typed the email that is already linked (e.g. "I logged in with x@gmail.com"):
+        # don't re-send the "Successfully Linked" template; let the AI answer the actual question.
         user_email = None
 
     if user_email:
@@ -250,9 +282,7 @@ async def handle_incoming_message(
         is_hinglish = "hinglish" in lang or "roman" in lang
 
         is_paid_student = bool(
-            new_state.get("payment_status") == "PAID"
-            or new_state.get("is_enrolled")
-            or new_state.get("stage") == "ENROLLED"
+            is_payment_verified(new_state)
             or new_state.get("awaiting_email_fulfillment")
             or session_state.get("awaiting_email_fulfillment")
             or new_state.get("classes_not_showing")
@@ -271,9 +301,11 @@ async def handle_incoming_message(
 
         # ── Path A: Paid Course Auto-Staging upon receiving Gmail ────────────
         if is_paid_student:
+            from src.services.payment_ledger import schedule_email_attach
+            schedule_email_attach(phone_val, user_email)  # background: Gmail onto their payment rows
             payment_id_val = new_state.get("payment_id") or new_state.get("order_id") or session_state.get("payment_id")
             paid_amt_val = new_state.get("paid_amount") or session_state.get("paid_amount") or 0.0
-            staging_successful = bool(new_state.get("staged_enrollment") and new_state.get("student_email") == user_email)
+            staging_successful = bool(new_state.get("staged_enrollment") and prev_email == user_email)
 
             if not staging_successful:
                 stage_payload = {
@@ -408,7 +440,7 @@ async def handle_incoming_message(
 
         # ── Path B: Free Trial Auto-Staging upon receiving Gmail ─────────────
         elif is_trial_candidate:
-            trial_staged_successful = bool(new_state.get("staged_trial") and new_state.get("student_email") == user_email)
+            trial_staged_successful = bool(new_state.get("staged_trial") and prev_email == user_email)
             if not trial_staged_successful:
                 try:
                     staging_res = await stage_ai_enrollment_async(
@@ -683,11 +715,7 @@ async def handle_incoming_message(
     #     new_state["stage"] = "COUPON_SENT"
     #     new_state["coupon_sent"] = True
 
-    is_client_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("is_enrolled")
-        or new_state.get("stage") == "ENROLLED"
-    )
+    is_client_paid = is_payment_verified(new_state)
 
     # Strict Zero Follow-up Rule: When an UNPAID user claims they paid, there must be NO follow up and NO buttons
     if not is_client_paid and (
@@ -976,8 +1004,7 @@ def _should_allow_app_links(
         return True
 
     app_access_required = bool(
-        state.get("payment_status") == "PAID"
-        or state.get("is_enrolled")
+        is_payment_verified(state)
         or state.get("staged_enrollment")
         or state.get("staged_trial")
         or state.get("stage") in _APP_ACCESS_STAGES
@@ -987,18 +1014,81 @@ def _should_allow_app_links(
 # ── Strict Non-Confirmation Guardrails (Payment, Trial, Enrollment) ───────────
 # The AI MUST NEVER confirm any enrollment, free trial booking, or payment under any circumstances.
 
+# Last-line safety net on LLM output (claims are normally answered by a fixed reply before the
+# LLM runs). Up to 4 filler words are allowed between subject and verb, because
+# "payment ALREADY received" / "payment SUCCESSFULLY verified" slipped past the strict patterns.
+_GAP = r"(?:\W+\w+){0,4}?\W+"
 _PAYMENT_CONFIRMATION_PATTERNS = [
-    # Latin / Hinglish
-    r"\b(?:aapka|aapki|apka|apki|humne|humein|hume|maine)?\s*(?:payment|paise|fees?|amount|transaction|screenshot)\s*(?:receive|received|mil\s*gay[aei]?|aa\s*gay[aei]?|verify|verified|confirm|ho\s*gay[aei]?|successful)",
-    r"\b(?:payment|paise|fees?|amount)\s+(?:mil\s*chuki?\s*hai|mil\s*gayi?\s*hai|receive\s*ho\s*gayi?\s*hai|verify\s*ho\s*gayi?\s*hai|confirm\s*ho\s*gayi?\s*hai|successful\s*hai)",
-    r"\b(?:screenshot|slip)\s*(?:check\s*ho\s*gay[aei]?|dekh\s*li(?:ya)?|verify\s*ho\s*gay[aei]?|confirm\s*ho\s*gay[aei]?)",
-    # English
-    r"\b(?:your\s+)?(?:payment|fees?|amount|transaction|screenshot)\s+(?:has\s+been\s+|is\s+)?(?:received|verified|confirmed|successful|approved)\b",
-    r"\b(?:we\s+have|i\s+have)\s+received\s+(?:your\s+)?(?:payment|fees?|amount|money|screenshot)\b",
-    r"\b(?:payment|transaction)\s+is\s+successful\b",
+    # Latin / Hinglish / English: "<payment word> ... <confirmed verb>"
+    rf"\b(?:payment|paise|fees?|amount|transaction|screenshot|slip){_GAP}(?:received|receive\s*ho|verified|verify\s*ho|confirmed|confirm\s*ho|successful|approved|mil\s*(?:gay|chuk)|aa\s*gay|check\s*ho\s*gay|dekh\s*li)",
+    r"\b(?:we|i)(?:\s+have|'ve)?\s+(?:already\s+)?(?:received|got)\s+(?:your\s+)?(?:payment|fees?|amount|money|screenshot)\b",
+    r"\b(?:payment|transaction)\s+(?:was|is)\s+successful\b",
     # Devanagari
-    r"(?:पेमेंट|पैसे|फीस)\s*(?:मिल\s*ग[यायीएई]|प्राप्त\s*हो\s*ग[यायीएई]|वेरिफाई\s*हो\s*ग[यायीएई]|कन्फर्म\s*हो\s*ग[यायीएई])",
+    r"(?:पेमेंट|पैसे|फीस)(?:\s+\S+){0,4}?\s*(?:मिल\s*ग[यायीएई]|प्राप्त\s*हो\s*ग[यायीएई]|वेरिफाई\s*हो\s*ग[यायीएई]|कन्फर्म\s*हो\s*ग[यायीएई])",
 ]
+# Not a confirmation when a condition comes right BEFORE the match ("once your payment is
+# received") or a negation / future sits INSIDE or right AFTER it ("payment has not been
+# received", "payment receive hote hi", "payment will be verified").
+_CONDITION_BEFORE = re.compile(r"\b(?:once|after|when|if|until|jaise\s+hi|jab|agar)\b|जैसे\s+ही|जब|अगर", re.IGNORECASE)
+_NEGATION_OR_FUTURE_AFTER = re.compile(
+    r"\bnot\b|n't|\bnahi\b|\bnahin\b|नहीं|hote\s+hi|hone\s+(?:par|ke)|ke\s+baad|will\s+be|होते\s+ही|के\s+बाद",
+    re.IGNORECASE,
+)
+
+
+def _contains_false_payment_confirmation(text: str) -> bool:
+    """True if the text states a payment as received / verified (conditional or negated mentions ignored)."""
+    for pattern in _PAYMENT_CONFIRMATION_PATTERNS:
+        for match in re.finditer(pattern, text or "", re.IGNORECASE):
+            before = text[max(0, match.start() - 40):match.start()]
+            span_and_after = text[match.start():match.end() + 20]
+            if _CONDITION_BEFORE.search(before) or _NEGATION_OR_FUTURE_AFTER.search(span_and_after):
+                continue
+            return True
+    return False
+
+
+def _is_payment_claim(flags: dict) -> bool:
+    """Client says they already paid / asks to confirm payment (NOT asking how to pay)."""
+    is_asking_to_pay = bool(
+        flags.get("requests_qr")
+        or flags.get("intent") == "PAYMENT_REQUEST"
+        or flags.get("customer_intent") == "PAYMENT_REQUEST"
+    )
+    claims_paid = bool(
+        flags.get("claims_payment_or_enrollment")
+        or flags.get("intent") == "PAYMENT_CLAIM"
+        or flags.get("customer_intent") == "PAYMENT_CLAIM"
+    )
+    return claims_paid and not is_asking_to_pay
+
+
+def build_payment_not_received_reply(language: Optional[str]) -> str:
+    """The ONE fixed answer for an unverified payment claim (same text every time)."""
+    lang = str(language or "Hinglish").lower()
+    if "english" in lang and "hinglish" not in lang:
+        return (
+            "We haven't received a payment confirmation from our payment gateway (Razorpay) for you yet. ⏳\n\n"
+            "Payments made through the QR code we sent you are confirmed here automatically, usually within a few "
+            "minutes, and you'll get a confirmation message as soon as it arrives.\n\n"
+            "If the amount was already deducted, please share the UPI transaction ID (12-digit UTR) "
+            "or type *agent* and our team will check it for you. 🙏"
+        )
+    if "hindi" in lang and "hinglish" not in lang:
+        return (
+            "हमें अभी तक हमारे पेमेंट गेटवे (Razorpay) से आपके पेमेंट का कन्फर्मेशन नहीं मिला है। ⏳\n\n"
+            "हमारे भेजे गए QR कोड से किया गया पेमेंट कुछ ही मिनटों में अपने आप कन्फर्म हो जाता है, "
+            "और कन्फर्म होते ही आपको यहां मैसेज मिल जाएगा।\n\n"
+            "अगर आपके खाते से राशि कट गई है, तो कृपया UPI ट्रांजेक्शन ID (12 अंकों का UTR) भेजें "
+            "या *agent* टाइप करें, हमारी टीम चेक कर देगी। 🙏"
+        )
+    return (
+        "Abhi tak humare payment gateway (Razorpay) se aapke payment ka confirmation nahi aaya hai. ⏳\n\n"
+        "Humare bheje gaye QR code se kiya gaya payment kuch hi minutes mein automatically confirm ho jata hai, "
+        "aur confirm hote hi aapko yahan message mil jayega.\n\n"
+        "Agar aapke account se paise kat gaye hain, toh kripya UPI transaction ID (12-digit UTR) bhejein "
+        "ya *agent* type karein, humari team check kar degi. 🙏"
+    )
 
 _TRIAL_CONFIRMATION_PATTERNS = [
     # Latin / Hinglish
@@ -1042,14 +1132,7 @@ def _sanitize_confirmation_guardrails(
     if not reply:
         return reply, followup
 
-    is_client_paid = bool(
-        state and (
-            state.get("payment_status") == "PAID"
-            or state.get("is_enrolled")
-            or state.get("stage") == "ENROLLED"
-            or state.get("staged_enrollment")
-        )
-    )
+    is_client_paid = is_payment_verified(state or {})
     is_trial_confirmed = bool(
         state and (
             state.get("staged_trial")
@@ -1062,29 +1145,12 @@ def _sanitize_confirmation_guardrails(
     is_english = bool(language and "english" in language.lower() and "hinglish" not in language.lower())
 
     # 1. Check Payment Confirmation (only for unverified/unpaid users)
-    if not is_client_paid and any(re.search(p, full_check, re.IGNORECASE) for p in _PAYMENT_CONFIRMATION_PATTERNS):
-        logger.warning(f"[guardrails] Payment confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
-        if has_devanagari:
-            sanitized_reply = (
-                "कृपया ध्यान दें: हमने आपके पेमेंट रिकॉर्ड्स चेक किए हैं, लेकिन आपका ट्रांजेक्शन अभी तक प्राप्त/कन्फर्म नहीं हुआ है। "
-                "यदि आपने Sensationz ऐप या वेबसाइट पर पेमेंट किया है, तो वह आपके अकाउंट में अपने आप अपडेट हो जाता है। "
-                "यदि आपने UPI या ट्रांसफर किया है और राशि कट गई है, तो कृपया *agent* टाइप करें ताकि हमारी अकाउंट्स टीम तुरंत आपकी मदद कर सके! 😊"
-            )
-        elif is_english:
-            sanitized_reply = (
-                "Please note: As an AI assistant, I do not have access to bank accounts to verify payments directly. "
-                "Our accounts team will verify your records. "
-                "If you completed payment through our official Sensationz App or website checkout, it will reflect automatically under your account. "
-                "If you transferred via UPI and amount was deducted, please type *agent* so a support coordinator can check and confirm your payment! 😊"
-            )
-        else:
-            sanitized_reply = (
-                "Dhyan dein: Main ek AI assistant hoon aur direct payment confirm karne ka access mere paas nahi hai. "
-                "Humari accounts team aapke records verify karegi. "
-                "Agar aapne official Sensationz App ya website par checkout kiya hai, toh payment aapke account mein automatically update ho jata hai. "
-                "Agar aapne manual UPI ya transfer kiya hai aur paise kat gaye hain, toh kripya *agent* type karein taaki humari team verify kar sake! 😊"
-            )
-        return sanitized_reply, None
+    if not is_client_paid and _contains_false_payment_confirmation(full_check):
+        # Should never fire now that claims get a fixed reply before the LLM runs. If it does,
+        # something upstream regressed: grep logs for [PAYMENT_GUARDRAIL].
+        logger.error(f"[PAYMENT_GUARDRAIL] Blocked unverified payment confirmation. Raw reply: {full_check[:160]!r}")
+        reply_language = "Hindi" if has_devanagari else ("English" if is_english else "Hinglish")
+        return build_payment_not_received_reply(reply_language), None
 
     # 2. Check Free Trial Confirmation (only if NOT verified/staged in session state)
     if not is_trial_confirmed and any(re.search(p, full_check, re.IGNORECASE) for p in _TRIAL_CONFIRMATION_PATTERNS):
@@ -1629,8 +1695,7 @@ async def dispatch_payment_qr_async(
         state["is_qr_sent"] = True
         state["qr_sent_at"] = state.get("qr_sent_at") or now_utc
         state["qr_id"] = qr_id
-        state["last_qr_id"] = qr_id
-        state["order_id"] = qr_id
+        track_sent_qr(state, qr_id)  # sets last_qr_id/order_id + keeps older still-valid QRs
         state["last_qr_package"] = pkg
         state["last_qr_url"] = image_url
         state["last_qr_amount"] = final_amount
@@ -1638,6 +1703,39 @@ async def dispatch_payment_qr_async(
         return qr_data
 
     return None
+
+
+_MEDIA_TAG = re.compile(r"\[MEDIA:(\w+)\]")  # set by routes._extract_message_text for inbound media
+
+
+def _media_not_readable_reply(state: dict, kind: str) -> str:
+    """Localized 'I can't read images/files/voice notes, please type it' reply.
+    Asks specifically for the Gmail ID when we are waiting for one."""
+    awaiting_gmail = bool(
+        state.get("awaiting_email_fulfillment")
+        or state.get("awaiting_trial_email")
+        or state.get("classes_not_showing")
+        or (is_payment_verified(state) and not state.get("student_email"))
+    )
+    lang = str(state.get("language") or "Hinglish").lower()
+    is_hindi = "hindi" in lang and "hinglish" not in lang
+    is_english = "english" in lang and "hinglish" not in lang
+    voice = kind == "audio"
+
+    if is_english:
+        what = "voice notes" if voice else "text inside images, screenshots or files"
+        ask = ("Please type your *Gmail ID* here in the chat (e.g. yourname@gmail.com) so we can link your classes."
+               if awaiting_gmail else "Could you please type your message here in the chat?")
+        return f"Sorry, as an AI assistant I can't read {what}. 🙏\n\n{ask} 😊"
+    if is_hindi:
+        what = "वॉइस नोट" if voice else "फोटो, स्क्रीनशॉट या फाइल में लिखा टेक्स्ट"
+        ask = ("कृपया अपना *Gmail ID* यहां चैट में टाइप करके भेजें (जैसे yourname@gmail.com) ताकि हम आपकी क्लासेज लिंक कर सकें।"
+               if awaiting_gmail else "कृपया अपना मैसेज यहां चैट में टाइप करके भेजें।")
+        return f"माफ़ कीजिए, AI असिस्टेंट होने के कारण मैं {what} नहीं पढ़ सकता। 🙏\n\n{ask} 😊"
+    what = "voice notes sun" if voice else "photo, screenshot ya file mein likha text padh"
+    ask = ("Kripya apna *Gmail ID* yahan chat mein type karke bhejein (jaise yourname@gmail.com) taaki hum aapki classes link kar sakein."
+           if awaiting_gmail else "Kripya apna message yahan chat mein type karke bhej dijiye.")
+    return f"Maaf kijiye, AI assistant hone ki wajah se main {what} nahi sakta. 🙏\n\n{ask} 😊"
 
 
 async def _handle_conversation_turn_unlocked(
@@ -1685,6 +1783,18 @@ async def _handle_conversation_turn_unlocked(
         latency_sec = round(time.time() - start_time, 2)
         asyncio.create_task(save_message_async(phone, "assistant", summary_text, response_time_sec=latency_sec))
         return {"status": "summary", "reply": summary_text}
+
+    # ── Media without typed text (screenshot / photo / PDF / voice note) ──────
+    # The AI cannot read media. Say so and ask the client to type it, instead of letting the
+    # LLM answer a blank message (or, before 11-14, linking "none@gmail.com").
+    media_kinds = _MEDIA_TAG.findall(text_clean)
+    text_clean = _MEDIA_TAG.sub("", text_clean).strip()
+    if media_kinds and not re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text_clean, flags=re.IGNORECASE).strip():
+        reply = _media_not_readable_reply(state, media_kinds[0])
+        await send_text_message_async(phone, reply)
+        latency_sec = round(time.time() - start_time, 2)
+        asyncio.create_task(save_message_async(phone, "assistant", reply, response_time_sec=latency_sec))
+        return {"status": "media_not_readable", "reply": reply}
 
     # ── Instant Direct Escalation on Agent Button tap ────────────────────────
     from src.core import language_loader
@@ -1981,18 +2091,7 @@ async def _handle_conversation_turn_unlocked(
         user_wants_trial_guide = False
 
     # Payment state is used both for payment guardrails and the app-access link policy.
-    is_client_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("is_enrolled")
-        or new_state.get("stage") == "ENROLLED"
-        or new_state.get("staged_enrollment")
-        or state.get("payment_status") == "PAID"
-        or state.get("is_enrolled")
-        or state.get("stage") == "ENROLLED"
-        or state.get("staged_enrollment")
-        or state.get("awaiting_email_fulfillment")
-        or new_state.get("awaiting_email_fulfillment")
-    )
+    is_client_paid = is_payment_verified(new_state) or is_payment_verified(state)
     if is_client_paid:
         new_state["payment_claimed"] = False
 
@@ -2296,11 +2395,7 @@ async def _handle_conversation_turn_unlocked(
         and has_valid_fee
     )
 
-    is_client_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("is_enrolled")
-        or new_state.get("stage") == "ENROLLED"
-    )
+    is_client_paid = is_payment_verified(new_state)
 
     # QR Code Dispatch Synchronization Guard:
     # NEVER dispatch payment QR code if slots are incomplete OR if Message #2 is actively asking the user to choose ANY slot (timing, teacher, days, package)!
@@ -2380,7 +2475,7 @@ async def _handle_conversation_turn_unlocked(
     if (
         not new_state.get("payment_claimed")
         and not new_state.get("is_escalated")
-        and new_state.get("payment_status") != "PAID"
+        and not is_payment_verified(new_state)
         and not new_state.get("_last_turn", {}).get("is_disinterested")
         and not new_state.get("_last_turn", {}).get("is_out_of_scope")
     ):

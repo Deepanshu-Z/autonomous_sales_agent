@@ -25,6 +25,7 @@ from src.state.chat_history import (
     save_message_async, get_recent_history_async
 )
 from src.state.csv_logger import log_message, log_message_async
+from src.state.payment_status import is_payment_verified
 from src.state.chat_state import (
     mark_escalated,
     is_escalated,
@@ -891,7 +892,7 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
             return
 
     # Initial lead assignment to Supreme Owner for monitoring (Interakt only)
-    if not state.get("already_assigned") and state.get("payment_status") != "PAID":
+    if not state.get("already_assigned") and not is_payment_verified(state):
         is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
         if OWNER_EMAIL and is_interakt:
             success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)
@@ -905,7 +906,7 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
 
     # Check for human agent trigger words
     text_lower = text.lower()
-    if state.get("payment_status") != "PAID" and matches_any(text_lower, AGENT_TRIGGER_WORDS):
+    if not is_payment_verified(state) and matches_any(text_lower, AGENT_TRIGGER_WORDS):
         await handle_agent_handoff_async(phone, start_time)
         print(f"[3] 👤 ACTION   : {phone} -> Handed off to human agent")
         print("="*80 + "\n")

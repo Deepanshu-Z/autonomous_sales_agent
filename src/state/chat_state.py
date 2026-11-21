@@ -114,6 +114,7 @@ def clear_escalation(phone: str):
 
 import json
 from src.services.redis_client import get_redis_connection
+from src.state.payment_status import is_payment_verified
 
 redis_conn = get_redis_connection()
 STATE_CACHE_TTL = 60 * 60 * 24 * 30  # 30 days persistence across restarts
@@ -527,6 +528,34 @@ async def clear_escalation_async(phone: str):
     return await asyncio.to_thread(clear_escalation, phone)
 
 
+MAX_TRACKED_QR_IDS = 5  # QRs live 24h; a client rarely gets more than 2-3 per day
+
+
+def track_sent_qr(state: dict, qr_id: str) -> None:
+    """Remember every QR sent to the client (newest last), so a payment on an OLDER,
+    still-valid QR is also found. Only `last_qr_id` used to be kept."""
+    if not qr_id:
+        return
+    qr_ids = [q for q in (state.get("qr_ids_sent") or []) if q != qr_id]
+    state["qr_ids_sent"] = (qr_ids + [qr_id])[-MAX_TRACKED_QR_IDS:]
+    state["last_qr_id"] = qr_id
+    state["order_id"] = qr_id
+
+
+def get_sent_qr_ids(state: dict) -> list:
+    """QR ids sent to this client, newest first. Falls back to last_qr_id/order_id because
+    `qr_ids_sent` lives only in the Redis copy of state (Supabase stores just `qr_id`)."""
+    candidates = list(reversed(state.get("qr_ids_sent") or [])) + [
+        state.get("last_qr_id"), state.get("order_id"), state.get("qr_id"),
+    ]
+    seen, qr_ids = set(), []
+    for qr_id in candidates:
+        if isinstance(qr_id, str) and qr_id.startswith("qr_") and qr_id not in seen:
+            seen.add(qr_id)
+            qr_ids.append(qr_id)
+    return qr_ids
+
+
 def is_at_qr_stage(state_or_phone) -> bool:
     """
     Checks whether a lead has reached the payment / QR scanner stage.
@@ -546,7 +575,7 @@ def is_at_qr_stage(state_or_phone) -> bool:
         return False
 
     # Already paid / enrolled is handled separately
-    if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED":
+    if is_payment_verified(state):
         return False
 
     # 1. Direct boolean flag indicating QR was sent
@@ -602,11 +631,7 @@ def is_protected_from_agent_assignment(state: dict) -> tuple[bool, str]:
         return False, ""
 
     # 1. Paid / Enrolled leads
-    if (
-        state.get("payment_status") == "PAID"
-        or state.get("stage") == "ENROLLED"
-        or state.get("is_enrolled") is True
-    ):
+    if is_payment_verified(state):
         return True, "PAID"
 
     # 2. QR Sent leads

@@ -15,13 +15,15 @@ import re
 from typing import Optional
 
 # Precompiled C-level regex patterns
-_EMAIL_PARSER = re.compile(r"^([a-z0-9_.+-]+)@([a-z0-9-]+(?:\.[a-z0-9-]+)+)$")
 _PRE_CLEAN_COMMA = re.compile(r",(?=[a-z]{2,})")
-_PRE_CLEAN_SPACES = re.compile(r"\s+")
-_EXTRACT_CANDIDATE = re.compile(r"([a-z0-9_.+-]+@[a-z0-9-.]+(?:\.[a-z0-9-]+)+)")
-_GMAIL_PREFIX = re.compile(
-    r"(?:gmail(?:\s*id|\s*address)?\s*(?:is|h|hai|:|=|\s)\s*)([a-zA-Z0-9_.+-]{3,35})",
-    re.IGNORECASE,
+# Token touching the '@' (group 1) + any whitespace before '@' (group 2), then the domain
+# (spaces around its dots allowed: "@gmail. com"). Only the token is the local part,
+# never the words before it ("Gmail ID-abc@", "I have log in with abc@").
+_AT_SPLIT = re.compile(r"(\S*?)(\s*)@\s*([a-z0-9-]+(?:\s*\.\s*[a-z0-9-]+)*)")
+_LOCAL_ALLOWED = re.compile(r"[a-z0-9_.+-]*$")
+_GMAIL_LOCAL_ALLOWED = re.compile(r"[a-z0-9.]*$")  # Gmail usernames: letters, digits, dots only
+_BARE_DOMAIN_ONLY = re.compile(
+    r"^\s*([a-z0-9_.+-]{3,35})\s*[\s.]\s*(gmail\.com|yahoo\.com|yahoo\.co\.in|outlook\.com|hotmail\.com|rediffmail\.com)\s*\.?\s*$"
 )
 
 # Canonical valid domains
@@ -92,16 +94,21 @@ def sanitize_email(
     if any(phrase in s_low for phrase in CONVERSATIONAL_NON_EMAILS):
         return None
 
-    # Step 1: Check for email candidate containing '@'
+    # Step 1: Extract ONLY the email token around '@' (never the surrounding sentence)
     if "@" in raw_str:
-        # Pre-clean spaces and mobile comma slips (e.g. user@yahoo,com -> user@yahoo.com)
-        cleaned = _PRE_CLEAN_SPACES.sub("", _PRE_CLEAN_COMMA.sub(".", s_low))
-        
-        # Guard against multi-@ junk
-        if cleaned.count("@") == 1:
-            local_candidate, domain_candidate = cleaned.split("@", 1)
-            local_part = local_candidate.strip(".")
-            domain_part = domain_candidate.strip(".")
+        # Mobile comma slips (e.g. user@yahoo,com -> user@yahoo.com)
+        cleaned = _PRE_CLEAN_COMMA.sub(".", s_low)
+        m = _AT_SPLIT.search(cleaned) if cleaned.count("@") == 1 else None  # multi-@ = junk
+        if m:
+            token, gap, domain_raw = m.group(1), m.group(2), m.group(3)
+            # "Lakshanya rajendra @gmail.com": space before '@' after several words is ambiguous
+            # (which words are the username?) -> don't guess, the bot asks the client to retype.
+            if gap and len(cleaned[:m.start(2)].split()) > 1:
+                return None
+            if not token:  # "rahul123 @gmail.com" (single word, then space)
+                token = cleaned[:m.start(2)].strip()
+            local_part = _LOCAL_ALLOWED.search(token).group().strip(".")
+            domain_part = re.sub(r"\s+", "", domain_raw).strip(".")
 
             if local_part and domain_part:
                 # If domain is just 'gmail', auto-append '.com' (e.g. user@gmail -> user@gmail.com)
@@ -114,17 +121,20 @@ def sanitize_email(
                     return _finalize_email(local_part, clean_domain)
 
                 # ── Slow Path: Algorithmic Typo Repair for the 5% with mistakes
-                # A. Fix broken TLDs (e.g. .con, .comm, .cpm, .col -> .com)
-                domain_tokens = domain_part.split(".")
-                if len(domain_tokens) >= 2:
-                    user_tld = domain_tokens[-1]
-                    tld_match = difflib.get_close_matches(user_tld, VALID_TLDS, n=1, cutoff=0.6)
-                    if tld_match:
-                        domain_tokens[-1] = tld_match[0]
-                        domain_part = ".".join(domain_tokens)
-
-                # B. Auto-snap domain typo via String Distance (e.g. gamil.com, yahooo.com -> gmail.com, yahoo.com)
+                # A. "name.con/.cpm/.comm" -> "name.com" (the generic TLD snap below picked ".co.in":
+                #    yahoo.con -> yahoo.co.in), then snap the whole domain to a known provider.
+                tokens = domain_part.split(".")
+                if len(tokens) == 2 and difflib.SequenceMatcher(None, tokens[1], "com").ratio() >= 0.6:
+                    domain_part = f"{tokens[0]}.com"
                 domain_match = difflib.get_close_matches(domain_part, VALID_DOMAINS_LIST, n=1, cutoff=0.75)
+                if not domain_match:
+                    # B. Custom domains only: fix broken TLDs (e.g. tcs.con -> tcs.com)
+                    domain_tokens = domain_part.split(".")
+                    if len(domain_tokens) >= 2:
+                        tld_match = difflib.get_close_matches(domain_tokens[-1], VALID_TLDS, n=1, cutoff=0.6)
+                        if tld_match:
+                            domain_tokens[-1] = tld_match[0]
+                            domain_part = ".".join(domain_tokens)
                 final_domain = domain_match[0] if domain_match else domain_part
                 if final_domain == "googlemail.com":
                     final_domain = "gmail.com"
@@ -133,26 +143,14 @@ def sanitize_email(
 
                 return _finalize_email(local_part, final_domain)
 
-    # Step 2: Explicit email domain without '@' (e.g. "rahul123 gmail.com" or "rahul123.gmail.com")
-    domain_match_no_at = re.search(
-        r"\b([a-z0-9_.+-]{3,35})\s*(?:@|\s+|\.)(gmail\.com|yahoo\.com|yahoo\.co\.in|outlook\.com|hotmail\.com|rediffmail\.com)\b",
-        s_low,
-    )
-    if domain_match_no_at:
-        handle = domain_match_no_at.group(1).strip(" .")
-        dom = domain_match_no_at.group(2).strip()
-        return _finalize_email(handle, dom)
+    # Step 2: Whole message is just "<handle> gmail.com" / "<handle>.gmail.com" (missing '@').
+    # Must be the ENTIRE message, so "I paid with gmail.com" never becomes "with@gmail.com".
+    bare = _BARE_DOMAIN_ONLY.match(s_low)
+    if bare:
+        return _finalize_email(bare.group(1).strip(" ."), bare.group(2))
 
-    # Step 3: Conversational handle with explicit 'gmail' keyword (e.g. "this is my gmail: deepanshupokhriyal07")
-    handle_match = _GMAIL_PREFIX.search(raw_str)
-    if handle_match:
-        handle = handle_match.group(1).lower().strip().rstrip(".")
-        if handle not in ("is", "h", "hai", "id", "address", "mera", "meri", "yhi", "yahi", "none", "null"):
-            if not handle.endswith("@gmail.com"):
-                return _finalize_email(handle, "gmail.com")
-            return _finalize_email(handle.replace("@gmail.com", ""), "gmail.com")
-
-    # STRICT POLICY: Under NO circumstances are bare words without '@' or email domain accepted as email!
+    # STRICT POLICY: bare words without '@' or an explicit domain are NEVER an email
+    # ("gmail account" must not become account@gmail.com, "gmail id koi" must not become koi@gmail.com).
     return None
 
 
@@ -165,6 +163,14 @@ def _finalize_email(local: str, domain: str) -> Optional[str]:
 
     if "@" in local_clean or "@" in domain_clean or "." not in domain_clean:
         return None
+
+    if domain_clean == "gmail.com":
+        # Gmail allows only letters/digits/dots: keep the trailing valid run and drop glued
+        # prefixes ("id-dashsatabdi2" -> "dashsatabdi2", "d....bharati.anu09" -> "bharati.anu09").
+        local_clean = _GMAIL_LOCAL_ALLOWED.search(local_clean).group()
+        local_clean = re.sub(r"^.*\.{2,}", "", local_clean).strip(".")
+        if not local_clean:
+            return None
 
     # Reject handles that are system artifacts or generic conversational words
     if local_clean in INVALID_LOCAL_HANDLES:

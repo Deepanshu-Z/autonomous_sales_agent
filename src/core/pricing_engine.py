@@ -634,7 +634,7 @@ def get_order_summary_details(state: Optional[Dict[str, Any]] = None, **kwargs) 
     phone = s.get("phone") or s.get("customer_phone") or ""
     student_name = s.get("customer_name") or s.get("user_name") or s.get("name") or ""
     order_id = s.get("order_id") or ""
-    payment_status = s.get("payment_status") or ("PAID" if s.get("claims_payment") else "PENDING")
+    payment_status = s.get("payment_status") or "PENDING"  # never derived from a client's claim
     language = s.get("language") or s.get("detected_language") or "English"
 
     return {

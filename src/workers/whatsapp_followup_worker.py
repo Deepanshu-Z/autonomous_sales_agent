@@ -30,6 +30,7 @@ from supabase import create_client
 
 from src.services.interakt import send_text_message_async, send_video_message_async, assign_chat_to_agent_async
 from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state
+from src.state.payment_status import is_payment_verified
 from src.state.chat_history import save_message_async, get_recent_history
 from src.state.csv_logger import log_message_async
 from src.services.redis_client import get_redis_connection
@@ -69,7 +70,7 @@ async def process_single_lead(row: dict, now_ts: float):
         state = await asyncio.to_thread(get_user_state, phone)
 
         # 1. Skip paid / enrolled users
-        if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED" or state.get("is_enrolled"):
+        if is_payment_verified(state):
             state["follow_up_count"] = 0
             state["next_followup_due_at"] = None
             state["next_follow_up_due_at"] = None
@@ -270,6 +271,9 @@ async def sweep_once():
 
 async def main_loop():
     print(f"[whatsapp_followup] Started — polling every {POLL_INTERVAL}s (concurrency={MAX_CONCURRENCY}, batch_size={BATCH_SIZE})")
+    # Payments ledger fallbacks (retry queue + Razorpay reconcile) run alongside, never blocking sweeps.
+    from src.services.payment_ledger import run_ledger_maintenance_forever
+    ledger_task = asyncio.create_task(run_ledger_maintenance_forever())  # noqa: F841 (kept referenced)
     cycle = 0
     while True:
         cycle += 1
@@ -280,4 +284,6 @@ async def main_loop():
 
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     asyncio.run(main_loop())

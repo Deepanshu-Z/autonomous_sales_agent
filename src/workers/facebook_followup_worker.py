@@ -62,8 +62,9 @@ async def sweep_once():
 
         try:
             from src.state.chat_state import get_user_state, save_user_state, is_at_qr_stage
+            from src.state.payment_status import is_payment_verified
             paid_state = get_user_state(phone)
-            if paid_state.get("payment_status") == "PAID" or paid_state.get("stage") == "ENROLLED":
+            if is_payment_verified(paid_state):
                 paid_state["follow_up_count"] = 0
                 paid_state["next_followup_due_at"] = None
                 paid_state["next_follow_up_due_at"] = None

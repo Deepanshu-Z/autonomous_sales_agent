@@ -17,6 +17,7 @@ Core Guarantees:
 
 from typing import Dict, Any, List, Optional
 from src.core import kb_loader
+from src.state.payment_status import is_payment_verified
 from src.core.helpers.schedule_engine import (
     get_available_days_for_batch,
     get_teachers_for_slot,
@@ -96,11 +97,7 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
     package_str = pkg_val if pkg_val else "NOT SELECTED"
 
     # Check Paid / Enrolled status
-    is_paid = bool(
-        s.get("payment_status") == "PAID"
-        or s.get("is_enrolled")
-        or s.get("stage") == "ENROLLED"
-    )
+    is_paid = is_payment_verified(s)
 
     is_trial_path = bool(
         s.get("wants_trial")

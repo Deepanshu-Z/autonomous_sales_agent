@@ -31,6 +31,7 @@ from src.state.chat_state import (
     matches_any,
     advance_stage,
 )
+from src.state.payment_status import is_payment_verified
 from src.workers.batching import add_message_to_batch_async
 from src.workers.tasks import is_target_ad_or_message, check_target_ad, get_next_agent_email
 from src.services.agent_handoff import OWNER_EMAIL, execute_agent_handoff_async
@@ -44,6 +45,21 @@ from src.services.razorpay_service import (
 router = APIRouter()
 
 AGENT_TRIGGER_WORDS = ["agent", "human", "talk to someone", "real person", "representative", "support"]
+
+
+_MEDIA_KINDS = ("image", "document", "video", "audio", "sticker")
+
+
+def _media_kind(message: dict):
+    """'image' / 'document' / ... when the inbound message is media, else None.
+    Checks Interakt's message_content_type plus media_type/type, whatever shape they arrive in."""
+    raw = " ".join(
+        str(message.get(k) or "") for k in ("message_content_type", "media_type", "type")
+    ).lower()
+    kind = next((k for k in _MEDIA_KINDS if k in raw), None)
+    if not kind and message.get("media_url"):
+        kind = "image"
+    return kind
 
 
 def _extract_message_text(message: dict) -> str:
@@ -92,6 +108,12 @@ def _extract_message_text(message: dict) -> str:
     extracted_text = (extracted_text or "").strip()
     if extracted_text.lower() in ("none", "null", "undefined"):
         extracted_text = ""
+
+    # Media (screenshot / photo / PDF / voice note): Interakt sends message=null + a content type.
+    # Tag it so the bot can say it can't read media, instead of seeing a blank (or "None") message.
+    media_kind = _media_kind(message)
+    if media_kind:
+        extracted_text = f"[MEDIA:{media_kind}]" + (f"\n{extracted_text}" if extracted_text else "")
 
     # Capture Quoted / Replied message context (when user swipes right / drags to reply)
     quoted_text = ""
@@ -151,10 +173,13 @@ async def sync_customer_email_endpoint(payload: SyncEmailPayload):
         state["student_email"] = normalized_email
         state["awaiting_email_fulfillment"] = False
         await save_user_state_async(phone, state)
+        if is_payment_verified(state):
+            from src.services.payment_ledger import schedule_email_attach
+            schedule_email_attach(phone, normalized_email)  # background: Gmail onto their payment rows
 
         staged_res = None
         # If student already paid or is enrolled, auto-stage to Hono backend
-        if state.get("payment_status") == "PAID" or state.get("stage") == "ENROLLED" or state.get("is_enrolled"):
+        if is_payment_verified(state):
             try:
                 staged_res = await stage_ai_enrollment_async(
                     email=normalized_email,
@@ -412,7 +437,8 @@ async def receive_test_razorpay_webhook(request: Request):
     if event_type not in accepted_events:
         return {"status": "ignored", "event": event_type}
 
-    result = await fulfill_razorpay_payment_async(event_payload)
+    # Simulated payments must never reach the payments ledger.
+    result = await fulfill_razorpay_payment_async(event_payload, ledger_source=None)
     return {"status": "ok", "event": event_type, "result": result}
 
 
@@ -458,6 +484,9 @@ def _extract_whatsapp_cloud_messages(data: dict) -> list[dict]:
                         )
                     elif mtype == "button":
                         text = msg.get("button", {}).get("text", "")
+                    elif mtype in _MEDIA_KINDS:
+                        caption = (msg.get(mtype) or {}).get("caption") or ""
+                        text = f"[MEDIA:{mtype}]" + (f"\n{caption}" if caption else "")
 
                     if text:
                         referral = msg.get("referral", {}) or {}

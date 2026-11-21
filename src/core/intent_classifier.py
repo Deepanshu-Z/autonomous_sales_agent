@@ -11,6 +11,7 @@ import json
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
+from src.state.payment_status import is_payment_verified
 
 _local_env = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
 load_dotenv(_local_env)
@@ -624,8 +625,7 @@ async def extract_intent_and_state_changes(
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
         is_timing_settled = bool(
-            s.get("payment_status") == "PAID"
-            or s.get("is_enrolled")
+            is_payment_verified(s)
             or s.get("timing")
             or s.get("awaiting_email_fulfillment")
         )
@@ -1073,8 +1073,7 @@ async def extract_intent_and_state_changes(
             matched_teacher = resolve_canonical_teacher(text, course_id=active_cid or None)
 
         is_student_settled = bool(
-            s.get("payment_status") == "PAID"
-            or s.get("is_enrolled")
+            is_payment_verified(s)
             or s.get("awaiting_email_fulfillment")
         )
         if is_student_settled:
@@ -1358,11 +1357,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     # Pre-Payment (payment_status != 'PAID' and stage != 'ENROLLED'): Unlimited modifications allowed.
     # Post-Payment (payment_status == 'PAID' or stage == 'ENROLLED'): Zero course modification via chat.
     # Course, timing, teacher, days, and package slots are strictly immutable in the database session.
-    is_paid = bool(
-        new_state.get("payment_status") == "PAID"
-        or new_state.get("stage") == "ENROLLED"
-        or new_state.get("is_enrolled")
-    )
+    is_paid = is_payment_verified(new_state)
     if is_paid:
         cand_course = flags.get("selected_course")
         is_switching_course = False
@@ -1667,9 +1662,6 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["wants_trial"] = True
     elif flags.get("wants_demo_video") or flags.get("wants_demo"):
         new_state["wants_trial"] = False
-
-    if flags.get("claims_payment_or_enrollment"):
-        new_state["claims_payment"] = True
 
     # Language management: Lock selected language until explicitly changed
     from src.core import language_loader

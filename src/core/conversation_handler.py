@@ -1354,10 +1354,11 @@ def _sanitize_state_grounded_replies(
     if not reply:
         return reply, followup
 
-    has_course = bool(active_cid or state.get("course"))
-    has_timing = bool(state.get("timing") or state.get("selected_timing"))
-    has_teacher = bool(state.get("teacher") or state.get("selected_teacher"))
-    has_package = bool(state.get("package") or state.get("selected_duration"))
+    # Same completeness check as dispatch_payment_qr_async (Course, Timing, Teacher, Days, Package),
+    # so the reply never promises a QR that the dispatcher will refuse to send.
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots
+    slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
+    all_slots_settled = bool(slot_eval.get("is_complete"))
 
     intent = (last_turn.get("intent") or last_turn.get("customer_intent") or "").upper()
     user_asked_qr = bool(
@@ -1394,8 +1395,8 @@ def _sanitize_state_grounded_replies(
             else:
                 followup = "Does this answer your question, or would you like to know more? 😊"
 
-    # 3. ALL SLOTS SETTLED GUARD: When Course + Timing + Teacher + Package are all complete
-    if has_course and has_timing and has_teacher and has_package and not is_question and not is_objection:
+    # 3. ALL SLOTS SETTLED GUARD: When Course + Timing + Teacher + Days + Package are all complete
+    if all_slots_settled and not is_question and not is_objection:
         # Strip hesitant confirmation patterns ("Before I can generate... I need to confirm that all details are in place")
         HESITANT_CONFIRMATION_PATTERNS = [
             r"Before I can generate your (customized )?payment QR code,?\s*(I need to confirm that all details are in place\.?)?",
@@ -1441,14 +1442,12 @@ def _sanitize_state_grounded_replies(
 
     # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero unprompted payment checkout until all slots confirmed)
     # If any slot is missing, QR is strictly blocked and user must be guided to choose the missing detail
-    if not (has_course and has_timing and has_teacher and has_package) and not is_objection and not is_question:
+    if not all_slots_settled and not is_objection and not is_question:
         PAYMENT_LEAK_REGEX = r"\b(order summary|total payable|final payable|fee breakdown|please complete your payment via the upi qr|scan the upi qr code below to confirm)\b"
         reply_leaks = bool(re.search(PAYMENT_LEAK_REGEX, reply, re.IGNORECASE))
         followup_leaks = bool(followup and re.search(r"\b(assistance completing your payment with the upi qr|complete your payment via the upi qr)\b", followup, re.IGNORECASE))
 
         if user_asked_qr or reply_leaks or followup_leaks:
-            from src.core.helpers.slot_engine import evaluate_enrollment_slots
-            slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
             next_slot = slot_eval.get("next_target_slot")
             cid_curr = (active_cid or state.get("course") or "").lower().strip()
             course_title = kb_loader.get_catalog_entry(cid_curr).get("name", cid_curr.title()) if kb_loader.get_catalog_entry(cid_curr) else cid_curr.title()
@@ -1467,6 +1466,12 @@ def _sanitize_state_grounded_replies(
             elif next_slot == "TEACHER":
                 reply = f"{prefix}Please select your preferred instructor for the *{timing_val}* batch of *{course_title}* first."
                 followup = "Which instructor would you prefer to learn with? 😊"
+            elif next_slot == "DAYS":
+                from src.core.helpers.schedule_engine import get_available_days_for_batch
+                day_options = get_available_days_for_batch(cid_curr, timing=timing_val, teacher=teacher_val)
+                options_text = " or ".join(f"*{d}*" for d in day_options) or "your preferred batch days"
+                reply = f"{prefix}Please choose your batch days for the *{timing_val}* *{course_title}* batch with {teacher_val} first."
+                followup = f"Which days work for you — {options_text}? 😊"
             elif next_slot == "DURATION":
                 reply = f"{prefix}Please select your package duration for *{course_title}* (*{timing_val}* batch with {teacher_val}) first."
                 followup = "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
@@ -2397,7 +2402,10 @@ async def _handle_conversation_turn_unlocked(
         not slot_eval.get("is_complete")
         or (
             clean_followup and re.search(
-                r"\b(which timing|which batch|which specific timing|which instructor|which package duration|choose a package|select a package|kisme se|kaunsa batch|kaunsi timing|batch days|which days|kaunse din|kaunsa pair|pair chahenge|tuesday|thursday|wednesday|friday|saturday|sunday)\b",
+                # No bare weekday names here: a follow-up that just mentions the chosen days
+                # ("your Tuesday & Thursday batch") must not block the QR. A real days ask is
+                # already covered by slot_eval being incomplete.
+                r"\b(which timing|which batch|which specific timing|which instructor|which package duration|choose a package|select a package|kisme se|kaunsa batch|kaunsi timing|batch days|which days|kaunse din|kaunsa pair|pair chahenge)\b",
                 clean_followup,
                 re.IGNORECASE,
             )

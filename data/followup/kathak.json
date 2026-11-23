@@ -1,7 +1,7 @@
 {
   "course": "kathak",
   "course_name": "Online Live Interactive Kathak",
-  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final offer extension)",
   "stages": {
     "30m": [
       {
@@ -113,34 +113,29 @@
     ],
     "6h_step5_trials": [
       {
-        "id": "kathak_trial_1",
-        "topic": "3 Free Live Trial Classes — Experience Guru Ji's Teaching",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🙏 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul chinta mat kijiye — hum chahte hain ki aap pehle guru ji ki live teaching style ko khud experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero fee\n• Direct live interaction with expert Kathak Guru\n• Complete beginner friendly guidance\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar bhej dijiye aur apna time batayein! 🙏✨"
+        "id": "kathak_offer_1",
+        "topic": "Last Extension — Final Chance",
+        "message": "Namaste! 🙏 Aapka ₹1,500 / 3-month offer khatam hone wala tha, lekin humne aapke number par ise *aakhri baar* extend kiya hai ⏳\n\nYeh *final chance* hai — iske baad yeh offer hata diya jayega.\n\nClaim karne ke liye bas *YES* likh dijiye! 🔒"
       },
       {
-        "id": "kathak_trial_2",
-        "topic": "3 Free Live Trial Classes — Experience Classical Grace",
-        "is_final_trial_offer": true,
-        "message": "Hello! 🌸 Kathak join karne se pehle live class ka feel lena sabse best decision hai. Isliye hum aapke liye **3 Free Live Interactive Trial Classes** unlock kar rahe hain! 🎁\n\nLive aakar guru ji ke saath basic tatkar aur mudras try kijiye — 100% Free Pass!\n\nKya main kal ke batch mein aapka trial slot confirm karoon? Bas timing bata dijiye! ✨💃"
+        "id": "kathak_offer_2",
+        "topic": "Offer Expiring — Extended One Last Time",
+        "message": "Hello! 🌸 Aapke number par jo ₹1,500 / 3-month offer active tha, woh ab *expire hone ke bilkul kareeb* hai ⏳\n\nHumne ise *last time* ke liye extend kiya hai taaki aap Live Kathak Classes join kar sakein. Iske baad yeh offer wapas nahi milega.\n\nClaim karne ke liye *YES* reply karein! 🔒"
       },
       {
-        "id": "kathak_trial_3",
-        "topic": "3 Free Live Trial Classes — Zero Risk Classical Pass",
-        "is_final_trial_offer": true,
-        "message": "Namaste! ✨ Sensationz App par aapke liye **3 Free Live Classical Kathak Trial Sessions** ready hain! 🎁\n• Senior Guru Ms. Madhuri / Kratika Gontiya ke live batch mein entry\n• Tatkar & basic mudra introduction\n• Zero registration fee\n\nTrial class book karne ke liye bas 'FREE TRIAL' likhein aur batayein weekday ya weekend kaunsa time suit karega! 🌿"
+        "id": "kathak_offer_3",
+        "topic": "Final Reminder — Offer Closing Soon",
+        "message": "Hi! 😊 Yeh aapka *aakhri reminder* hai — ₹1,500 / 3-month offer ab *jaldi hi band* ho raha hai ⏳\n\nAgar aap Live Kathak Classes ka hissa banna chahte hain, toh isse abhi claim kar lijiye, warna yeh offer chala jayega!\n\nBas *YES* likh dijiye 🔒"
       },
       {
-        "id": "kathak_trial_4",
-        "topic": "3 Free Live Trial Classes — Weekend & Weekday Pass",
-        "is_final_trial_offer": true,
-        "message": "Special Invitation: Kathak ki shastriya kala ko ghar baithe live experience kijiye with **3 Free Trial Classes**! 🌟🎁\n\nAgar pasand aaye toh hi aage continue kijiye, koi commitment nahi hai. Chahe weekday ho ya weekend, batch timing aapki pasand ka hoga.\n\nKya main aapka trial slot lock kar doon? Bas 'YES' bhej dijiye! 🙏✨"
+        "id": "kathak_offer_4",
+        "topic": "Extended For The Final Time",
+        "message": "Namaste! ✨ Humne aapke liye ₹1,500 / 3-month offer ko *final baar* extend kiya hai.\n\nYeh aapka *last mauka* hai — iske baad yeh offer hata diya jayega ⏳\n\nLive Kathak Classes mein apni seat pakki karne ke liye abhi *YES* reply karein! 🔒"
       },
       {
-        "id": "kathak_trial_5",
-        "topic": "3 Free Live Trial Classes — Final Invitation",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🙏 Yeh aapka final classical pass hai: **3 Free Live Interactive Kathak Sessions** Sensationz App par! 🌺\n\nExpert classical guru se direct live guidance paayein bilkul muft. Limited seats available hain.\n\nKya main aapka trial confirm kar doon? Bas apna preferred timing bata dijiye! 🌟✨"
+        "id": "kathak_offer_5",
+        "topic": "Very Little Time Left",
+        "message": "Hello! 🙏 Bahut kam time bacha hai — aapka ₹1,500 / 3-month offer *jaldi expire* ho jayega ⏳\n\nAgar Live Kathak Classes join karna chahte hain, toh abhi *YES* likh dijiye. Hum aapka timing aur registration turant set kar denge! 🔒"
       }
     ]
   }

@@ -1,7 +1,7 @@
 {
   "course": "ladies_dance",
   "course_name": "Online Live Interactive Ladies Bollywood Dance",
-  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final offer extension)",
   "stages": {
     "30m": [
       {
@@ -113,34 +113,29 @@
     ],
     "6h_step5_trials": [
       {
-        "id": "dance_trial_1",
-        "topic": "3 Free Live Trial Classes — Experience the Energy",
-        "is_final_trial_offer": true,
-        "message": "Hi! 😊 Agar aap abhi decide nahi kar pa rahe hain, toh no problem! Hum chahte hain ki aap pehle class ka fun, energy aur instructor ka style khud experience karein! 💃🎉\n\nHum aapke liye **3 Free Live Interactive Trial Classes** de rahe hain Sensationz App par! 🎁\n• 100% Free / Zero commitment\n• Direct live interaction with expert female choreographer\n• Ghar baithe live dance session\n\nKya main aapka free trial book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🌟✨"
+        "id": "dance_offer_1",
+        "topic": "Last Extension — Final Chance",
+        "message": "Namaste! 🙏 Aapka ₹600 / 3-month offer khatam hone wala tha, lekin humne aapke number par ise *aakhri baar* extend kiya hai ⏳\n\nYeh *final chance* hai — iske baad yeh offer hata diya jayega.\n\nClaim karne ke liye bas *YES* likh dijiye! 🔒"
       },
       {
-        "id": "dance_trial_2",
-        "topic": "3 Free Live Trial Classes — Try Before Enrolling",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🌸 Koi bhi payment karne se pehle, pehle 3 din hamari live Bollywood dance batch attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki choreographer kitne easy steps mein sikhate hain aur kitna maza aata hai. 100% Free Pass!\n\nKya main aapka trial slot book karoon? Apna timing bata dijiye! 💃✨"
+        "id": "dance_offer_2",
+        "topic": "Offer Expiring — Extended One Last Time",
+        "message": "Hello! 🌸 Aapke number par jo ₹600 / 3-month offer active tha, woh ab *expire hone ke bilkul kareeb* hai ⏳\n\nHumne ise *last time* ke liye extend kiya hai taaki aap Live Ladies Bollywood Dance Classes join kar sakein. Iske baad yeh offer wapas nahi milega.\n\nClaim karne ke liye *YES* reply karein! 🔒"
       },
       {
-        "id": "dance_trial_3",
-        "topic": "3 Free Live Trial Classes — Zero Risk Pass",
-        "is_final_trial_offer": true,
-        "message": "Special Pass for You: Sensationz App par aapke liye **3 Free Live Interactive Trial Classes** unlock ho chuki hain! 🎁\n• Female choreographer ke saath live session\n• Beginner friendly Bollywood beats\n• Zero registration fee\n\nFree trial book karne ke liye bas 'FREE TRIAL' reply kijiye aur batayein morning 11 AM ya evening 5 PM/6 PM kaunsa time suit karega! 🌟"
+        "id": "dance_offer_3",
+        "topic": "Final Reminder — Offer Closing Soon",
+        "message": "Hi! 😊 Yeh aapka *aakhri reminder* hai — ₹600 / 3-month offer ab *jaldi hi band* ho raha hai ⏳\n\nAgar aap Live Ladies Bollywood Dance Classes ka hissa banna chahte hain, toh isse abhi claim kar lijiye, warna yeh offer chala jayega!\n\nBas *YES* likh dijiye 🔒"
       },
       {
-        "id": "dance_trial_4",
-        "topic": "3 Free Live Trial Classes — Join Live Today",
-        "is_final_trial_offer": true,
-        "message": "Hello! 💃 Don't miss out — hum aapko invite kar rahe hain hamare exclusive live batch mein with **3 Free Trial Sessions**! 🎁\n\nLive aakar dekhiye aur Bollywood beats par full energy enjoy kijiye. Koi card ya commitment ki zaroorat nahi hai.\n\nKya main kal ke batch mein aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+        "id": "dance_offer_4",
+        "topic": "Extended For The Final Time",
+        "message": "Namaste! ✨ Humne aapke liye ₹600 / 3-month offer ko *final baar* extend kiya hai.\n\nYeh aapka *last mauka* hai — iske baad yeh offer hata diya jayega ⏳\n\nLive Ladies Bollywood Dance Classes mein apni seat pakki karne ke liye abhi *YES* reply karein! 🔒"
       },
       {
-        "id": "dance_trial_5",
-        "topic": "3 Free Live Trial Classes — Final Invitation",
-        "is_final_trial_offer": true,
-        "message": "Namaste! ✨ Yeh aapka final VIP invite hai: **3 Free Live Interactive Bollywood Dance Classes** Sensationz App par! 🌟\n\nGhar baithe expert choreographer se step-by-step dance seekhein bilkul free. Limited trial slots available hain.\n\nKya main aapka free pass activate kar doon? Bas timing bata dijiye! 🙏💃"
+        "id": "dance_offer_5",
+        "topic": "Very Little Time Left",
+        "message": "Hello! 🙏 Bahut kam time bacha hai — aapka ₹600 / 3-month offer *jaldi expire* ho jayega ⏳\n\nAgar Live Ladies Bollywood Dance Classes join karna chahte hain, toh abhi *YES* likh dijiye. Hum aapka timing aur registration turant set kar denge! 🔒"
       }
     ]
   }

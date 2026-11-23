@@ -1,0 +1,169 @@
+{
+  "course": "qr",
+  "course_name": "QR Sent — Awaiting Payment",
+  "cadence_description": "5m -> 30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final reminder). Payment help only: no trial offers, no fake urgency, never asks for OTP/card details.",
+  "stages": {
+    "5m": [
+      {
+        "id": "qr_5m_1",
+        "topic": "Payment Assistance Check-in",
+        "message": "Hi! 😊 Upar bheje gaye UPI QR se payment karne mein koi dikkat to nahi aa rahi? Koi bhi sawaal ho toh yahin pooch lijiye, main help karta hoon! 🙏"
+      },
+      {
+        "id": "qr_5m_2",
+        "topic": "Any UPI App Works",
+        "message": "Namaste! ✨ Upar wala QR aap kisi bhi UPI app se scan kar sakte hain — GPay, PhonePe, Paytm ya apne bank ka app. Payment complete hote hi aapka enrollment activate ho jaata hai! 😊"
+      },
+      {
+        "id": "qr_5m_3",
+        "topic": "Scan From Another Phone",
+        "message": "Hello! 📱 Agar QR isi phone par hai, toh screenshot leke UPI app mein 'Scan from gallery' option se bhi pay kar sakte hain. Koi problem aaye toh bataiye! 🙏"
+      },
+      {
+        "id": "qr_5m_4",
+        "topic": "Quick Help Offer",
+        "message": "Hi! 😊 Bas check kar raha tha — kya payment ho gaya, ya aapko kisi step mein help chahiye? Main yahin hoon! ✨"
+      },
+      {
+        "id": "qr_5m_5",
+        "topic": "Exact Amount Pre-filled",
+        "message": "Namaste! 🌸 QR mein amount pehle se set hai, aapko kuch type nahi karna — bas scan karke pay kar dijiye. Koi doubt ho toh zaroor poochiye! 🙏"
+      }
+    ],
+    "30m": [
+      {
+        "id": "qr_30m_1",
+        "topic": "Gentle Payment Reminder",
+        "message": "Namaste! ✨ Aapka QR abhi bhi active hai. Jab aap ready hon, kisi bhi UPI app se scan karke payment complete kar sakte hain. Koi sawaal ho toh poochiye! 😊"
+      },
+      {
+        "id": "qr_30m_2",
+        "topic": "What Happens After Payment",
+        "message": "Hello! 🌟 Payment ke baad aapko Sensationz App mein Gmail se login karna hota hai aur aapki classes wahin dikh jaati hain. Pura process 2 minute ka hai! Kya payment mein koi help chahiye? 🙏"
+      },
+      {
+        "id": "qr_30m_3",
+        "topic": "Payment Failed Help",
+        "message": "Hi! 😊 Agar payment fail ho gaya ho ya paise kat gaye par confirmation nahi aaya, toh ghabraiye mat — yahan bata dijiye, hum check karke help karenge. 🙏"
+      },
+      {
+        "id": "qr_30m_4",
+        "topic": "Change Package or Timing",
+        "message": "Namaste! 🌸 Agar aap package ya timing badalna chahte hain, toh bata dijiye — main naya QR bhej dunga. Warna upar wale QR se payment kar sakte hain! ✨"
+      },
+      {
+        "id": "qr_30m_5",
+        "topic": "Secure Payment",
+        "message": "Hello! 🔒 Payment Razorpay ke secure UPI gateway se hota hai. Hum kabhi bhi OTP, card number ya bank password nahi maangte. Koi sawaal ho toh poochiye! 😊"
+      }
+    ],
+    "3h": [
+      {
+        "id": "qr_3h_1",
+        "topic": "Seat Still Open",
+        "message": "Namaste! 🙏 Aapka selected batch abhi bhi aapke liye open hai. Payment complete karte hi aap apni classes join kar sakte hain. Kya koi help chahiye? 😊"
+      },
+      {
+        "id": "qr_3h_2",
+        "topic": "Any Questions Before Paying",
+        "message": "Hello! ✨ Payment se pehle koi bhi sawaal ho — timing, teacher, ya app ke baare mein — toh bina hichkichaye pooch lijiye. Main yahin hoon! 🌸"
+      },
+      {
+        "id": "qr_3h_3",
+        "topic": "UPI Limit / Bank Issue",
+        "message": "Hi! 😊 Kabhi kabhi bank ki daily UPI limit ya server issue se payment ruk jaata hai. Thodi der baad dobara try kijiye, ya kisi doosre UPI app se scan kijiye. Help chahiye toh bataiye! 🙏"
+      },
+      {
+        "id": "qr_3h_4",
+        "topic": "Family Member Can Pay",
+        "message": "Namaste! 🌟 Ghar ka koi bhi member apne UPI app se yeh QR scan karke payment kar sakta hai — enrollment aapke hi number par hoga. 😊"
+      },
+      {
+        "id": "qr_3h_5",
+        "topic": "Live Classes From Home",
+        "message": "Hello! 🏠 Payment ke baad aap ghar baithe live interactive classes join kar sakte hain, certified teacher ke saath. Kya main payment mein aapki help karoon? ✨"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "qr_6h1_1",
+        "topic": "Friendly Check-in",
+        "message": "Namaste! 🙏 Bas yaad dila raha tha — aapka QR abhi bhi active hai. Jab aapko convenient ho tab payment kar dijiye. Koi dikkat ho toh bataiye! 😊"
+      },
+      {
+        "id": "qr_6h1_2",
+        "topic": "Need A Fresh QR?",
+        "message": "Hello! ✨ Agar upar wala QR dhoondhne mein dikkat ho rahi hai, toh 'QR' likh dijiye — main dobara bhej dunga. 🌸"
+      },
+      {
+        "id": "qr_6h1_3",
+        "topic": "Login After Payment",
+        "message": "Hi! 😊 Payment ke baad bas apni Gmail ID yahan share karni hoti hai, taaki hum aapka course app mein activate kar sakein. Bahut simple process hai! 🙏"
+      },
+      {
+        "id": "qr_6h1_4",
+        "topic": "Doubt Clearing",
+        "message": "Namaste! 🌟 Kya koi aisi baat hai jo aapko payment karne se rok rahi hai? Bataiye, main pura clear karne ki koshish karunga. 😊"
+      },
+      {
+        "id": "qr_6h1_5",
+        "topic": "Class Recordings Included",
+        "message": "Hello! 📱 Enrollment ke saath aapko live classes ke saath class recordings bhi app mein milti hain, taaki aap kabhi bhi practice kar sakein. Payment mein help chahiye? ✨"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "qr_6h2_1",
+        "topic": "Still Interested?",
+        "message": "Namaste! 🙏 Kya aap abhi bhi join karna chahte hain? Agar haan, toh QR se payment kar dijiye. Agar koi problem hai toh bataiye, hum solve karenge. 😊"
+      },
+      {
+        "id": "qr_6h2_2",
+        "topic": "Different Package Option",
+        "message": "Hello! ✨ Agar abhi wala package budget mein nahi baith raha, toh bata dijiye — main doosre package options share kar sakta hoon. 🌸"
+      },
+      {
+        "id": "qr_6h2_3",
+        "topic": "Payment Proof Help",
+        "message": "Hi! 😊 Agar aapne payment kar diya hai, toh bas yahan 'paid' likh dijiye — hum Razorpay par check karke turant confirm karenge. 🙏"
+      },
+      {
+        "id": "qr_6h2_4",
+        "topic": "Timing Change",
+        "message": "Namaste! 🌟 Agar selected timing ab suit nahi kar rahi, toh bataiye — doosri timing ke saath naya QR bhej dunga. 😊"
+      },
+      {
+        "id": "qr_6h2_5",
+        "topic": "Here To Help",
+        "message": "Hello! 🌸 Main yahin hoon agar aapko payment, app ya class ke baare mein koi bhi madad chahiye. Bas reply kar dijiye! ✨"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "qr_final_1",
+        "topic": "Final Reminder",
+        "message": "Namaste! 🙏 Yeh aapke enrollment ka last reminder hai. Jab bhi aap ready hon, QR se payment kar sakte hain ya naya QR mangwa sakte hain. Hum aapka intezaar karenge! 😊"
+      },
+      {
+        "id": "qr_final_2",
+        "topic": "Door Always Open",
+        "message": "Hello! ✨ Koi jaldi nahi hai — jab bhi aapko time mile, bas 'QR' likh dijiye aur main naya QR bhej dunga. Aapka swagat hai! 🌸"
+      },
+      {
+        "id": "qr_final_3",
+        "topic": "Ask Anything",
+        "message": "Hi! 😊 Agar payment se pehle kisi se baat karni ho ya koi sawaal ho, toh bas yahan likh dijiye. Hum hamesha help ke liye ready hain! 🙏"
+      },
+      {
+        "id": "qr_final_4",
+        "topic": "Gentle Close",
+        "message": "Namaste! 🌟 Aapki learning journey shuru karne ke liye hum excited hain. Jab bhi ready hon, payment karke turant classes join kar sakte hain! 😊"
+      },
+      {
+        "id": "qr_final_5",
+        "topic": "Final Help Offer",
+        "message": "Hello! 🌸 Agar payment mein koi bhi technical dikkat aa rahi ho, toh bataiye — hum step-by-step help karenge. Aapka din shubh ho! ✨"
+      }
+    ]
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "course": "trial",
+  "course_name": "Trial Path — Book In App",
+  "cadence_description": "5m -> 30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final). App booking help only: never asks timing/teacher/package/fees in chat, never books or confirms a trial in chat, no QR, no paid pitch.",
+  "stages": {
+    "5m": [
+      {
+        "id": "trial_5m_1",
+        "topic": "Booked In App?",
+        "message": "Hi! 😊 Kya aap Sensationz App mein apni free trial class book kar paaye? Koi dikkat aaye toh bataiye, main help karta hoon! 🙏"
+      },
+      {
+        "id": "trial_5m_2",
+        "topic": "Booking Steps",
+        "message": "Namaste! ✨ Trial book karna bahut aasan hai:\n1. Sensationz App download karein\n2. Google se login karein\n3. Profile → Trial Links\n4. Apni pasand ki timing select karke 'Confirm Trial Enrollment' par tap karein 🌸"
+      },
+      {
+        "id": "trial_5m_3",
+        "topic": "Video Guide Offer",
+        "message": "Hello! 🎥 Agar app mein trial book karne mein confusion ho, toh 'GUIDE' likh dijiye — main 1 minute ka video guide bhej dunga. 😊"
+      },
+      {
+        "id": "trial_5m_4",
+        "topic": "App Download Help",
+        "message": "Hi! 📱 App download karne mein koi dikkat to nahi aayi? Android aur iPhone dono par Sensationz App available hai. 'LINK' likhiye, main link bhej deta hoon! ✨"
+      },
+      {
+        "id": "trial_5m_5",
+        "topic": "Free, No Payment",
+        "message": "Namaste! 🌟 Yaad rahe, trial classes bilkul free hain — koi payment nahi lagta. Bas app mein Profile → Trial Links se book kar lijiye! 🙏"
+      }
+    ],
+    "30m": [
+      {
+        "id": "trial_30m_1",
+        "topic": "Trial Links Location",
+        "message": "Namaste! 😊 App mein login karne ke baad niche 'Profile' par jaiye, wahan 'Trial Links' milega. Wahin se aap apni trial class book kar sakte hain! ✨"
+      },
+      {
+        "id": "trial_30m_2",
+        "topic": "Choose Timing In App",
+        "message": "Hello! 🌸 Trial ki timing aap khud app mein choose kar sakte hain — jo bhi aapke routine mein fit ho. Booking ke baad class app mein dikh jaayegi! 🙏"
+      },
+      {
+        "id": "trial_30m_3",
+        "topic": "Login Help",
+        "message": "Hi! 📲 Login mein dikkat aa rahi ho toh 'Continue with Google' option use kijiye — sabse aasan hai. Phir bhi problem ho toh bataiye! 😊"
+      },
+      {
+        "id": "trial_30m_4",
+        "topic": "Live Interactive Trial",
+        "message": "Namaste! ✨ Trial classes bhi poori tarah live aur interactive hoti hain — certified teacher aapko real-time guide karte hain. App mein book karke khud experience kijiye! 🌟"
+      },
+      {
+        "id": "trial_30m_5",
+        "topic": "Any Question",
+        "message": "Hello! 😊 Class ke format, teacher ya app ke baare mein koi sawaal ho toh yahan pooch lijiye. Booking app mein hi hoti hai, par help main yahan kar sakta hoon! 🙏"
+      }
+    ],
+    "3h": [
+      {
+        "id": "trial_3h_1",
+        "topic": "Gentle Booking Reminder",
+        "message": "Namaste! 🌸 Bas yaad dila raha tha — aapki free trial classes app mein aapka intezaar kar rahi hain. Profile → Trial Links se book kar lijiye! 😊"
+      },
+      {
+        "id": "trial_3h_2",
+        "topic": "Device Options",
+        "message": "Hello! 📱💻 Trial class aap mobile, tablet ya laptop kisi par bhi join kar sakte hain. Bas stable internet aur thodi khuli jagah chahiye! ✨"
+      },
+      {
+        "id": "trial_3h_3",
+        "topic": "What To Keep Ready",
+        "message": "Hi! 🌟 Trial class ke liye comfortable kapde, paani ki bottle aur thodi khuli jagah ready rakhiye. Baaki sab teacher class mein sikha denge! 🙏"
+      },
+      {
+        "id": "trial_3h_4",
+        "topic": "Video Guide Reminder",
+        "message": "Namaste! 🎥 Agar booking ke steps samajh nahi aa rahe, toh 'GUIDE' likhiye — main video guide bhej deta hoon jisme sab step-by-step dikhaya gaya hai. 😊"
+      },
+      {
+        "id": "trial_3h_5",
+        "topic": "Beginner Friendly",
+        "message": "Hello! ✨ Pehle se koi experience zaroori nahi hai — trial class beginners ke liye bilkul comfortable hoti hai. App mein book karke try kijiye! 🌸"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "trial_6h1_1",
+        "topic": "Booking Status",
+        "message": "Namaste! 🙏 Kya aapne trial book kar liya? Agar app mein koi error ya problem aa rahi hai toh screenshot ke bajaye yahan likh ke bataiye, hum help karenge. 😊"
+      },
+      {
+        "id": "trial_6h1_2",
+        "topic": "Trial Links Not Showing",
+        "message": "Hello! ✨ Agar 'Trial Links' nahi dikh raha, toh app ko update karke dobara login kijiye. Phir bhi na dikhe toh bataiye! 🌸"
+      },
+      {
+        "id": "trial_6h1_3",
+        "topic": "Join On Time",
+        "message": "Hi! 😊 Trial book karne ke baad class time se 5 minute pehle app khol lijiye, taaki aap aaram se join kar sakein. 🌟"
+      },
+      {
+        "id": "trial_6h1_4",
+        "topic": "Experience Before Deciding",
+        "message": "Namaste! 🌸 Trial ka maksad yahi hai ki aap pehle khud class ka experience lein, phir decide karein. Koi pressure nahi hai! App mein book kar lijiye. 🙏"
+      },
+      {
+        "id": "trial_6h1_5",
+        "topic": "Help Available",
+        "message": "Hello! 📲 App, login ya booking — kisi bhi cheez mein help chahiye ho toh bas reply kar dijiye. Main yahin hoon! ✨"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "trial_6h2_1",
+        "topic": "Still Planning The Trial?",
+        "message": "Namaste! 😊 Kya aap abhi bhi trial class lena chahte hain? Jab bhi time mile, app mein Profile → Trial Links se book kar sakte hain. 🌸"
+      },
+      {
+        "id": "trial_6h2_2",
+        "topic": "How Was It?",
+        "message": "Hello! ✨ Agar aapne trial class le li hai, toh kaisi lagi? Aapka feedback jaanna hamare liye bahut keemti hai! 🙏"
+      },
+      {
+        "id": "trial_6h2_3",
+        "topic": "Missed The Trial?",
+        "message": "Hi! 🌟 Agar kisi wajah se trial class miss ho gayi, toh koi baat nahi — app mein dobara Trial Links se doosri timing book kar sakte hain. 😊"
+      },
+      {
+        "id": "trial_6h2_4",
+        "topic": "App Help Reminder",
+        "message": "Namaste! 📱 Agar app download ya login abhi tak nahi hua, toh 'LINK' ya 'GUIDE' likhiye — main turant bhej dunga. 🌸"
+      },
+      {
+        "id": "trial_6h2_5",
+        "topic": "Questions About Classes",
+        "message": "Hello! 😊 Teacher, class format ya syllabus ke baare mein koi sawaal ho toh yahan pooch lijiye. Main jawab dene ke liye yahin hoon! ✨"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "trial_final_1",
+        "topic": "Final Gentle Reminder",
+        "message": "Namaste! 🙏 Aapki free trial classes abhi bhi available hain. Jab bhi aap ready hon, app mein Profile → Trial Links se book kar lijiye. Hum aapka intezaar karenge! 😊"
+      },
+      {
+        "id": "trial_final_2",
+        "topic": "Feedback Request",
+        "message": "Hello! 🌸 Agar trial class attend ki hai, toh batayein aapko kaisi lagi? Agar abhi tak nahi ki, toh koi jaldi nahi — app mein kabhi bhi book kar sakte hain! ✨"
+      },
+      {
+        "id": "trial_final_3",
+        "topic": "Door Always Open",
+        "message": "Hi! 😊 Jab bhi aapko time mile, app mein trial book kar lijiye. Koi bhi sawaal ho toh bas yahan likh dijiye! 🙏"
+      },
+      {
+        "id": "trial_final_4",
+        "topic": "Support Offer",
+        "message": "Namaste! 🌟 App mein trial booking ya class join karne mein koi bhi technical dikkat ho, toh bataiye — hum step-by-step help karenge. 😊"
+      },
+      {
+        "id": "trial_final_5",
+        "topic": "Warm Close",
+        "message": "Hello! ✨ Aapki learning journey ke liye hamari shubhkamnayein! Trial ke baare mein koi bhi sawaal ho, main hamesha yahin hoon. 🌸"
+      }
+    ]
+  }
+}

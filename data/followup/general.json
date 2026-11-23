@@ -1,7 +1,7 @@
 {
   "course": "general",
   "course_name": "Sensationz Performing Arts Academy",
-  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final offer extension)",
   "stages": {
     "30m": [
       {
@@ -113,34 +113,29 @@
     ],
     "6h_step5_trials": [
       {
-        "id": "general_trial_1",
-        "topic": "3 Free Live Trial Classes — Experience Sensationz",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 😊 Agar aap decide nahi kar pa rahe hain, toh koi baat nahi — hum chahte hain ki aap pehle khud class ka standard aur teaching style live experience karein! 🌟\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• Zero payment / Bilkul Free\n• Live 2-way session with master instructor\n• Zero commitment\n\nKya main aapka free trial book kar doon? Bas 'YES' likh kar reply karein aur apna preferred course batayein! 🙏✨"
+        "id": "general_offer_1",
+        "topic": "Last Extension — Final Chance",
+        "message": "Namaste! 🙏 Aapka special 3-month offer khatam hone wala tha, lekin humne aapke number par ise *aakhri baar* extend kiya hai ⏳\n\nYeh *final chance* hai — iske baad yeh offer hata diya jayega.\n\nClaim karne ke liye bas *YES* likh dijiye! 🔒"
       },
       {
-        "id": "general_trial_2",
-        "topic": "3 Free Live Trial Classes — Zero Risk Pass",
-        "is_final_trial_offer": true,
-        "message": "Hello! 🌸 Kisi bhi payment se pehle, 3 din hamari live interactive class attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki certified teachers kitne pyaar aur patience se sikhate hain. 100% Free Pass!\n\nKya main aapka trial slot confirm karoon? Bas timing bata dijiye! ✨🌿"
+        "id": "general_offer_2",
+        "topic": "Offer Expiring — Extended One Last Time",
+        "message": "Hello! 🌸 Aapke number par jo special 3-month offer active tha, woh ab *expire hone ke bilkul kareeb* hai ⏳\n\nHumne ise *last time* ke liye extend kiya hai taaki aap hamari live classes join kar sakein. Iske baad yeh offer wapas nahi milega.\n\nClaim karne ke liye *YES* reply karein! 🔒"
       },
       {
-        "id": "general_trial_3",
-        "topic": "3 Free Live Trial Classes — Multi-Course Pass",
-        "is_final_trial_offer": true,
-        "message": "Special Pass: Sensationz App par aapke liye **3 Free Live Interactive Trial Classes** unlock ho chuki hain! 🎁\n• Yoga, Dance ya Kathak kisi bhi course mein live entry\n• Direct interaction with master faculty\n• Zero registration charge\n\nFree trial book karne ke liye bas 'FREE TRIAL' reply kijiye aur apna preferred time batayein! 🌟"
+        "id": "general_offer_3",
+        "topic": "Final Reminder — Offer Closing Soon",
+        "message": "Hi! 😊 Yeh aapka *aakhri reminder* hai — special 3-month offer ab *jaldi hi band* ho raha hai ⏳\n\nAgar aap hamari live classes ka hissa banna chahte hain, toh isse abhi claim kar lijiye, warna yeh offer chala jayega!\n\nBas *YES* likh dijiye 🔒"
       },
       {
-        "id": "general_trial_4",
-        "topic": "3 Free Live Trial Classes — Join Live from Home",
-        "is_final_trial_offer": true,
-        "message": "Hello! 🏠 Don't miss out — hum aapko invite kar rahe hain hamare exclusive live batch mein with **3 Free Trial Sessions**! 🎁\n\nGhar baithe live interactive learning ka maza lijiye. Agar pasand aaye toh continue kijiye, koi compulsion nahi hai.\n\nKya main kal ke batch mein aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+        "id": "general_offer_4",
+        "topic": "Extended For The Final Time",
+        "message": "Namaste! ✨ Humne aapke liye special 3-month offer ko *final baar* extend kiya hai.\n\nYeh aapka *last mauka* hai — iske baad yeh offer hata diya jayega ⏳\n\nhamari live classes mein apni seat pakki karne ke liye abhi *YES* reply karein! 🔒"
       },
       {
-        "id": "general_trial_5",
-        "topic": "3 Free Live Trial Classes — Final VIP Pass",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🙏 Yeh aapka final VIP invite hai: **3 Free Live Interactive Classes** Sensationz App par! 🌟\n\nCertified master teachers se direct live sikhne ka mauka paayein bilkul muft. Limited seats available hain.\n\nKya main aapka free pass activate kar doon? Bas course aur timing bata dijiye! 🌿✨"
+        "id": "general_offer_5",
+        "topic": "Very Little Time Left",
+        "message": "Hello! 🙏 Bahut kam time bacha hai — aapka special 3-month offer *jaldi expire* ho jayega ⏳\n\nAgar hamari live classes join karna chahte hain, toh abhi *YES* likh dijiye. Hum aapka timing aur registration turant set kar denge! 🔒"
       }
     ]
   }

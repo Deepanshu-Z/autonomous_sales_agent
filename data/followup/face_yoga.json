@@ -1,7 +1,7 @@
 {
   "course": "face_yoga",
   "course_name": "Online Live Interactive Face Yoga",
-  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final offer extension)",
   "stages": {
     "30m": [
       {
@@ -113,34 +113,29 @@
     ],
     "6h_step5_trials": [
       {
-        "id": "face_trial_1",
-        "topic": "3 Free Live Trial Classes — Feel the Refreshing Glow",
-        "is_final_trial_offer": true,
-        "message": "Namaste! ✨ Agar aap abhi decide nahi kar pa rahe hain, toh bilkul koi baat nahi — hum chahte hain ki aap pehle face yoga ka refreshing feel khud live class mein dekhein! 🌸\n\nHum aapke liye **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero cost\n• Live guidance with certified Face Yoga expert\n• Instant fresh glow & relaxation feel\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur batayein kaunsa time suit karega! 🌟🙏"
+        "id": "face_offer_1",
+        "topic": "Last Extension — Final Chance",
+        "message": "Namaste! 🙏 Aapka ₹600 / 3-month offer khatam hone wala tha, lekin humne aapke number par ise *aakhri baar* extend kiya hai ⏳\n\nYeh *final chance* hai — iske baad yeh offer hata diya jayega.\n\nClaim karne ke liye bas *YES* likh dijiye! 🔒"
       },
       {
-        "id": "face_trial_2",
-        "topic": "3 Free Live Trial Classes — Try Live Massage Strokes",
-        "is_final_trial_offer": true,
-        "message": "Hello! 💆‍♀️ Kisi bhi payment se pehle, 3 din hamare certified instructor ke saath live Face Yoga attend karke dekhiye — bilkul FREE! 🎁\n\nAap khud dekhenge ki kaise facial muscles relax hoti hain aur jawline par instant light feel hota hai. Pure Free Pass!\n\nKya main kal ke batch mein aapka trial slot confirm karoon? Timing bata dijiye! ✨🌸"
+        "id": "face_offer_2",
+        "topic": "Offer Expiring — Extended One Last Time",
+        "message": "Hello! 🌸 Aapke number par jo ₹600 / 3-month offer active tha, woh ab *expire hone ke bilkul kareeb* hai ⏳\n\nHumne ise *last time* ke liye extend kiya hai taaki aap Live Face Yoga Classes join kar sakein. Iske baad yeh offer wapas nahi milega.\n\nClaim karne ke liye *YES* reply karein! 🔒"
       },
       {
-        "id": "face_trial_3",
-        "topic": "3 Free Live Trial Classes — Zero Risk Glow Pass",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 💎 Sensationz App par aapke liye **3 Free Live Interactive Face Yoga Sessions** ready hain! 🎁\n• Certified instructor ke saath live correction\n• Acupressure points & anti-puffiness techniques\n• Zero registration fee\n\nTrial book karne ke liye bas 'FREE TRIAL' likhkar reply karein aur batayein morning 7/8 AM ya evening 5/6 PM kaunsa time suit karega! 🌿"
+        "id": "face_offer_3",
+        "topic": "Final Reminder — Offer Closing Soon",
+        "message": "Hi! 😊 Yeh aapka *aakhri reminder* hai — ₹600 / 3-month offer ab *jaldi hi band* ho raha hai ⏳\n\nAgar aap Live Face Yoga Classes ka hissa banna chahte hain, toh isse abhi claim kar lijiye, warna yeh offer chala jayega!\n\nBas *YES* likh dijiye 🔒"
       },
       {
-        "id": "face_trial_4",
-        "topic": "3 Free Live Trial Classes — Experience Natural Rejuvenation",
-        "is_final_trial_offer": true,
-        "message": "Special Pass: Hum aapko invite kar rahe hain hamare exclusive live Face Yoga batch mein with **3 Free Trial Sessions**! 🌸🎁\n\nGhar baithe natural skin care aur relaxation seekhein. Agar pasand aaye toh continue kijiye, koi compulsion nahi hai.\n\nKya main aapka trial slot hold karoon? Bas 'YES' likhein! 😊✨"
+        "id": "face_offer_4",
+        "topic": "Extended For The Final Time",
+        "message": "Namaste! ✨ Humne aapke liye ₹600 / 3-month offer ko *final baar* extend kiya hai.\n\nYeh aapka *last mauka* hai — iske baad yeh offer hata diya jayega ⏳\n\nLive Face Yoga Classes mein apni seat pakki karne ke liye abhi *YES* reply karein! 🔒"
       },
       {
-        "id": "face_trial_5",
-        "topic": "3 Free Live Trial Classes — Final Invitation",
-        "is_final_trial_offer": true,
-        "message": "Namaste! ✨ Yeh aapka final VIP invite hai: **3 Free Live Interactive Face Yoga Classes** Sensationz App par! 🌟\n\nExpert instructor se direct live guidance paayein bilkul free. Limited trial slots available hain.\n\nKya main aapka free pass activate kar doon? Bas preferred timing bata dijiye! 🙏💆‍♀️"
+        "id": "face_offer_5",
+        "topic": "Very Little Time Left",
+        "message": "Hello! 🙏 Bahut kam time bacha hai — aapka ₹600 / 3-month offer *jaldi expire* ho jayega ⏳\n\nAgar Live Face Yoga Classes join karna chahte hain, toh abhi *YES* likh dijiye. Hum aapka timing aur registration turant set kar denge! 🔒"
       }
     ]
   }

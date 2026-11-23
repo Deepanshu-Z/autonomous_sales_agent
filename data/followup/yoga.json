@@ -1,7 +1,7 @@
 {
   "course": "yoga",
   "course_name": "Online Live Interactive Yoga",
-  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h with 3 Free Trials)",
+  "cadence_description": "30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final offer extension)",
   "stages": {
     "30m": [
       {
@@ -113,34 +113,29 @@
     ],
     "6h_step5_trials": [
       {
-        "id": "yoga_trial_1",
-        "topic": "3 Free Live Trial Classes Offer — Complete Experience",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 😊 Agar aap abhi decide nahi kar pa rahe hain, toh bilkul tension mat lijiye — hum chahte hain ki aap pehle khud instructor ki live teaching experience karein! 🌟\n\nHum aapko **3 Free Live Interactive Trial Classes** offer kar rahe hain Sensationz App par! 🎁\n• 100% Free / Zero payment\n• Direct live interaction with certified female yoga instructor\n• Koi commitment nahi\n\nKya main aapka free trial class book kar doon? Bas 'YES' likhein aur apna preferred timing batayein! 🙏✨"
+        "id": "yoga_offer_1",
+        "topic": "Last Extension — Final Chance",
+        "message": "Namaste! 🙏 Aapka ₹600 / 3-month offer khatam hone wala tha, lekin humne aapke number par ise *aakhri baar* extend kiya hai ⏳\n\nYeh *final chance* hai — iske baad yeh offer hata diya jayega.\n\nClaim karne ke liye bas *YES* likh dijiye! 🔒"
       },
       {
-        "id": "yoga_trial_2",
-        "topic": "3 Free Live Trial Classes Offer — Experience Live Correction",
-        "is_final_trial_offer": true,
-        "message": "Hello! 🌿 Hum jante hain ki online yoga join karne se pehle live environment dekhna kitna zaroori hota hai. Isliye hum aapke liye **3 Free Live Interactive Trial Classes** unlock kar rahe hain! 🎁\n\nAap class attend karke dekhiye ki instructor kaise postures check karte hain aur kitna relaxing feel hota hai. Purely Free — zero charge!\n\nKya main aapka trial slot confirm kar doon? Bas apna timing bata dijiye! 😊✨"
+        "id": "yoga_offer_2",
+        "topic": "Offer Expiring — Extended One Last Time",
+        "message": "Hello! 🌸 Aapke number par jo ₹600 / 3-month offer active tha, woh ab *expire hone ke bilkul kareeb* hai ⏳\n\nHumne ise *last time* ke liye extend kiya hai taaki aap Live Yoga Classes join kar sakein. Iske baad yeh offer wapas nahi milega.\n\nClaim karne ke liye *YES* reply karein! 🔒"
       },
       {
-        "id": "yoga_trial_3",
-        "topic": "3 Free Live Trial Classes Offer — Zero Risk Start",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🌸 Koi payment karne se pehle, pehle 3 din bilkul FREE hamare saath live practice kijiye! Sensationz App par aapke liye **3 Free Live Trial Sessions** bilkul ready hain. 🎁\n• Female master instructor ke saath live batch\n• Complete beginner friendly guidance\n• Zero registration fee\n\nTrial book karne ke liye bas 'FREE TRIAL' likhkar reply kijiye aur apna morning ya evening time batayein! 🙏"
+        "id": "yoga_offer_3",
+        "topic": "Final Reminder — Offer Closing Soon",
+        "message": "Hi! 😊 Yeh aapka *aakhri reminder* hai — ₹600 / 3-month offer ab *jaldi hi band* ho raha hai ⏳\n\nAgar aap Live Yoga Classes ka hissa banna chahte hain, toh isse abhi claim kar lijiye, warna yeh offer chala jayega!\n\nBas *YES* likh dijiye 🔒"
       },
       {
-        "id": "yoga_trial_4",
-        "topic": "3 Free Live Trial Classes Offer — App Live Pass",
-        "is_final_trial_offer": true,
-        "message": "Special Invitation: Hum aapko invite kar rahe hain hamari certified live yoga class mein with **3 Free Trial Sessions**! 🧘‍♀️🎁\n\nKhud dekhiye ki kaise hazaron women ghar baithe live yoga enjoy karti hain. Agar pasand aaye toh continue kijiye, koi obligation nahi hai!\n\nKya main kal subah ya shaam ke batch mein aapka trial slot book karoon? 😊✨"
+        "id": "yoga_offer_4",
+        "topic": "Extended For The Final Time",
+        "message": "Namaste! ✨ Humne aapke liye ₹600 / 3-month offer ko *final baar* extend kiya hai.\n\nYeh aapka *last mauka* hai — iske baad yeh offer hata diya jayega ⏳\n\nLive Yoga Classes mein apni seat pakki karne ke liye abhi *YES* reply karein! 🔒"
       },
       {
-        "id": "yoga_trial_5",
-        "topic": "3 Free Live Trial Classes Offer — Final Reminder",
-        "is_final_trial_offer": true,
-        "message": "Namaste! 🙏 Yeh aapka final special pass hai: **3 Free Live Interactive Trial Classes** bilkul muft Sensationz App par! 🌟\n\nBina kisi fee ke direct live instructor ke saath asanas aur pranayama seekhein. Yeh offer limited slots ke liye hai.\n\nKya main aapka name aur slot book kar doon? Bas 'YES' bhej dijiye! 🌿✨"
+        "id": "yoga_offer_5",
+        "topic": "Very Little Time Left",
+        "message": "Hello! 🙏 Bahut kam time bacha hai — aapka ₹600 / 3-month offer *jaldi expire* ho jayega ⏳\n\nAgar Live Yoga Classes join karna chahte hain, toh abhi *YES* likh dijiye. Hum aapka timing aur registration turant set kar denge! 🔒"
       }
     ]
   }

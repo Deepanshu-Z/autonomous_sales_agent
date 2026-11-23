@@ -15,7 +15,7 @@ to switch between:
          * 3 hours: 5 distinct company & course fact messages
          * 6 hours (step 3): 5 distinct company & course fact messages
          * 6 hours (step 4): 5 distinct company & course fact messages
-         * 6 hours (step 5): 5 distinct variations of the 3 Free Live Trial Classes offer!
+         * 6 hours (step 5): 5 distinct variations of the "offer expiring — last extension" message
      - Step 6 (~23.5h continuous silence): Final handoff to human agent in Interakt (inside Meta 24h window).
 """
 
@@ -52,7 +52,7 @@ FOLLOWUP_DIR = os.path.join(
 # Step 1 (at 30m silence): wait 3h (10800s) -> triggers 3h message
 # Step 2 (at 3h silence): wait 6h (21600s) -> triggers 6h_step3 message
 # Step 3 (at 6h silence): wait 6h (21600s) -> triggers 6h_step4 message
-# Step 4 (at 6h silence): wait 6h (21600s) -> triggers 6h_step5_trials message (trial offer)
+# Step 4 (at 6h silence): wait 6h (21600s) -> triggers 6h_step5_trials message (final offer-expiry nudge)
 # Step 5 (at 6h silence): wait 2h (7200s) -> triggers ~23.5h agent handoff inside Meta 24h window
 GAPS_24H_SEC: Dict[int, int] = {
     0: 1800,   # 30 minutes after 5m message
@@ -71,7 +71,7 @@ STAGE_KEYS: Dict[int, str] = {
     2: "3h",
     3: "6h_step3",
     4: "6h_step4",
-    5: "6h_step5_trials",
+    5: "6h_step5_trials",  # key kept for compat; content is now the "offer expiring / final extension" message (3-free-trials offer removed)
 }
 
 

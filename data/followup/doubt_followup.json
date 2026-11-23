@@ -1,0 +1,169 @@
+{
+  "course": "doubt",
+  "course_name": "Doubtful / Cautious Client — Build Trust",
+  "cadence_description": "5m -> 30m -> 3h -> 6h (+6h) -> 6h (+6h) -> 6h (+6h final). Proof over claims, zero pressure: no urgency, no limited-seat lines, no QR push, no refund promises. Only verified company facts (legal name, GSTIN, est. 2007, 100k+ students in 18 countries, office addresses, official links).",
+  "stages": {
+    "5m": [
+      {
+        "id": "doubt_5m_1",
+        "topic": "Your Caution Is Right + Company Card",
+        "message": "Namaste! 🙏 Aapka cautious rehna bilkul sahi hai — online itne scams hote hain. Hamari poori details yeh rahi, aap khud verify kar sakte hain:\n\n🏢 *SENSATIONZ MEDIA & ARTS PRIVATE LIMITED*\n📅 Established: 2007\n🧾 Registration No. (GSTIN): 07AALCS9864Q1Z4\n📍 B-305, 3rd Floor, North Ex Mall, Rohini Sector-9, Delhi"
+      },
+      {
+        "id": "doubt_5m_2",
+        "topic": "Registered Company Since 2007",
+        "message": "Hello! ✨ Sensationz koi naya ya anjaan naam nahi hai — hum *Sensationz Media & Arts Pvt. Ltd.* hain, 2007 se registered company. Hamara Registration No. (GSTIN) *07AALCS9864Q1Z4* hai, jo aap GST portal par khud check kar sakte hain. 😊"
+      },
+      {
+        "id": "doubt_5m_3",
+        "topic": "Google Reviews",
+        "message": "Hi! ⭐ Hamare baare mein hamare students kya kehte hain, woh Google reviews par khud padhiye:\nhttps://maps.app.goo.gl/AEWmQTwQ9CRg82Qu9\n\nAap jitna chahein verify kijiye, phir hi decide kijiye. 🙏"
+      },
+      {
+        "id": "doubt_5m_4",
+        "topic": "We Never Ask For OTP",
+        "message": "Namaste! 🔒 Ek zaroori baat: hum kabhi bhi OTP, card number, CVV ya bank password nahi maangte. Agar koi aisa maange toh woh hum nahi hain. 😊"
+      },
+      {
+        "id": "doubt_5m_5",
+        "topic": "Ask Anything",
+        "message": "Hello! 🌸 Aapke mann mein jo bhi sawaal ya shaq hai, bina hichkichaye poochiye — company, teachers, classes ya payment ke baare mein. Main seedha aur sach jawab dunga. 🙏"
+      }
+    ],
+    "30m": [
+      {
+        "id": "doubt_30m_1",
+        "topic": "Real Classes On Instagram",
+        "message": "Namaste! 🎥 Hamari real live classes, students aur performances aap Instagram par khud dekh sakte hain:\nhttps://www.instagram.com/sensationz_performing_arts/ ✨"
+      },
+      {
+        "id": "doubt_30m_2",
+        "topic": "YouTube Channel",
+        "message": "Hello! 🌟 Hamare teachers aur students ki videos hamare YouTube channel par dekhiye:\nhttps://www.youtube.com/@SensationzDanceAndMusic 😊"
+      },
+      {
+        "id": "doubt_30m_3",
+        "topic": "Google Business Profile",
+        "message": "Hi! 🔎 Google par hamara official business profile dekhiye — wahan hamara address, photos aur reviews sab hain:\nhttps://g.co/kgs/xx9XiaW 🙏"
+      },
+      {
+        "id": "doubt_30m_4",
+        "topic": "Two Physical Offices",
+        "message": "Namaste! 🏢 Hamare do offices hain:\n📍 B-305, 3rd Floor, North Ex Mall, Rohini Sector-9, Delhi\n📍 House No. 178, Naul (Ward No. 3), Naukuchiatal, Bhimtal (Nainital), Uttarakhand\n\nClasses online hoti hain, par company ke asli pate yahi hain. 😊"
+      },
+      {
+        "id": "doubt_30m_5",
+        "topic": "Facebook + Website",
+        "message": "Hello! ✨ Aap hamara Facebook page aur official website bhi dekh sakte hain:\n🌐 https://www.sensationzperformingarts.com/\n📘 https://www.facebook.com/sensationz.dance\n\nJitna chahein verify kijiye. 🌸"
+      }
+    ],
+    "3h": [
+      {
+        "id": "doubt_3h_1",
+        "topic": "Try Free First",
+        "message": "Namaste! 🌟 Sabse aasan tareeka: pehle bina koi payment kiye Sensationz App mein free trial class lijiye aur khud dekhiye. App mein Profile → Trial Links se book hota hai. 🙏"
+      },
+      {
+        "id": "doubt_3h_2",
+        "topic": "100k+ Family In 18 Countries",
+        "message": "Hello! 😊 Sensationz family mein 100k se zyada log hain, jo 18 deshon se judte hain — Kathak, Yoga, Ladies & Kids Dance, Face Yoga, Fitness, Music aur Spoken English seekhne ke liye. ✨"
+      },
+      {
+        "id": "doubt_3h_3",
+        "topic": "Secure Payment Gateway",
+        "message": "Hi! 🔒 Jab bhi aap join karna chahein, payment Razorpay ke secure UPI gateway se hota hai — seedha company *Sensationz Media & Arts Pvt. Ltd.* ke account mein, kisi personal account mein nahi. 🌸"
+      },
+      {
+        "id": "doubt_3h_4",
+        "topic": "Honest About Fees",
+        "message": "Namaste! 🙏 Hum seedhi baat karte hain: fees ek baar dene ke baad refund nahi hoti. Isliye hum chahte hain ki aap pehle free trial se poori tasalli kar lein, phir hi join karein. 😊"
+      },
+      {
+        "id": "doubt_3h_5",
+        "topic": "Talk To A Person",
+        "message": "Hello! ✨ Agar aap kisi insaan se baat karke tasalli karna chahte hain, toh 'CALL' likhiye — hamari team aapse sampark karegi. 🌸"
+      }
+    ],
+    "6h_step3": [
+      {
+        "id": "doubt_6h1_1",
+        "topic": "No Pressure",
+        "message": "Namaste! 😊 Koi jaldi ya pressure nahi hai. Aap aaram se verify kijiye, sochiye, phir decide kijiye. Main yahin hoon jab bhi aapko zaroorat ho. 🙏"
+      },
+      {
+        "id": "doubt_6h1_2",
+        "topic": "Verify GSTIN Yourself",
+        "message": "Hello! 🧾 Hamara Registration No. (GSTIN) *07AALCS9864Q1Z4* hai, legal name *SENSATIONZ MEDIA & ARTS PRIVATE LIMITED*. Aap GST portal (gst.gov.in → Search Taxpayer) par khud check kar sakte hain. ✨"
+      },
+      {
+        "id": "doubt_6h1_3",
+        "topic": "App Access After Payment",
+        "message": "Hi! 📱 Payment ke baad aapki classes turant Sensationz App mein aapki Gmail ID se activate hoti hain — sab kuch app mein dikhta hai, kuch chhupa nahi. App Play Store par hai:\nhttps://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev 😊"
+      },
+      {
+        "id": "doubt_6h1_4",
+        "topic": "Certified Teachers",
+        "message": "Namaste! 🌸 Hamare sabhi teachers certified hain aur class mein aap unhe live dekh aur sun sakte hain. Free trial mein aap khud unse mil sakte hain! 🙏"
+      },
+      {
+        "id": "doubt_6h1_5",
+        "topic": "Read Student Reviews",
+        "message": "Hello! ⭐ Hamare students ne Google par apna experience likha hai — ek baar zaroor padhiye:\nhttps://maps.app.goo.gl/AEWmQTwQ9CRg82Qu9 😊"
+      }
+    ],
+    "6h_step4": [
+      {
+        "id": "doubt_6h2_1",
+        "topic": "Free Trial Reminder",
+        "message": "Namaste! 🙏 Free trial classes mein ek bhi rupaya nahi lagta. Pehle class dekhiye, teacher se miliye, phir hi kuch decide kijiye. 😊"
+      },
+      {
+        "id": "doubt_6h2_2",
+        "topic": "Safe Payment Habits",
+        "message": "Hello! 🔒 Online payment ka ek simple rule: sirf official QR se pay kijiye, aur kabhi OTP share mat kijiye. Hum bhi sirf company ke naam ka official Razorpay QR bhejte hain. ✨"
+      },
+      {
+        "id": "doubt_6h2_3",
+        "topic": "Since 2007",
+        "message": "Hi! 🌟 Sensationz 2007 se performing arts sikha raha hai — Delhi aur Uttarakhand mein hamare offices hain aur students 18 deshon se online judte hain. Koi bhi sawaal ho toh poochiye! 🙏"
+      },
+      {
+        "id": "doubt_6h2_4",
+        "topic": "Human Call Option",
+        "message": "Namaste! 📞 Chat se tasalli na ho toh 'CALL' likhiye — hamari team ka koi member aapse baat karega. 😊"
+      },
+      {
+        "id": "doubt_6h2_5",
+        "topic": "See Real Classes",
+        "message": "Hello! 🎥 Hamari real classes apni aankhon se dekhiye:\n📸 https://www.instagram.com/sensationz_performing_arts/\n▶️ https://www.youtube.com/@SensationzDanceAndMusic ✨"
+      }
+    ],
+    "6h_step5_trials": [
+      {
+        "id": "doubt_final_1",
+        "topic": "Whenever You Are Ready",
+        "message": "Namaste! 🙏 Jab bhi aap ready hon, main yahin hoon. Aap pehle free trial bhi le sakte hain — bina kisi payment ke. Aapka din shubh ho! 😊"
+      },
+      {
+        "id": "doubt_final_2",
+        "topic": "Trust Takes Time",
+        "message": "Hello! 🌸 Bharosa banne mein waqt lagta hai, aur yeh bilkul theek hai. Jab bhi aap verify karke ready hon, bas ek message kar dijiye. ✨"
+      },
+      {
+        "id": "doubt_final_3",
+        "topic": "Free Trial In App",
+        "message": "Hi! 🌟 Ek baar app mein free trial le kar dekhiye — Profile → Trial Links. Koi payment nahi, koi commitment nahi. 🙏"
+      },
+      {
+        "id": "doubt_final_4",
+        "topic": "Full Company Details Recap",
+        "message": "Namaste! 😊 Aapke reference ke liye:\n🏢 SENSATIONZ MEDIA & ARTS PRIVATE LIMITED (est. 2007)\n🧾 GSTIN: 07AALCS9864Q1Z4\n⭐ Reviews: https://maps.app.goo.gl/AEWmQTwQ9CRg82Qu9\n🌐 https://www.sensationzperformingarts.com/\n\nKisi bhi sawaal ke liye yeh chat hamesha khuli hai. 🌸"
+      },
+      {
+        "id": "doubt_final_5",
+        "topic": "Warm Close",
+        "message": "Hello! ✨ Aapne itni dhyan se sawaal poochhe, yeh achhi baat hai. Jab bhi aapko theek lage, hum aapka swagat karenge! 🙏"
+      }
+    ]
+  }
+}

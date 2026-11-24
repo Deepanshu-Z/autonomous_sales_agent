@@ -144,7 +144,7 @@
                 "time_12h": "8:00 AM to 9:00 AM",
                 "instructors": [
                     "Sonali Dhote",
-                    "Prachi"
+                    "Nidhi"
                 ]
             },
             {
@@ -268,6 +268,7 @@
                 "Academically specialized Yoga instruction"
             ],
             "assigned_batches": [
+                "8:00 AM to 9:00 AM",
                 "10:00 AM to 11:00 AM",
                 "12:00 PM to 1:00 PM",
                 "7:00 PM to 8:00 PM"
@@ -331,24 +332,6 @@
             ],
             "assigned_batches": [
                 "5:00 AM to 6:00 AM"
-            ],
-            "demo_video": null
-        },
-        {
-            "name": "Prachi",
-            "experience_years": "4+",
-            "qualifications": [
-                "Certified Yoga Instructor"
-            ],
-            "certifications": [
-                "Certified Yoga Teacher"
-            ],
-            "specialization": [
-                "Yoga Wellness",
-                "Asana & Pranayama"
-            ],
-            "assigned_batches": [
-                "8:00 AM to 9:00 AM"
             ],
             "demo_video": null
         }

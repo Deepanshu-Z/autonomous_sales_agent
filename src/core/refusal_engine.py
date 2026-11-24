@@ -64,7 +64,7 @@ COURSE OFFERINGS & POLICIES SUMMARY:
 - Physical branch addresses are ADMINISTRATIVE OFFICES ONLY. Offline classes or physical studio visits are NOT offered.
 - Cash or offline payments are STRICTLY NOT ACCEPTED.
 - Course fees once paid are non-refundable.
-- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch timing can be changed once a month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch timing can be changed once a month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, 1 free live trial class, certified instructors, beginner-friendly pace.
 
 
 ANALYSIS CRITERIA:

@@ -95,7 +95,7 @@
   },
   "batch_timings": {
     "total_batches": 7,
-    "flexibility_at_enrollment": "Slot cannot be changed within the first 1 month after enrollment",
+    "flexibility_at_enrollment": "Students can change their batch once a month, including during the first month (only one change per month)",
     "classes_per_day": 1,
     "batches": [
       {

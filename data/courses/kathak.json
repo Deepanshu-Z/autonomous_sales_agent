@@ -110,7 +110,7 @@
                 "time_12h": "4:00 PM to 5:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Ms. Madhuri"
+                    "Vibha Mittal"
                 ]
             },
             {
@@ -126,18 +126,7 @@
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Ms. Madhuri",
-                    "Vibha Mittal",
                     "Sneha Maurya"
-                ]
-            },
-            {
-                "slot": "Wednesday/Friday",
-                "time_12h": "5:00 PM to 6:00 PM",
-                "days": "Wednesday/Friday",
-                "instructors": [
-                    "Ms. Madhuri",
-                    "Kratika Gontiya"
                 ]
             },
             {
@@ -145,37 +134,25 @@
                 "time_12h": "5:00 PM to 6:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
-                    "Vibha Mittal",
-                    "Kratika Gontiya",
-                    "Sneha Maurya"
+                    "Sneha Maurya",
+                    "Vibha Mittal"
                 ]
             },
             {
-                "slot": "Tuesday/Thursday",
+                "slot": "Wednesday/Friday",
                 "time_12h": "6:00 PM to 7:00 PM",
-                "days": "Tuesday/Thursday",
+                "days": "Wednesday/Friday",
                 "instructors": [
+                    "Kratika Gontiya",
                     "Ms. Madhuri"
                 ]
             },
             {
-                "slot": "Wednesday/Friday",
-                "time_12h": "6:00 PM to 7:00 PM",
-                "days": "Wednesday/Friday",
-                "instructors": [
-                    "Ms. Madhuri",
-                    "Vibha Mittal",
-                    "Kratika Gontiya"
-                ]
-            },
-            {
                 "slot": "Saturday/Sunday",
                 "time_12h": "6:00 PM to 7:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
-                    "Vibha Mittal",
-                    "Kratika Gontiya",
-                    "Sneha Maurya"
+                    "Vibha Mittal"
                 ]
             },
             {
@@ -183,17 +160,8 @@
                 "time_12h": "7:00 PM to 8:00 PM",
                 "days": "Tuesday/Thursday",
                 "instructors": [
-                    "Vibha Mittal",
-                    "Kratika Gontiya"
-                ]
-            },
-            {
-                "slot": "Wednesday/Friday",
-                "time_12h": "7:00 PM to 8:00 PM",
-                "days": "Wednesday/Friday",
-                "instructors": [
-                    "Vibha Mittal",
-                    "Kratika Gontiya"
+                    "Kratika Gontiya",
+                    "Moumita Basu"
                 ]
             },
             {
@@ -201,9 +169,7 @@
                 "time_12h": "7:00 PM to 8:00 PM",
                 "days": "Saturday/Sunday",
                 "instructors": [
-                    "Vibha Mittal",
-                    "Kratika Gontiya",
-                    "Sneha Maurya"
+                    "Vibha Mittal"
                 ]
             },
             {
@@ -211,24 +177,7 @@
                 "time_12h": "8:00 PM to 9:00 PM",
                 "days": "Wednesday/Friday",
                 "instructors": [
-                    "Kratika Gontiya",
-                    "Sneha Maurya"
-                ]
-            },
-            {
-                "slot": "Saturday/Sunday",
-                "time_12h": "8:00 PM to 9:00 PM",
-                "days": "Saturday/Sunday",
-                "instructors": [
-                    "Kratika Gontiya",
-                    "Sneha Maurya"
-                ]
-            },
-            {
-                "slot": "Tuesday/Thursday",
-                "time_12h": "8:00 PM to 9:00 PM",
-                "days": "Tuesday/Thursday",
-                "instructors": [
+                    "Moumita Basu",
                     "Sneha Maurya"
                 ]
             }
@@ -250,7 +199,6 @@
             ],
             "assigned_batches": [
                 "4:00 PM to 5:00 PM",
-                "5:00 PM to 6:00 PM",
                 "6:00 PM to 7:00 PM"
             ],
             "demo_video": "https://youtu.be/t-XO2enPGwM"
@@ -266,6 +214,7 @@
                 "Footwork & Mudras"
             ],
             "assigned_batches": [
+                "4:00 PM to 5:00 PM",
                 "5:00 PM to 6:00 PM",
                 "6:00 PM to 7:00 PM",
                 "7:00 PM to 8:00 PM"
@@ -283,10 +232,8 @@
                 "Chakkars & Expressions"
             ],
             "assigned_batches": [
-                "5:00 PM to 6:00 PM",
                 "6:00 PM to 7:00 PM",
-                "7:00 PM to 8:00 PM",
-                "8:00 PM to 9:00 PM"
+                "7:00 PM to 8:00 PM"
             ],
             "demo_video": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1"
         },
@@ -302,11 +249,16 @@
             ],
             "assigned_batches": [
                 "5:00 PM to 6:00 PM",
-                "6:00 PM to 7:00 PM",
-                "7:00 PM to 8:00 PM",
                 "8:00 PM to 9:00 PM"
             ],
             "demo_video": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
+        },
+        {
+            "name": "Moumita Basu",
+            "assigned_batches": [
+                "7:00 PM to 8:00 PM",
+                "8:00 PM to 9:00 PM"
+            ]
         }
     ],
     "syllabus": {

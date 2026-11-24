@@ -46,7 +46,7 @@
         "recordings_available": false,
         "certificate_provided": false,
         "trial_classes_available": true,
-        "max_trial_classes": 3,
+        "max_trial_classes": 1,
         "trial_cost": "Free",
         "important_note": "Physical branches are office addresses only. Online Yoga classes are accessible from anywhere worldwide."
     },
@@ -404,7 +404,7 @@
     "trial_class": {
         "available": true,
         "cost": "Free",
-        "max_trials": 3,
+        "max_trials": 1,
         "booking_platform": "Sensationz App",
         "booking_steps": [
             "Download the Sensationz App",

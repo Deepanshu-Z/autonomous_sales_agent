@@ -125,7 +125,7 @@ def _get_course_summary_str(course_id: str) -> str:
         return (
             "Sensationz offers live interactive online courses in: Bollywood Dance, Kathak, Yoga, Face Yoga, "
             "Fitness & Zumba, Singing / Vocal Music, Guitar, and Piano. Certified instructors, daily batches, "
-            "and up to 3 Free Trial Classes available on the Sensationz App."
+            "and a Free Trial Class available on the Sensationz App."
         )
     try:
         from src.core import kb_loader
@@ -149,8 +149,8 @@ def _get_course_summary_str(course_id: str) -> str:
         timings_str = ", ".join(timing_list[:3]) if timing_list else "Morning & Evening slots available"
         trial_available = overview.get("trial_classes_available", True)
         trial_cost = overview.get("trial_cost", "Free")
-        max_trials = overview.get("max_trial_classes", 3)
-        trial_str = f"{max_trials} {trial_cost} Trial Classes Available" if trial_available else "No trial classes"
+        max_trials = overview.get("max_trial_classes", 1)
+        trial_str = f"{max_trials} {trial_cost} Trial Class(es) Available" if trial_available else "No trial classes"
         return f"Course: {name} | Mode: {mode} ({days}) | Timings: {timings_str} | Fees: {pkg_str} | Trial Info: {trial_str}"
     except Exception as e:
         print(f"[meta_loader] Error reading course summary for {course_id}: {e}")
@@ -197,7 +197,7 @@ async def generate_crisp_comment_reply_async(comment_text: str, username: str, p
         "Generate a single, ultra-crisp public Instagram/Facebook comment reply (strictly under 18 words).\n"
         "Rules:\n"
         "1. Start with the user handle provided.\n"
-        "2. Directly answer their specific question (e.g. fees, timings, trial classes — note: we offer 3 free trial classes on Sensationz app, online format) using the Course Info. NEVER say we do not offer free trials.\n"
+        "2. Directly answer their specific question (e.g. fees, timings, trial classes — note: we offer 1 free trial class on Sensationz app, online format) using the Course Info. NEVER say we do not offer free trials.\n"
         "3. If they just commented 'interested', 'info', or an emoji with no specific question, warmly acknowledge.\n"
         "4. Always end by stating you sent the full details/schedule to their DM with an emoji (e.g. 'Sent full details in your DM! 📩').\n"
         "5. Exactly 1 sentence. No markdown asterisks. Natural English or Hinglish matching the user.\n"
@@ -249,7 +249,7 @@ async def generate_ai_private_dm_async(comment_text: str, username: str, post_cf
         "Rules:\n"
         "1. Greet the user warmly (e.g., 'Hi!' or 'Hey there!').\n"
         "2. Directly answer their comment inquiry using the Course Info provided.\n"
-        "3. Provide the key highlights concisely: Live interactive classes, 3 free trial classes, schedule/days, starting fee overview.\n"
+        "3. Provide the key highlights concisely: Live interactive classes, 1 free trial class, schedule/days, starting fee overview.\n"
         "4. End with a friendly, low-friction question to continue the conversation (e.g. 'Would morning or evening batch suit you better?').\n"
         "5. Keep the tone warm, welcoming, and concise (under 75 words).\n"
         "6. Do NOT use markdown asterisks (*bold*). Use clean text, bullet points (•), and tasteful emojis.\n"
@@ -367,13 +367,13 @@ async def evaluate_and_generate_comment_actions_async(
         "   - Ultra-crisp, strictly under 18 words, exactly 1 sentence.\n"
         "   - Start with the user handle provided.\n"
         "   - If they greeted (e.g. 'hi', 'hello'), greet them back warmly and inform them that details were sent to their DM.\n"
-        "   - If they asked a question (fees, timings, trial, online format), directly answer using the Course Info. (IMPORTANT: We DO offer up to 3 FREE trial classes on the Sensationz App — NEVER claim we don't offer free trials!).\n"
+        "   - If they asked a question (fees, timings, trial, online format), directly answer using the Course Info. (IMPORTANT: We DO offer 1 FREE trial class on the Sensationz App — NEVER claim we don't offer free trials!).\n"
         "   - Always end with notice that details/schedule were sent to their DM (e.g. 'Sent full details in your DM! 📩').\n"
         "   - Natural English/Hinglish matching the user. NO markdown asterisks (*bold*).\n"
         "2. private_dm:\n"
         "   - Warm, friendly, welcoming admissions guide message (under 75 words).\n"
         "   - Greet user warmly.\n"
-        "   - Introduce the course with Course Info (fees, live online format, up to 3 free trial classes, morning/evening batches).\n"
+        "   - Introduce the course with Course Info (fees, live online format, 1 free trial class, morning/evening batches).\n"
         "   - End with a low-friction question to continue the conversation (e.g. 'Would morning or evening batch suit you better?').\n"
         "   - Tasteful emojis, clean formatting (bullet points •), NO markdown asterisks (*bold*).\n\n"
         "OUTPUT FORMAT: Return strictly valid JSON:\n"

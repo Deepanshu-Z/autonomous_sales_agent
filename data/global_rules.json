@@ -92,7 +92,7 @@
         "gender_specific_batches": false,
         "trial_classes": {
             "free_trials_available": true,
-            "max_trials": 3,
+            "max_trials": 1,
             "raw_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1790055283/WhatsApp_Video_2026-09-17_at_2.54.55_PM_r98gwo.mp4",
             "how_to_book_video_url": "https://youtube.com/shorts/wyJBvEqIsvU?feature=share",
             "video_caption": "🎬 How to Book Your Free Trial Class",

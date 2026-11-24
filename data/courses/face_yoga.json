@@ -40,9 +40,9 @@
         "recordings_available": false,
         "certificate_provided": false,
         "trial_classes_available": true,
-        "max_trial_classes": 3,
+        "max_trial_classes": 1,
         "trial_cost": "Free",
-        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
+        "trial_note": "1 free trial per user, shared across any course on the Sensationz app (not Face Yoga specific)",
         "important_note": "Not provided",
         "welcome_raw_video_url": null,
         "class_raw_video_url": null
@@ -222,8 +222,8 @@
     "trial_class": {
         "available": true,
         "cost": "Free",
-        "max_trials": 3,
-        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
+        "max_trials": 1,
+        "trial_note": "1 free trial per user, shared across any course on the Sensationz app (not Face Yoga specific)",
         "booking_platform": "Sensationz App",
         "booking_steps": [
             "Open the Sensationz App",

@@ -165,7 +165,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          - Proactively offering trials devalues the course, turns off serious buyers, and derails the sales funnel.
          - The default funnel is strictly: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.
        * When a customer EXPLICITLY asks for a trial class (RULE 1 - TRIAL PIPELINE DE-ESCALATION):
-         - Warmly confirm that Sensationz offers up to 3 free live interactive trial classes.
+         - Warmly confirm that Sensationz offers 1 free live interactive trial class.
          - ZERO DETAIL COLLECTION IN CHAT: The chat has NO booking power for trials! NEVER ask for batch timing, instructor, package duration, fee, or Gmail for trials in chat.
          - All trial scheduling and batch selection happen EXCLUSIVELY inside the Sensationz App (Profile -> Trial Links -> Confirm Trial Enrollment).
          - Message #1: Warmly confirm trial availability and directly answer ANY questions they asked (syllabus, duration, faculty, class format).
@@ -642,7 +642,7 @@ def format_system_prompt(
     if not is_trial_path:
         state_context += (
             "- ⛔ TRIAL MODE: LOCKED (Customer has NOT explicitly demanded a free trial class. "
-            "Under NO circumstances mention 'trial class', 'free trial', '3 free trials', or ask 'Kya aap trial class book karna chahenge?'. "
+            "Under NO circumstances mention 'trial class', 'free trial', '1 free trial', or ask 'Kya aap trial class book karna chahenge?'. "
             "Keep the conversation strictly focused on the enrollment funnel: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.)\n"
         )
 
@@ -917,7 +917,7 @@ def format_system_prompt(
     elif is_trial_path:
         next_funnel_slot = (
             "TRIAL INQUIRY & APP BOOKING GUIDANCE (Customer has explicitly asked for a live interactive free trial session. "
-            "Warmly confirm up to 3 free live interactive trial classes are available. "
+            "Warmly confirm 1 free live interactive trial class is available. "
             "State clearly that trial classes CANNOT be booked in WhatsApp chat — all trial bookings are done directly "
             "by the student inside the Sensationz App under Profile -> Trial Links -> Confirm Trial Enrollment. "
             "Provide the 4 quick steps to book on the app and ask if they would like the app download link or video tutorial. "

@@ -198,8 +198,8 @@
                 "Abhinaya & Stage Presentation"
             ],
             "assigned_batches": [
-                "4:00 PM to 5:00 PM",
-                "6:00 PM to 7:00 PM"
+                "Wednesday/Friday 4:00 PM to 5:00 PM",
+                "Wednesday/Friday 6:00 PM to 7:00 PM"
             ],
             "demo_video": "https://youtu.be/t-XO2enPGwM"
         },
@@ -214,10 +214,10 @@
                 "Footwork & Mudras"
             ],
             "assigned_batches": [
-                "4:00 PM to 5:00 PM",
-                "5:00 PM to 6:00 PM",
-                "6:00 PM to 7:00 PM",
-                "7:00 PM to 8:00 PM"
+                "Tuesday/Thursday 4:00 PM to 5:00 PM",
+                "Saturday/Sunday 5:00 PM to 6:00 PM",
+                "Saturday/Sunday 6:00 PM to 7:00 PM",
+                "Saturday/Sunday 7:00 PM to 8:00 PM"
             ],
             "demo_video": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS"
         },
@@ -232,8 +232,8 @@
                 "Chakkars & Expressions"
             ],
             "assigned_batches": [
-                "6:00 PM to 7:00 PM",
-                "7:00 PM to 8:00 PM"
+                "Tuesday/Thursday 7:00 PM to 8:00 PM",
+                "Wednesday/Friday 6:00 PM to 7:00 PM"
             ],
             "demo_video": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1"
         },
@@ -248,17 +248,27 @@
                 "Rhythm & Taal Mastery"
             ],
             "assigned_batches": [
-                "5:00 PM to 6:00 PM",
-                "8:00 PM to 9:00 PM"
+                "Tuesday/Thursday 5:00 PM to 6:00 PM",
+                "Wednesday/Friday 8:00 PM to 9:00 PM",
+                "Saturday/Sunday 5:00 PM to 6:00 PM"
             ],
             "demo_video": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
         },
         {
             "name": "Moumita Basu",
+            "experience_years": "2+",
+            "certifications": [
+                "Certified Kathak Teacher"
+            ],
+            "specialization": [
+                "Kathak Classical Dance",
+                "Tatkar & Hastak Fundamentals"
+            ],
             "assigned_batches": [
-                "7:00 PM to 8:00 PM",
-                "8:00 PM to 9:00 PM"
-            ]
+                "Tuesday/Thursday 7:00 PM to 8:00 PM",
+                "Wednesday/Friday 8:00 PM to 9:00 PM"
+            ],
+            "demo_video": "https://www.instagram.com/reel/Df4axVdAAW4/"
         }
     ],
     "syllabus": {
@@ -316,7 +326,8 @@
             "Madhuri": "https://youtu.be/t-XO2enPGwM",
             "Vibha Mittal": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS",
             "Kratika Gontiya": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1",
-            "Sneha Maurya": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
+            "Sneha Maurya": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv",
+            "Moumita Basu": "https://www.instagram.com/reel/Df4axVdAAW4/"
         }
     },
     "certification_structure": {

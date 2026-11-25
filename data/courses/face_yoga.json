@@ -39,10 +39,6 @@
         "available_from_anywhere": true,
         "recordings_available": false,
         "certificate_provided": false,
-        "trial_classes_available": true,
-        "max_trial_classes": 3,
-        "trial_cost": "Free",
-        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
         "important_note": "Not provided",
         "welcome_raw_video_url": null,
         "class_raw_video_url": null
@@ -219,24 +215,6 @@
     "what_to_keep_ready": [
         "Nothing"
     ],
-    "trial_class": {
-        "available": true,
-        "cost": "Free",
-        "max_trials": 3,
-        "trial_note": "3 free trials per user, shared across any course on the Sensationz app (not Face Yoga specific)",
-        "booking_platform": "Sensationz App",
-        "booking_steps": [
-            "Open the Sensationz App",
-            "Go to the Profile section",
-            "Select the Trial Links option",
-            "Tap the + icon in the top right corner",
-            "Select the desired trial"
-        ],
-        "demo_videos": {
-            "Parul mam": "https://youtu.be/PzwrL2P8mYQ?si=6yi_xF-Gj5Z3gSa8",
-            "Sonali mam": "https://www.instagram.com/reel/Dc-2YCFCFn7/?stkn=Z3NlZ2s0dmE5cWxm"
-        }
-    },
     "enrollment": {
         "batches_start": "Ongoing — enroll anytime"
     },
@@ -258,5 +236,9 @@
         ],
         "medical_disclaimer": "This course is not a substitute for medical or dermatological treatment. Consult a doctor or dermatologist if you have a facial/skin medical condition.",
         "sensitive_topic_instruction": "Not provided"
+    },
+    "demo_videos": {
+        "Parul mam": "https://youtu.be/PzwrL2P8mYQ?si=6yi_xF-Gj5Z3gSa8",
+        "Sonali mam": "https://www.instagram.com/reel/Dc-2YCFCFn7/?stkn=Z3NlZ2s0dmE5cWxm"
     }
 }

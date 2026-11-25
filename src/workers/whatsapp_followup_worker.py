@@ -101,8 +101,16 @@ async def process_single_lead(row: dict, now_ts: float):
         lead_at_qr = is_at_qr_stage(state)
         sent_ids = state.get("sent_followup_ids", [])
 
-        # 3. Get decision from unified followup_service
+        # 3. Get decision from unified followup_service (same slot check the AI uses, so it never re-asks a chosen slot)
+        try:
+            from src.core.helpers.slot_engine import evaluate_enrollment_slots
+            slot_eval = evaluate_enrollment_slots(state, course_id=course_id) if course_id else None
+        except Exception as e:
+            print(f"[whatsapp_followup] {phone}: slot check failed, using normal templates: {e}")
+            slot_eval = None
         decision = get_followup_decision(
+            slot_eval=slot_eval,
+            language=state.get("language"),
             phone=phone,
             count=count,
             course_id=course_id,

@@ -41,9 +41,6 @@
         ],
         "available_from_anywhere": true,
         "recordings_available": false,
-        "trial_classes_available": true,
-        "max_trial_classes": 3,
-        "trial_cost": "Free",
         "important_note": "Physical branches are office addresses only. Online Kathak classes are accessible from anywhere worldwide.",
         "certificate_provided": false
     },
@@ -344,29 +341,6 @@
         "rule": "Whenever the customer asks about ghungroo / ghungroos / ghunghroo / ghungru / bells / payal for Kathak, give THIS answer. Reply in the language the customer has selected for the conversation (English, Hindi or Hinglish), translating the answer below while keeping its meaning exactly. Do not recommend any brand, price or link, and never say ghungroos are not needed at all.",
         "answer": "At the beginning level you can start without ghungroos, but after 6 months ghungroos become compulsory. Your teacher will guide you in class on which ghungroos to purchase. Ghungroos are easily available on Amazon, Flipkart, etc. 🙏"
     },
-    "trial_class": {
-        "available": true,
-        "cost": "Free",
-        "max_trials": 3,
-        "booking_platform": "Sensationz App",
-        "booking_steps": [
-            "Download the Sensationz App",
-            "Login using Continue with Google",
-            "Complete your profile (Name, Gender, Country, etc.)",
-            "Go to Profile then tap Trial Links",
-            "Select the desired Kathak trial class",
-            "Select preferred Timing, Days, and Teacher",
-            "Tap Confirm Trial Enrollment",
-            "Your trial will be confirmed and booked"
-        ],
-        "demo_videos": {
-            "Ms. Madhuri": "https://youtu.be/t-XO2enPGwM",
-            "Madhuri": "https://youtu.be/t-XO2enPGwM",
-            "Vibha Mittal": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS",
-            "Kratika Gontiya": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1",
-            "Sneha Maurya": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
-        }
-    },
     "certification_structure": {
         "tiers": [
             {
@@ -400,5 +374,12 @@
             "Leave or class pause",
             "Refunds"
         ]
+    },
+    "demo_videos": {
+        "Ms. Madhuri": "https://youtu.be/t-XO2enPGwM",
+        "Madhuri": "https://youtu.be/t-XO2enPGwM",
+        "Vibha Mittal": "https://youtu.be/7CxyfJVV9QU?si=TqV-4Q3qETJCNXqS",
+        "Kratika Gontiya": "https://youtu.be/hBqbfZfYa-8?si=aBW-m-li7yXR6Id1",
+        "Sneha Maurya": "https://youtu.be/hKQGqgHN0qE?si=GLQjfQW5kPPRE_Bv"
     }
 }

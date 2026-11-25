@@ -186,6 +186,44 @@ def get_variation_for_stage(
     return variations[0]
 
 
+_LEAD_IN_HI = [
+    "Hi again! 😊 Aapka {s} select ho chuka hai.",
+    "Namaste! 🙏 Aapki details ({s}) save hain — bas ek step bacha hai.",
+    "Hello! ✨ Aapka {s} batch reserve karne ke liye bas ek detail chahiye.",
+    "Hi! 😊 Aapki selection ({s}) ready hai.",
+    "Namaste! 🌸 {s} — aapka batch abhi bhi open hai.",
+]
+_LEAD_IN_EN = [
+    "Hi again! 😊 You've already picked {s}.",
+    "Hello! 🙏 Your details ({s}) are saved — just one step left.",
+    "Hi! ✨ Just one more detail to reserve your {s} batch.",
+    "Hi! 😊 Your selection ({s}) is ready.",
+    "Hello! 🌸 {s} — your batch is still open.",
+]
+
+
+def get_slot_followup_message(slot_eval: Optional[dict], count: int, language: Optional[str] = None) -> Optional[str]:
+    """
+    Follow-up for a lead who already chose some details: recap what they picked and ask ONLY for the next
+    missing slot, using the SAME question the AI's Message #2 uses (slot_engine.slot_question).
+    None => nothing slot-specific to say (use the normal templates).
+    """
+    from src.core.helpers.slot_engine import slot_question, _is_english
+    if not slot_eval:
+        return None
+    slot, en = slot_eval.get("next_target_slot"), _is_english(language)
+    if slot == "PAYMENT":  # everything chosen, QR not sent yet
+        q = "Shall I send your payment QR now? 😊" if en else "Kya main aapke liye payment QR bhej doon? 😊"
+    elif slot in ("TEACHER", "DAYS", "DURATION"):  # TIMING/COURSE: the normal templates already ask for those
+        q = slot_question(slot_eval, language)
+    else:
+        return None
+    # "Course: Kathak" -> *Kathak*
+    summary = " • ".join(f"*{s.split(': ', 1)[-1]}*" for s in slot_eval.get("settled_slots", []))
+    lead_in = (_LEAD_IN_EN if en else _LEAD_IN_HI)[min(count, 4)].format(s=summary)
+    return f"{lead_in}\n\n{q}"
+
+
 def get_qr_followup_message(course_name: Optional[str] = None, count: int = 0) -> str:
     """Returns tailored payment assistance follow-up messages for leads who received a QR code."""
     cname = course_name or "classes"
@@ -218,6 +256,8 @@ def get_followup_decision(
     sent_ids: Optional[List[str]] = None,
     sent_steps: Optional[Any] = None,
     class_video_already_sent: bool = False,
+    slot_eval: Optional[dict] = None,
+    language: Optional[str] = None,
 ) -> FollowupDecision:
     """
     Core single-point-of-entry decision engine.
@@ -280,6 +320,24 @@ def get_followup_decision(
                 next_gap_seconds=None,
                 step_label="QR lead — all follow-ups sent, skipping agent handoff (AI stays active)",
                 updated_sent_ids=sent_ids,
+            )
+
+    # -------------------------------------------------------------
+    # 0b. SLOT-AWARE FOLLOW-UP: lead already chose timing/teacher/days/package -> never re-ask it.
+    # Same slot check + same question as the AI's Message #2. Steps 0-4 only; the final-offer step (5) is unchanged.
+    # -------------------------------------------------------------
+    if not is_legacy_mode() and count <= 4:
+        slot_msg = get_slot_followup_message(slot_eval, count, language)
+        if slot_msg:
+            vid = f"slot_{slot_eval['next_target_slot'].lower()}_{count}"
+            return FollowupDecision(
+                action="SEND_MESSAGE",
+                message=slot_msg,
+                next_count=count + 1,
+                next_gap_seconds=GAPS_24H_SEC.get(count, 21600),
+                step_label=f"24h slot-aware [{slot_eval['next_target_slot']}] step {count}",
+                message_id=vid,
+                updated_sent_ids=list(set(sent_ids + [vid])),
             )
 
     # -------------------------------------------------------------

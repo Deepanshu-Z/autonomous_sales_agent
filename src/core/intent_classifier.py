@@ -62,6 +62,9 @@ def _empty_flags() -> Dict[str, Any]:
         "profile_created_stated": "unmentioned",
         "selected_timing": None,
         "timing_period": None,
+        "numbers_not_timing": False,
+        "language_unclear": False,
+        "wants_trust_proof": False,
         "selected_teacher": None,
         "selected_days": None,
         "selected_package": None,
@@ -216,11 +219,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
      • Set unoffered_type to "COURSE", set unoffered_value to the requested course name, and set customer_intent to "QUESTION".
 
 8. "wants_trial":
-   - boolean: true ONLY if customer explicitly demands an interactive live trial class session (e.g. "free trial chahiye", "can I get a trial session", "trial class attend karni hai", "trial book karna hai").
-   - STRICT DEMO-VIDEO PREVIEW RULE (RULE A): Asking for "demo class", "demo chahiye", "sample video", "sample class", "give demo", "pls give demo", "1 demo", or asking to SEE a class/video/preview/teaching style is NEVER a trial request! You MUST set "wants_trial" = false and set "wants_demo_video" = true!
+   - boolean: true if the customer, in ANY language or script, wants to try/attend a trial, free, sample or one-time LIVE class before committing (e.g. "free trial chahiye", "can I get a trial session", "trial class attend karni hai", "can I try one class first"), OR explicitly asks about a 1-week / weekly / short-term pass. Judge by MEANING in whatever language the customer writes — never by keywords.
+   - Sensationz has no free trials any more; this flag only means "the customer wants to try the classes", which triggers the paid 1 Week Pass offer.
+   - WATCH vs ATTEND (judge by meaning, in any language): if the customer only wants to SEE/WATCH something (a sample video, recording, preview, teacher reel, how classes are taught), set "wants_trial" = false and "wants_demo_video" = true. But if the customer wants to ATTEND / TAKE / TRY a live class first, OR asks whether demo / trial / free / sample classes are offered or available, set "wants_trial" = true and "wants_demo_video" = false EVEN IF they call it a "demo class" or "demo" (e.g. "I want to take a demo class first", "are demo classes available?", "demo class lena hai", "pehle ek class try karni hai"). Only if it is truly impossible to tell watching from attending, set BOTH true.
 
 8a. "wants_demo_video":
-   - boolean: true if customer asks for "demo class", "demo chahiye", "sample video", "sample class", asks to see a class video, live class recording, instructor demo, sample preview, or simply wants to see how classes are taught before enrolling (e.g. "demo class", "demo chahiye", "sample video", "sample class", "pls give demo class", "I want to see", "want to see", "videos of dance class", "send video", "class video", "dekhna hai", "kaisa hota hai", "demo video", "teacher preview", "demo dikhao", "teaching video", "video bhejo", "plz send video", "preview").
+   - boolean: true if customer wants to WATCH/SEE a "demo video", "sample video", "demo dikhao", asks to see a class video, live class recording, instructor demo, sample preview, or simply wants to see how classes are taught before enrolling (e.g. "demo class", "demo chahiye", "sample video", "sample class", "pls give demo class", "I want to see", "want to see", "videos of dance class", "send video", "class video", "dekhna hai", "kaisa hota hai", "demo video", "teacher preview", "demo dikhao", "teaching video", "video bhejo", "plz send video", "preview").
    - When true, set customer_intent = "QUESTION" and set question_summary = "Request to see class/instructor preview video".
 
 8b. "wants_app_link":
@@ -260,7 +264,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Set "is_disinterested" = true.
 
 12. "is_complaint_or_refund":
-    - boolean: true if customer demands a refund, threatens legal/police action, or accuses fraud/scam.
+    - boolean: true if customer demands a refund, threatens legal/police action, or angrily accuses fraud/scam. (A calm question or doubt about whether Sensationz is genuine/registered is NOT a complaint: use "wants_trust_proof" for it.)
 
 12b. "is_out_of_scope":
     - boolean: true if the customer's message asks about programming/coding, software code, syntax errors (e.g. Python, JavaScript, Hello World), mathematics, science, homework, medical diagnosis, recipes/cooking, politics, news, trivia, general world knowledge, or treats this bot as a general-purpose AI / search engine (ChatGPT, Siri, Google).
@@ -300,8 +304,9 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - Detect the customer's exact language and writing script from any language in the world (e.g. "English", "Hinglish (Latin script)", "Hindi (Devanagari script)", "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "French", "German", "Arabic", etc.).
     - STRICT SCRIPT RULES — READ CAREFULLY:
       • LATIN/ROMAN ALPHABET = NEVER DEVANAGARI: If the customer's message contains ONLY standard ASCII/Latin characters (a-z, A-Z, 0-9, punctuation, spaces), it is physically impossible for it to be Devanagari script. You MUST classify it as "Hinglish (Latin script)" (if Indic/Hindi meaning) or "English" (if pure English).
-      • Hinglish (Latin script): Any message typed in the Latin alphabet that uses Hindi/Urdu words, shortened forms, or phonetic transliterations. Examples: "fees kya h", "teachers kon h", "trial kon leta h", "mjhe tumpe trust nhi hora", "kya timing h", "nhi kathak ki fees bta", "seekhna h", "acha", "fees bta do", "kya h", "kon h", "kab h", "batao", "nahi lena", "thik h", "hnji", "kaise hoga", "mujhe chahiye", "mam", "sir", "plz", "pls". ALL of these MUST be classified as "Hinglish (Latin script)".
+      • Hinglish (Latin script): Any message typed in the Latin alphabet that uses Hindi/Urdu words, shortened forms, or phonetic transliterations. Examples: "fees kya h", "teachers kon h", "trial kon leta h", "mjhe tumpe trust nhi hora", "kya timing h", "nhi kathak ki fees bta", "seekhna h", "acha", "fees bta do", "kya h", "kon h", "kab h", "batao", "nahi lena", "thik h", "hnji", "kaise hoga", "mujhe chahiye". ALL of these MUST be classified as "Hinglish (Latin script)".
       • English: Message is in standard English words with no Hindi/Urdu terms.
+      • English-compatible words NEVER decide the language: "ok", "okay", "yes", "sir", "mam", "madam", "plz", "pls", "thanks", "hi", "hello" are used by English speakers too. A sentence whose grammar and content words are English is "English" even if it contains them (e.g. "want to take demo first", "ok sir send the details", "plz share fees"). Decide from the WHOLE message, never from one word.
       • Classify as "Hindi (Devanagari script)" ONLY IF the customer's message literally contains Devanagari Unicode characters (e.g. "कथक की फीस बताओ", "नमस्ते", "क्या टाइमिंग है"). If you do NOT see actual Devanagari characters (अ आ इ ई etc.) in the message, NEVER output "Hindi (Devanagari script)"!
       • For any other language worldwide, accurately indicate the language and script (e.g. "Tamil (Latin script)", "Tamil (Tamil script)", "Spanish", "Arabic", etc.).
 
@@ -348,6 +353,17 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 22. "conversation_summary":
     - string or null: A concise 1-2 sentence factual English summary of the customer's conversational journey so far based on the chronological transcript. Note what was offered, what was selected, any rejections or objections (e.g. "Customer rejected the available 10 batch timings due to a timing conflict."), and what the customer's current stance is.
 
+24. "numbers_not_timing":
+   - boolean, default false. Set true ONLY when BOTH hold: (a) the message contains numerals or number-words in ANY language/script (e.g. "99", "₹99/-", "٩٩", "७ दिन", "300 or 600", "2 clases", "12 mahine", digits inside an email address or phone number, ages, dates, ids) and every one of them clearly means something OTHER than a class time: a price, fee, GST/tax, amount, number of days/weeks/months/classes, age, phone, email, date, or id; AND (b) the customer is NOT stating, choosing, asking about or changing a batch timing/time slot/time of day in this message.
+   - Judge by MEANING in whatever language the customer writes, never by digits alone. If the customer states or asks about any class time (e.g. "6", "6 pm", "5-6", "subah 7 baje", "evening"), or you are unsure, set false.
+
+25. "language_unclear":
+   - boolean, default false. Set true when the message alone is too short or neutral to tell which language the customer prefers: a bare acknowledgement ("ok", "yes", "haan", "thanks", "ok sir"), only numbers / times / prices, a name, an email, a single word, an emoji or a button label. Set false whenever the message has enough real words to judge the language, and ALWAYS false when the customer explicitly asks to change language. When true, the customer keeps their previously detected language.
+
+26. "wants_trust_proof":
+   - boolean, default false. Set true when the customer, in ANY language or script, doubts or asks whether Sensationz is genuine / legit / real / a registered company, or asks for proof to verify us (GST number, company registration, reviews, ratings, social media, "how do I trust you", "is this fake?", "kya aap genuine ho?", "company registered hai?", "GST number do", "reviews dikhao"). Judge by MEANING, never by keywords.
+   - Do NOT set it for ordinary course / fee / timing questions. An angry accusation, refund demand or legal threat is "is_complaint_or_refund" instead; if the customer both doubts us AND is angry or threatening, set is_complaint_or_refund true as well.
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -357,6 +373,9 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "requested_end_24h": string | null,
   "requested_timing_period": string | null,
   "timing_period": string | null,
+  "numbers_not_timing": boolean,
+  "language_unclear": boolean,
+  "wants_trust_proof": boolean,
   "selected_teacher": string | null,
   "selected_days": string | null,
   "selected_package": string | null,
@@ -396,6 +415,7 @@ Return ONLY one valid JSON object. Never write a customer-facing reply. Never in
 Rules:
 - Use the exact canonical course, timing, teacher, day, and package values supplied in context.
 - A broad period such as morning/evening is not an exact timing. Keep selected_timing null and set requested_timing_period.
+- numbers_not_timing is true ONLY if every number in the message (in any language/script) is clearly a price, GST, amount, count of days/weeks/months/classes, age, phone, email, date or id AND the customer is not stating or asking about a class time; if unsure, false.
 - A bare hour is ambiguous when both AM and PM exist. Keep selected_timing null and set timing_ambiguous.
 - An unavailable timing, teacher, package, or course stays null and sets unoffered_type and unoffered_value.
 - Informational questions are not selections. Casual acknowledgements are OTHER.
@@ -404,6 +424,8 @@ Rules:
 - PAYMENT_REQUEST means asking how to pay or asking for QR/link. PAYMENT_CLAIM means saying payment was already completed.
 - Demo-video requests are not tutorial-video requests. App and trial guide requests are separate from teacher demos.
 - Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
+- wants_trust_proof is true when the customer doubts whether Sensationz is genuine/registered or asks for proof (GST number, registration, reviews, ratings, social media). A calm doubt is NOT is_complaint_or_refund; anger, refund demands and threats are.
+- Words like ok, yes, sir, mam, plz, pls, thanks do not make a message Hinglish; judge the whole message. language_unclear is true for acknowledgements, numbers/times, names, emails, single words, emojis (keep the earlier language); false when there are enough real words or an explicit language request.
 - Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
 
 Return exactly this schema, using null for unknown strings and false for unknown booleans:
@@ -415,6 +437,9 @@ Return exactly this schema, using null for unknown strings and false for unknown
   "requested_end_24h": string | null,
   "requested_timing_period": string | null,
   "timing_period": string | null,
+  "numbers_not_timing": boolean,
+  "language_unclear": boolean,
+  "wants_trust_proof": boolean,
   "selected_teacher": string | null,
   "selected_days": string | null,
   "selected_package": string | null,
@@ -556,7 +581,7 @@ async def extract_intent_and_state_changes(
             "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
             "is_complaint_or_refund", "is_out_of_scope", "wants_stop_messaging", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
-            "wants_trial_guide", "wants_trial_video_guide"
+            "wants_trial_guide", "wants_trial_video_guide", "numbers_not_timing", "language_unclear", "wants_trust_proof"
         ]:
             val = clean.get(bool_key)
             if isinstance(val, str):
@@ -611,6 +636,11 @@ async def extract_intent_and_state_changes(
             or any(w in text_lower for w in demo_kws)
             or (any(w in text_lower for w in ["video", "videos", "class recording"]) and not is_missed_class_inquiry)
         )
+        # The model judged by MEANING that the customer wants to ATTEND a class first (e.g. "I want a demo class first"):
+        # that is the 1 Week Pass offer, not a video preview. Keyword matching must not override that judgement.
+        llm_wants_pass = bool(clean.get("wants_trial")) and not clean.get("wants_demo_video")
+        if llm_wants_pass:
+            is_preview_inquiry = False
         if is_preview_inquiry:
             clean["wants_demo"] = True
             clean["wants_demo_video"] = True
@@ -620,8 +650,7 @@ async def extract_intent_and_state_changes(
             clean["wants_app_video_guide"] = False
             clean["wants_trial_guide"] = False
             clean["wants_trial_video_guide"] = False
-            # Rule A: Asking for "demo class", "demo chahiye", "sample video" strictly sets wants_trial = False
-            clean["wants_trial"] = False
+            # (wants_trial is left exactly as the model judged it: false for a pure watch request, true when it is ambiguous)
 
         # Validate selected timing against allowed canonical course batches (supports button text e.g. "5:00 PM", and casual formats e.g. "12pm", "12-1")
         is_timing_settled = bool(
@@ -895,6 +924,20 @@ async def extract_intent_and_state_changes(
             )
             if package_candidate and not (has_time_num or has_bare_time_word):
                 timing_requested = False
+        # Semantic veto (multilingual LLM judgement, no keywords/regex): when the classifier says every number in
+        # this message is a price/GST/count/email/phone etc. and NOT a class time, the clock-time parser must not see
+        # it. Otherwise "is 99 incl. GST?" is read as an unavailable slot and wipes the customer's saved timing and
+        # teacher, and "7 days" auto-selects 7 PM. Default/unknown keeps the old behaviour; an LLM-extracted timing or a
+        # TIMING_SELECTION intent always wins over the veto.
+        if (
+            clean.get("numbers_not_timing") is True
+            and clean.get("customer_intent") != "TIMING_SELECTION"
+            and not (
+                clean.get("selected_timing") or clean.get("requested_start_24h") or clean.get("requested_end_24h")
+                or clean.get("requested_timing_period") or clean.get("unoffered_timing_mentioned")
+            )
+        ):
+            timing_requested = False
         if timing_requested:
             timing_resolution = resolve_catalog_batch_semantics(
                 active_cid,
@@ -955,6 +998,10 @@ async def extract_intent_and_state_changes(
         # Strict canonical package normalization against allowed course packages
         from src.core.coupons import detect_unoffered_duration
         unoffered_dur = detect_unoffered_duration(text, course_id=active_cid or "yoga", allowed_packages=course_pkgs)
+        # On the 1 Week Pass journey "7 days" / "1 week" is the pass's own validity, not a request for an unoffered
+        # package. The keyword detector alone must not flag it (that would also wipe the pass); the AI still can.
+        if unoffered_dur and (s.get("package") or s.get("selected_duration")) == "1 Week Pass" and clean.get("unoffered_type") != "PACKAGE":
+            unoffered_dur = None
         if unoffered_dur:
             clean["unoffered_type"] = "PACKAGE"
             clean["unoffered_value"] = unoffered_dur
@@ -1718,6 +1765,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         # User typed in a native script (e.g. Malayalam, Tamil, Devanagari, Telugu, etc.)
         new_state["language"] = detected_lang
         new_state["language_selected"] = True
+    elif flags.get("language_unclear") is True and new_state.get("language"):
+        # Too short / neutral to judge ("ok", "5 pm", "yes"): keep the language the customer was already using.
+        pass
     elif not new_state.get("language_selected"):
         # Language was not explicitly locked; dynamically adapt to detected language
         detected_lang = detected_lang or new_state.get("language") or language_loader.get_default_language()
@@ -1751,6 +1801,8 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "ambiguous_timing_candidates": flags.get("ambiguous_timing_candidates"),
         "invalid_timing_candidates": flags.get("invalid_timing_candidates"),
         "wants_trial": flags.get("wants_trial", False),
+        "wants_pass": flags.get("wants_pass", False),
+        "wants_trust_proof": flags.get("wants_trust_proof", False),
         "wants_demo": flags.get("wants_demo", False),
         "wants_app_link": flags.get("wants_app_link", False),
         "wants_app_guide": flags.get("wants_app_guide", False),

@@ -89,7 +89,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 
     3. DURATION SLOT (If Timing & Instructor are BOTH SELECTED, but Package Duration is NOT SELECTED):
        - ABSOLUTE PREREQUISITE GUARD: BOTH Course AND Batch Timing AND Instructor MUST be selected before asking for package duration! If timing or instructor is still missing, DO NOT ask for package duration!
-       - ABSOLUTE TRIAL & DEMO GUARD: If the customer is on the Trial path (Trial Class Status is REQUESTED, wants_trial is True, or customer asked for a demo/trial), DO NOT ask for package duration, fees, or course enrollment! Their goal is exclusively to attend the free trial class first. Keep them focused on confirming their trial in the app (Profile -> Trial Links).
+       - 1 WEEK PASS GUARD: If Package Duration is already "1 Week Pass", the package is SETTLED — do NOT ask for package duration or pitch other packages (unless the customer asks for them).
        - Otherwise, if customer is on the standard enrollment path and ready to select packages:
          * Message #1: Present ALL available package tiers from COURSE_DATA (1 Month, 3 Months, 6 Months, and 1 Year) with their regular prices, transparent offer prices, coupons, and the official GST note. Under NO circumstances omit or hide the 6 Months or 1 Year packages!
          * Message #2 (followup): Ask which package duration they would like to choose (e.g. "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊").
@@ -102,7 +102,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - DO NOT summarize details for payment, DO NOT mention UPI QR code, DO NOT mention total payable fees, and DO NOT ask for assistance completing payment if ANY detail (such as Batch Timing) is missing!
        - PRIORITIZE DIRECT IN-CHAT PAYMENT (MANDATORY):
          * Course payment must be completed DIRECTLY in this WhatsApp chat via the dynamic Razorpay UPI QR code / direct UPI payment link.
-         * NEVER instruct the customer to download the app or visit the website to make their payment! (Only free trial booking happens from the app; enrollment payments happen directly in chat).
+         * NEVER instruct the customer to download the app or visit the website to make their payment! (Enrollment payments happen directly in chat).
          * Do not redirect enrollment payment to the app or website. Payment is completed in this chat; the app is used for attending classes after activation.
        - Message #1: Present their transparent Order / Fee Breakdown (Base catalog price, Welcome coupon discount, GST breakdown, and Final Total Payable amount). State clearly that they can pay directly in this chat by scanning the UPI QR code or tapping the direct payment link. Reassure them that once payment is completed, their classes will be activated and they can use the Sensationz App to attend their live sessions.
        - Message #2 (followup): Ask if they would like any help completing their payment via the UPI QR code (e.g. "Would you like any assistance completing your payment with the UPI QR code? 😊").
@@ -156,21 +156,11 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     - Non-Digitized Courses (where batch_timings are NOT in COURSE_DATA, e.g. Western Dance, Zumba, Music, Guitar, Drawing, Acting, Spoken English):
        * In Message #1, warmly confirm Sensationz offers the course, provide its description, explain that live batch schedules and fee packages can be viewed directly on our official Sensationz App or website, and let them know you can share the link if they'd like or they can type *agent* for human coordinator assistance. DO NOT share raw URLs unless they specifically ask! In Message #2 (followup), ask if they need any help or have any questions.
 
-    - Step Trial (ONLY when the customer explicitly asks for a live interactive free trial session):
-       * STRICT SEPARATION (RULE A):
-         - Asking for "demo class", "demo chahiye", "sample video", or "sample class" is STRICTLY a request for demo video previews, NOT a trial class!
-         - Live trial is ONLY for customers explicitly demanding trial booking (e.g. "free trial", "trial class attend karni hai").
-       * ABSOLUTE PROACTIVE TRIAL BAN:
-         - NEVER proactively ask the customer if they want a free trial (e.g. NEVER ask "Kya aap trial class book karna chahenge?", "Would you like a free trial?", "Would you like to try a trial class first?").
-         - Proactively offering trials devalues the course, turns off serious buyers, and derails the sales funnel.
-         - The default funnel is strictly: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.
-       * When a customer EXPLICITLY asks for a trial class (RULE 1 - TRIAL PIPELINE DE-ESCALATION):
-         - Warmly confirm that Sensationz offers up to 3 free live interactive trial classes.
-         - ZERO DETAIL COLLECTION IN CHAT: The chat has NO booking power for trials! NEVER ask for batch timing, instructor, package duration, fee, or Gmail for trials in chat.
-         - All trial scheduling and batch selection happen EXCLUSIVELY inside the Sensationz App (Profile -> Trial Links -> Confirm Trial Enrollment).
-         - Message #1: Warmly confirm trial availability and directly answer ANY questions they asked (syllabus, duration, faculty, class format).
-         - Message #2 (followup): Guide them to download the Sensationz App and book their trial in the app (e.g. "Would you like the app download link or video guide on how to book your trial in the app? 😊").
-         - ABSOLUTE GUARD: NEVER pitch paid course packages, fee durations (1 Month / 3 Months), ask for timing/instructor, or enrollment checkout to a customer who is pursuing a trial!
+    - Step Pass (ONLY when the customer explicitly asks for a trial / free class — the session context will then show the 1 Week Pass as their package):
+       * Sensationz does NOT offer free trial classes. NEVER say or imply that free trials exist, and NEVER mention the app's 'Trial Links'.
+       * WATCH vs ATTEND: a request to only WATCH a demo/sample VIDEO is answered with the demo video, without the pass. A customer who wants to ATTEND or TAKE a demo/trial class first (or asks if demo classes are available) is a pass request: the session context will show the 1 Week Pass; never answer such a customer with "demo classes do not exist" and nothing else.
+       * ABSOLUTE PROACTIVE BAN: NEVER bring up the 1 Week Pass (or any trial) on your own. Only when the session context says the customer asked for a trial.
+       * The pass is just their package: collect Course -> Batch Timing -> Instructor like any enrollment, then in-chat payment. Never ask for package duration for a pass customer.
   • FORMAT EXAMPLE:
     {{
       "reply": "Direct, informative, and warm answer to the customer's question strictly grounded in COURSE_DATA.",
@@ -203,7 +193,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     - If a customer asks whether any extra charges/taxes apply, asks "300 se zyada to nahi dena na?", "kuch extra to nahi lagega?", "tax included hai kya?", or expresses price doubt:
     - NEVER say "Aapko isse zyada nahi dena padega"! That is false and misleading!
     - Explicitly and transparently clarify that listed package prices do not include GST. At checkout, the course's official GST percentage is added (refer to the Active Course GST Slab and numbers in COURSE_DATA). Reassure them that beyond official GST, there are zero hidden fees, admission fees, or extra charges!
-- QUALIFY & RE-ENGAGE: If the customer sounds unsure, has an objection, or gives a short/cool reply, respond empathatically, address their concern using COURSE_DATA (e.g. multiple fixed batch slots to choose from, free trial, small 1-month starter package). Never be pushy or salesy — always helpful and warm.
+- QUALIFY & RE-ENGAGE: If the customer sounds unsure, has an objection, or gives a short/cool reply, respond empathatically, address their concern using COURSE_DATA (e.g. multiple fixed batch slots to choose from, small 1-month starter package). Never be pushy or salesy — always helpful and warm.
 - STRICT ANTI-SPAM & STATE-AWARE CONCISENESS (NON-NEGOTIABLE):
   • DO NOT behave like an FAQ bot: do NOT dump unasked information, multiple lists, or overwhelming walls of text. Answer what was asked clearly and concisely in 2-4 sentences max for Message #1.
   • NEVER REPEAT WHAT IS ALREADY IN SESSION CONTEXT: Always check 'ACTIVE CUSTOMER SESSION CONTEXT'. If timing, package, or profile status is already established/confirmed in state, NEVER re-explain, re-list, or re-ask for it. Focus strictly on the customer's immediate question or the next incomplete step.
@@ -229,8 +219,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
 - NEVER spam app or website links during informational Q&A, timings inquiries, teacher questions, general doubts, package selection, or fee breakdown!
 - ONLY provide the official access links if:
   1. CUSTOMER ASKED FOR LINKS: Customer specifically asked for the app, website, or download links.
-  2. TRIAL BOOKING: Customer explicitly asked to book a trial class or asked how to book a trial.
-  3. NON-DIGITIZED COURSE: The course is not digitized in our database and they must check the app/website for schedule/fees.
+  2. NON-DIGITIZED COURSE: The course is not digitized in our database and they must check the app/website for schedule/fees.
 - OFFICIAL ACCESS LINKS BLOCK:
   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev
   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351
@@ -242,7 +231,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
     - Share the official demo links directly in Message #1! Do NOT withhold links or ask "Which instructor's demo would you like to watch?" without providing the links.
     - If the customer asks for a specific instructor who has a demo video, share that instructor's link immediately.
     - If the customer asks for an instructor who does NOT have a recorded demo video (e.g. Nidhi, Sonali Dhote, Lokesh Kumar):
-      * Message #1: Politely explain that a recorded demo video is currently not available for that instructor, but you can share demo videos of other instructors who do have recorded previews, or they can attend live teaching via a trial class on the app.
+      * Message #1: Politely explain that a recorded demo video is currently not available for that instructor, but you can share demo videos of other instructors who do have recorded previews.
       * Message #2 (followup): Ask if they would like to explore demo videos of other instructors, or proceed with selecting a package duration (e.g. "Would you like to explore demo videos of our other instructors, or select a package to get started? 😊").
       * CRITICAL ANTI-PUSHINESS GUARD: NEVER jump immediately to package duration ("Which package duration would you like to start with — 1 Month or 3 Months?") right after telling a customer their instructor has no demo video! If a customer asked for a demo video, they want to verify teaching quality first before committing to a paid package!
   • WHEN PREVIEW / DEMO VIDEOS ARE AVAILABLE for the active course (listed in ACTIVE COURSE INSTRUCTOR DEMO VIDEOS in session context):
@@ -279,19 +268,9 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
      - If the customer asks you to enroll them, asks to confirm their admission, or asks "mera enrollment ho gaya kya?":
        Explain clearly that their enrollment will be instantly confirmed and classes activated as soon as they complete payment via the UPI QR code or direct payment link sent in this chat. They will attend the live classes through the Sensationz App.
 
-2. ABSOLUTELY ZERO FREE TRIAL BOOKING CONFIRMATION:
-   • NEVER tell a customer that their free trial class has been booked, confirmed, scheduled, or fixed for any day or timing.
-   • FORBIDDEN PHRASES (and any equivalents in any language/script):
-     - "Aapka trial confirm ho gaya hai / book ho gaya hai"
-     - "Kal ke liye aapka trial fix ho gaya hai"
-     - "Your free trial is confirmed / booked for tomorrow"
-     - "Aapki trial class book ho chuki hai"
-   • REQUIRED BEHAVIOR:
-     - The AI assistant CANNOT book or confirm trial classes on WhatsApp.
-     - Free trial bookings can ONLY be confirmed by the student THEMSELVES directly inside the Sensationz App:
-       (Open Sensationz App -> Login -> Profile -> Trial Links -> Select batch timing & teacher -> Tap Confirm Trial Enrollment).
-     - If the customer asks you to book or confirm their trial, or asks "mera trial book ho gaya kya?":
-       Explain clearly that trial bookings cannot be confirmed directly over chat — they must complete the confirmation in the Sensationz App under Profile -> Trial Links. Once they tap Confirm Trial Enrollment in the app, their trial class is instantly activated on the app.
+2. NO FREE TRIALS EXIST / NO BOOKING CONFIRMATION:
+   • Sensationz does NOT offer free trial classes. NEVER say a trial is booked, confirmed, or available, and NEVER mention 'Trial Links' or 'Confirm Trial Enrollment'.
+   • A 1 Week Pass (when it is the customer's package) is activated ONLY after payment is confirmed by our payment gateway. NEVER tell the customer a pass or class is booked, confirmed or activated before that.
 
 3. ABSOLUTELY ZERO PAYMENT OR TRANSACTION CONFIRMATION BY YOU:
    • Payment is confirmed ONLY by our payment gateway (Razorpay). The system itself sends the confirmation message once Razorpay confirms it. You NEVER decide or announce that a payment was received.
@@ -639,11 +618,61 @@ def format_system_prompt(
         or s.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
         or (s.get("_last_turn") or {}).get("wants_trial")
     )
-    if not is_trial_path:
+    from src.core.pricing_engine import WEEK_PASS, WEEK_PASS_PRICE, week_pass_classes, pass_qr_should_wait
+    if (s.get("package") or "") == WEEK_PASS and not is_paid:
+        n_cls = week_pass_classes(cid) if cid else None
+        cls_txt = f"{n_cls} live classes" if n_cls else "2 live classes (Kathak) or 5 live classes (Yoga / Dance / Face Yoga)"
+        per_cls = f" (about ₹{round(WEEK_PASS_PRICE / n_cls)} per class)" if n_cls else ""
+        from src.core.helpers.slot_engine import evaluate_enrollment_slots
+        slots_done = bool(cid and evaluate_enrollment_slots(s, course_id=cid).get("is_complete"))
+        _lt = s.get("_last_turn") or {}
+        qr_waits = pass_qr_should_wait(s, _lt, bool(_lt.get("requests_qr") or _lt.get("intent") == "PAYMENT_REQUEST"))
+        if (s.get("_last_turn") or {}).get("wants_pass"):
+            state_context += (
+                "- 🎟️ 1 WEEK PASS (customer wants to try the classes first). Sensationz has no free trial, but NEVER open with 'no', 'sorry' or 'we don't offer' and never sound like a rejection. "
+                "Message #1, in the customer's own language and a warm, enthusiastic tone: (1) first say that trying us out first is a great idea; "
+                f"(2) present the 1 Week Pass as the better alternative to a single demo session: just ₹99 all-inclusive (GST included), valid 7 days, {cls_txt}{per_cls} with the same live instructors, in their own chosen batch and teacher, so they can feel the real class and routine before deciding anything longer; "
+                "(3) be honest that it is a paid pass and NEVER imply it is free; (4) answer any other question they asked. "
+                "If the pass was ALREADY offered earlier in this chat and the customer pushes back or insists on something free, do NOT repeat the same message: acknowledge their feeling warmly in fresh words, "
+                "mention they can watch the instructors' free demo videos, gently restate the value, never pressure, and if they still decline accept gracefully and leave the door open. "
+                + (
+                    "Message #2 (followup): ALL details (course, timing, instructor, days) are ALREADY settled, so ask NOTHING about them or about the package. "
+                    "The customer is still deciding, so NO payment QR is sent with this message: do NOT say a QR is attached or below. "
+                    "The followup must be ONE short, soft question asking whether they would like you to send the secure payment QR for the pass (no pressure). "
+                    if (slots_done and qr_waits) else
+                    "Message #2 (followup): ALL details (course, timing, instructor, days) are ALREADY settled, so ask NOTHING about them or about the package; "
+                    "a payment QR for the pass is sent right below your message, so the followup may only offer help paying with it (or be null). "
+                    if slots_done else
+                    "Message #2 (followup): ask for the next missing detail (course / batch timing / instructor). "
+                ) +
+                "The pass IS their package: NEVER ask for package duration, NEVER list other packages, NEVER mention the app's Trial Links.)\n"
+            )
+        else:
+            state_context += (
+                f"- 🎟️ 1 WEEK PASS selected (₹99 all-inclusive, 7 days, {cls_txt}). Do NOT re-pitch it and do NOT ask for package duration; "
+                "continue the funnel (course -> batch timing -> instructor -> in-chat payment). Only if the customer asks about longer plans, share the regular packages. "
+                + (
+                    "ALL details are settled and the customer is still asking questions / hesitating, so NO QR is sent with this message: answer them warmly, do NOT say a QR is attached or below, and end with ONE soft question asking if they would like the payment QR for the pass.)\n"
+                    if (slots_done and qr_waits) else ")\n"
+                )
+            )
+    elif not is_trial_path:
         state_context += (
             "- ⛔ TRIAL MODE: LOCKED (Customer has NOT explicitly demanded a free trial class. "
             "Under NO circumstances mention 'trial class', 'free trial', '3 free trials', or ask 'Kya aap trial class book karna chahenge?'. "
             "Keep the conversation strictly focused on the enrollment funnel: Course -> Batch Timing -> Instructor -> Package Duration -> In-chat Payment.)\n"
+        )
+
+    if (s.get("_last_turn") or {}).get("wants_trust_proof") and not (s.get("_last_turn") or {}).get("is_complaint_or_refund"):
+        state_context += (
+            "- 🛡️ TRUST CHECK (the customer is unsure whether Sensationz is genuine): "
+            "Message #1: reassure them warmly and briefly (2-3 short sentences) in their language: we are a registered company, "
+            "name and facts ONLY from COURSE_DATA organization (e.g. legal name, established year, students trained). "
+            "Tell them a 'Verify Sensationz yourself' card is attached right below this message with our GSTIN and official links, "
+            "so they can check us directly on the Government GST portal. "
+            "NEVER type the GSTIN, ratings, follower counts or any link yourself (the card carries them exactly). "
+            "Do NOT pitch packages or the 1 Week Pass, do NOT ask for payment and do NOT mention any QR in this turn. "
+            "Message #2 (followup): at most ONE soft line inviting any other questions (no sales push), or null.)\n"
         )
 
     # ── Deterministic Slot State Engine (Order-Independent & Centralized) ──
@@ -748,16 +777,6 @@ def format_system_prompt(
                 "  • Message #1: Warmly address their question, payment reassurance, onboarding steps, or batch management explanation.\n"
                 "  • Message #2 (followup): Guide them to log into the Sensationz App using Google to view their batch.\n"
             )
-    elif is_trial_path:
-        turn_intent_guidance = (
-            "- 🎟️ TRIAL PIPELINE (CHAT HAS NO BOOKING POWER - RULE 1):\n"
-            "  • The customer is inquiring about or requested a FREE TRIAL / DEMO.\n"
-            "  • ZERO DETAIL COLLECTION IN CHAT: The bot must NEVER ask for batch timing, instructor, package duration, fee, or Gmail for trials in chat!\n"
-            "  • CHAT CANNOT BOOK OR CONFIRM TRIALS: Trial selection and confirmation happen STRICTLY and EXCLUSIVELY inside the Sensationz App (Profile -> Trial Links -> Confirm Trial Enrollment).\n"
-            "  • Message #1: Warmly and directly answer ANY questions the customer asked (syllabus, duration, faculty, class format, trial availability).\n"
-            "  • Message #2 (followup): Guide them to download the Sensationz App and book their trial in the app (e.g. 'Would you like the app download link or video guide on how to book your trial in the app? 😊').\n"
-            "  • UNDER NO CIRCUMSTANCES ask for package duration, fees, timing selection, instructor preference, or claim trial is confirmed in chat!\n"
-        )
     elif is_objection_turn:
         turn_intent_guidance = (
             "- ⚠️ CURRENT TURN CONVERSATIONAL MODE: OBJECTION / COMPLAINT / HESITATION\n"
@@ -914,16 +933,6 @@ def format_system_prompt(
             "Do NOT ask for batch timing, instructor, package duration, fees, or checkout. "
             "Warmly support them as an enrolled student with class joining instructions, app navigation, or schedule details.)"
         )
-    elif is_trial_path:
-        next_funnel_slot = (
-            "TRIAL INQUIRY & APP BOOKING GUIDANCE (Customer has explicitly asked for a live interactive free trial session. "
-            "Warmly confirm up to 3 free live interactive trial classes are available. "
-            "State clearly that trial classes CANNOT be booked in WhatsApp chat — all trial bookings are done directly "
-            "by the student inside the Sensationz App under Profile -> Trial Links -> Confirm Trial Enrollment. "
-            "Provide the 4 quick steps to book on the app and ask if they would like the app download link or video tutorial. "
-            "DO NOT collect trial timing or teacher in chat! "
-            "DO NOT pitch paid package durations or enrollment checkout!)"
-        )
     elif is_complete:
         next_funnel_slot = "PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (All 5 prerequisites complete: Course, Timing, Teacher, Package, Fee. Present transparent order fee breakdown and guide direct in-chat UPI QR payment)"
     else:
@@ -998,7 +1007,8 @@ def format_system_prompt(
         )
 
     if timing_str != "NOT SELECTED" and cid:
-        slot_teachers = kb_loader.get_teachers_for_slot(cid, timing_str)
+        # Same list the follow-ups use (slot_engine): narrowed to instructors who teach this timing on the chosen days.
+        slot_teachers = (teacher_str == "NOT SELECTED" and slot_eval.get("available_teachers_for_timing")) or kb_loader.get_teachers_for_slot(cid, timing_str)
         if slot_teachers:
             if teacher_str == "NOT SELECTED" and len(slot_teachers) > 1:
                 state_context += (

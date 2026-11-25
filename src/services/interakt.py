@@ -37,6 +37,21 @@ def _headers():
     }
 
 
+def is_cloud_test_number(phone) -> bool:
+    """Opt-in testing switch: numbers listed in CLOUD_TEST_NUMBERS are answered via the Meta WhatsApp
+    Cloud API (native WhatsApp test number) instead of Interakt. Unset/empty => always False (no effect)."""
+    raw = os.getenv("CLOUD_TEST_NUMBERS", "").strip()
+    if not raw:
+        return False
+    digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    listed = ["".join(c for c in p if c.isdigit())[-10:] for p in raw.split(",")]
+    return len(digits) == 10 and digits in listed
+
+
+def _cloud_ok(res) -> bool:
+    return isinstance(res, dict) and "error" not in res and bool(res.get("messages"))
+
+
 def _split_phone(phone_with_country_code: str):
     clean_phone = str(phone_with_country_code).replace("+", "").strip()
     if len(clean_phone) == 10:
@@ -60,6 +75,10 @@ async def send_text_message_async(phone: str, message: str):
         from src.core.meta_loader import format_for_meta
         channel = "facebook" if clean_phone.startswith("fb_") else "instagram"
         return await send_direct_message_async(clean_phone.split("_", 1)[1], format_for_meta(message), channel=channel)
+
+    if is_cloud_test_number(clean_phone):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_text_async
+        return await send_whatsapp_cloud_text_async(clean_phone.replace("wa_", "", 1), message)
 
     if clean_phone.startswith("wa_"):
         clean_phone = clean_phone[3:]
@@ -267,6 +286,10 @@ async def send_video_message_async(phone: str, video_url: str, caption: str = ""
             print(f"[interakt] send_video_message_async Meta error for {clean_phone}: {e}")
         return False
 
+    if is_cloud_test_number(clean_phone):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_video_async
+        return _cloud_ok(await send_whatsapp_cloud_video_async(clean_phone.replace("wa_", "", 1), video_url, caption))
+
     if clean_phone.startswith("wa_"):
         clean_phone = clean_phone[3:]
 
@@ -324,6 +347,10 @@ async def send_image_message_async(phone: str, image_url: str, caption: str = ""
         except Exception as e:
             print(f"[interakt] send_image_message_async Meta error for {clean_phone}: {e}")
         return False
+
+    if is_cloud_test_number(clean_phone):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_image_async
+        return _cloud_ok(await send_whatsapp_cloud_image_async(clean_phone.replace("wa_", "", 1), image_url, caption))
 
     if clean_phone.startswith("wa_"):
         clean_phone = clean_phone[3:]

@@ -34,9 +34,6 @@
     "recordings_available": true,
     "recordings_note": "Recordings of the class are provided daily, after each class.",
     "certificate_provided": false,
-    "trial_classes_available": true,
-    "max_trial_classes": 3,
-    "trial_cost": "Free",
     "important_note": "Physical branches are office addresses only. Online Ladies Bollywood Dance classes are accessible from anywhere worldwide."
   },
   "pricing": {
@@ -273,24 +270,10 @@
     "Stable internet connection",
     "Open space to move freely"
   ],
-  "trial_class": {
-    "available": true,
-    "cost": "Free",
-    "max_trials": 3,
-    "booking_platform": "Sensationz App",
-    "booking_steps": [
-      "Download the Sensationz App",
-      "Login using Continue with Google",
-      "Complete your profile (Name, Gender, Country, etc.)",
-      "Go to Profile then tap Trial Links",
-      "Select Ladies Bollywood Dance and your preferred timing",
-      "Tap Confirm Trial Enrollment"
-    ],
-    "demo_videos": {
+  "demo_videos": {
       "Aditi Vyas": "https://www.instagram.com/reel/DcgMu1kQDeJ/?stkn=MXVxa3g0cTB0dXF4bw==",
       "Gresi Gurung": "https://www.instagram.com/reel/Dca-An0FgIR/?stkn=MXA2eGNlejdzb213Nw==",
       "Mansi Pal": "https://www.instagram.com/reel/DdL2ZOcjhmQ/?stkn=c2FnczgzMWQ0eno4"
-    }
   },
   "enrollment": {
     "batches_start": "Ongoing — enroll anytime"

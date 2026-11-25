@@ -45,9 +45,6 @@
         "available_from_anywhere": true,
         "recordings_available": false,
         "certificate_provided": false,
-        "trial_classes_available": true,
-        "max_trial_classes": 3,
-        "trial_cost": "Free",
         "important_note": "Physical branches are office addresses only. Online Yoga classes are accessible from anywhere worldwide."
     },
     "pricing": {
@@ -401,27 +398,6 @@
         "Water Bottle",
         "Stable Internet Connection"
     ],
-    "trial_class": {
-        "available": true,
-        "cost": "Free",
-        "max_trials": 3,
-        "booking_platform": "Sensationz App",
-        "booking_steps": [
-            "Download the Sensationz App",
-            "Login using Continue with Google",
-            "Complete your profile (Name, Gender, Country, etc.)",
-            "Go to Profile then tap Trial Links",
-            "Select the desired trial class ",
-            "Select preferred Timing, Days, and Teacher",
-            "Tap Confirm Trial Enrollment",
-            "Your trial will be confirmed and booked"
-        ],
-        "demo_videos": {
-            "Suman Lata": "https://youtu.be/IiVVdu4NkwI?si=leLgCK40Uo5Qhr0V",
-            "Mradula": "https://youtu.be/vXZ6UtrWpM8?si=WYpuo8Us7xIkXT8n",
-            "Priya Mathur": "https://youtu.be/M2Zh9SaHpX4?si=RXg-HXGI5n_ftxs-"
-        }
-    },
     "enrollment": {
         "batches_start": "Ongoing — enroll anytime"
     },
@@ -452,5 +428,10 @@
         ],
         "medical_disclaimer": "Course is for general wellness only. Not a substitute for medical treatment. Advise users to consult a doctor for medical conditions.",
         "prenatal_yoga_instruction": "Do NOT mention Mradula's prenatal certification when answering about Prenatal Yoga. Simply state we do not currently offer it."
+    },
+    "demo_videos": {
+        "Suman Lata": "https://youtu.be/IiVVdu4NkwI?si=leLgCK40Uo5Qhr0V",
+        "Mradula": "https://youtu.be/vXZ6UtrWpM8?si=WYpuo8Us7xIkXT8n",
+        "Priya Mathur": "https://youtu.be/M2Zh9SaHpX4?si=RXg-HXGI5n_ftxs-"
     }
 }

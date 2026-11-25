@@ -70,10 +70,10 @@ _QUESTION_BANK = [
             "sir", "sikhane", "sikhata", "sikhati",
         ],
         "hindi": (
-            "Aap kis teacher ya timing ka trial lena chahenge? 😊"
+            "Aap kis teacher ya timing mein join karna chahenge? 😊"
         ),
         "english": (
-            "Which teacher or batch timing would you like to try? 😊"
+            "Which teacher or batch timing would you like to join? 😊"
         ),
     },
     {
@@ -98,11 +98,11 @@ _QUESTION_BANK = [
         ],
         "hindi": (
             "Live interactive format mein aap directly teacher se class ke dauran pooch sakte hain. "
-            "Kya aap ek free trial try karke dekh sakte hain? 😊"
+            "Kya aap apna batch select karna chahenge? 😊"
         ),
         "english": (
             "In our live interactive format, you can ask the teacher directly during class. "
-            "Would you like to try a free trial to see for yourself? 😊"
+            "Would you like to pick your batch? 😊"
         ),
     },
     {
@@ -120,23 +120,23 @@ _QUESTION_BANK = [
             "real", "genuine", "testimonial", "sach", "verified",
         ],
         "hindi": (
-            "Aap ek free trial leke khud experience kar sakte hain — koi risk nahi. "
-            "Kya aap try karna chahenge? 😊"
+            "Hamare live classes ka demo video dekh sakte hain — koi risk nahi. "
+            "Kya main bhej doon? 😊"
         ),
         "english": (
-            "You can experience it yourself with a free trial — absolutely no risk. "
-            "Would you like to give it a try? 😊"
+            "You can watch a demo of our live classes first — no risk at all. "
+            "Shall I send it? 😊"
         ),
     },
     {
         "triggers": ["trial", "demo", "free class", "sample", "pehle try"],
         "hindi": (
-            "Trial book karne ke baad koi sawaal ho — timing ya teacher ke baare mein — "
-            "toh zaroor poochein. Kya aap trial ke liye ready hain? 😊"
+            "Timing ya teacher ke baare mein koi bhi sawaal ho toh zaroor poochein. "
+            "Kya aap apna batch select karna chahenge? 😊"
         ),
         "english": (
-            "Feel free to ask anything after booking the trial — about timing or teachers. "
-            "Are you ready to book your trial? 😊"
+            "Feel free to ask anything about timing or teachers. "
+            "Would you like to pick your batch? 😊"
         ),
     },
     {
@@ -201,7 +201,7 @@ _FALLBACK_BY_STAGE = {
         "english": "Morning or evening — which time suits you better? 😊",
     },
     "TIMING_SELECTED": {
-        "hindi": "Kitne time ke liye join karna chahenge — 1 month trial se shuru karein ya seedha 3 months? 😊",
+        "hindi": "Kitne time ke liye join karna chahenge — 1 month se shuru karein ya seedha 3 months? 😊",
         "english": "How long would you like to join — start with 1 month or go for 3 months? 😊",
     },
     "PACKAGE_SELECTED": {

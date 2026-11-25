@@ -64,7 +64,7 @@ COURSE OFFERINGS & POLICIES SUMMARY:
 - Physical branch addresses are ADMINISTRATIVE OFFICES ONLY. Offline classes or physical studio visits are NOT offered.
 - Cash or offline payments are STRICTLY NOT ACCEPTED.
 - Course fees once paid are non-refundable.
-- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch timing can be changed once a month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, up to 3 free live trial classes, certified instructors, beginner-friendly pace.
+- Offerings: 10 fixed batch timing slots available (ranging 5:00 AM to 8:00 PM) — students choose ONE fixed batch at enrollment; batch timing can be changed once a month. Flexible/on-demand timings are NOT offered. Recorded sessions in app, starter packages, certified instructors, beginner-friendly pace.
 
 
 ANALYSIS CRITERIA:
@@ -93,7 +93,7 @@ ANALYSIS CRITERIA:
 
 4. SOLUTION VIABILITY:
    - Can our system/knowledge base legitimately solve the customer's reason?
-     • Solvable: Budget/price (free trial, discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch change allowed once a month, app recordings), beginner fear (interactive beginner classes, certified guidance), trial/trust (free live trial, demo videos).
+     • Solvable: Budget/price (discount coupon, 1-month starter pack), schedule/timing (10 fixed batch slots 5AM–8PM to choose from, batch change allowed once a month, app recordings), beginner fear (interactive beginner classes, certified guidance), trust (demo videos).
      • Temporary / Situational Unavailability: Customer is currently at office/work, in a meeting, driving, traveling, or temporarily occupied. This is SOLVABLE by respecting their time, acknowledging their schedule politely with zero pressure, and letting them know they can connect whenever free (or we can check in later). Set `solution_viable` = true.
      • NOT Solvable: Customer insists on physical offline in-person studio classes, demands 1-on-1 private home tutors, demands cash payment at physical office, refund demand, or has unserviceable demands.
    - If the request cannot be fulfilled by our offerings -> `solution_viable` = false.
@@ -137,12 +137,12 @@ DECISION OUTCOMES:
        -> `resolution_type` = "PROVIDE_SOLUTION"
        -> GENERATE a `reply_message` that: warmly and empathetically addresses their specific situation:
           - If temporary situational unavailability (e.g. at office, working, driving, busy right now, in meeting):
-            Warmly acknowledge their situation with zero pressure. Let them know they can finish their work and check out the trial or details whenever they are free.
+            Warmly acknowledge their situation with zero pressure. Let them know they can finish their work and check out the details whenever they are free.
             Example tone (Hinglish): "Bilkul koi baat nahi! 😊 Aap apna office ka kaam complete kar lijiye. Jab bhi aap free hon, tab batayega — hum tab connect kar lenge. Have a productive day at work! 👍"
             Example tone (English): "No problem at all! 😊 Please focus on your work. Feel free to message whenever you are free and we can connect then. Have a great day! 👍"
           - If doubt about schedule, timing flexibility, or missing classes: Warmly explain that live interactive classes run Mon-Fri (1 session/day) across 10 batch slots (5 AM to 8 PM). While day-to-day switching isn't available, they can change their batch once a month, and full recordings are available in the app if they ever miss a session.
-          - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) or free live trial class so they can see the beginner pace firsthand. Do NOT push paid packages.
-          - If doubt about fees/pricing: Mention the free live trial class or starter package without being pushy.
+          - If doubt about teachers, exercise pace, or beginner guidance: Share YouTube demo video links from ACTIVE COURSE CONTEXT (if available) so they can see the beginner pace firsthand. Do NOT push paid packages.
+          - If doubt about fees/pricing: Mention the starter package without being pushy.
           - Keep it inviting, empathetic, and friendly.
 
 4. REFUSAL WITHOUT REASON (FIRST-TIME REFUSAL ONLY, REFUSAL STAGE == 0):
@@ -215,14 +215,8 @@ async def evaluate_refusal_async(
                 f"(Regular: ₹{starter.get('base_price', 0):,})" if starter else "N/A"
             )
             all_pkgs = ", ".join(f"{p.get('duration')}: ₹{p.get('offer_price', p.get('base_price', 0)):,}" for p in pkgs)
-            trial_info = course_data.get("trial_classes", {})
             course_overview = course_data.get("course_overview", {})
-            max_trials = (
-                course_overview.get("max_trial_classes")
-                or trial_info.get("max_trial_classes")
-                or 3
-            )
-            demo_videos = trial_info.get("demo_videos") or course_data.get("demo_videos", {})
+            demo_videos = course_data.get("demo_videos", {})
             demo_str = ", ".join(f"{teacher}: {url}" for teacher, url in demo_videos.items() if url) if demo_videos else "None"
             not_offered = course_data.get("not_offered", {})
             course_context_str = (
@@ -230,7 +224,6 @@ async def evaluate_refusal_async(
                 f"- Course Name: {course_name}\n"
                 f"- Starter Package: {starter_str}\n"
                 f"- All Package Offer Prices: {all_pkgs}\n"
-                f"- Free Trial Available: Up to {max_trials} free trial class(es)\n"
                 f"- YouTube Demo Videos: {demo_str}\n"
                 f"- Unoffered / Excluded: {', '.join(not_offered.get('course_types', []))}"
             )

@@ -117,9 +117,15 @@ async def handle_incoming_message(
         history=conversation_history,
     )
 
+    # Free trials are discontinued: trial interest becomes a 1 Week Pass request.
+    from src.core.pricing_engine import route_week_pass, apply_week_pass
+    flags = route_week_pass(flags)
+
     # 2. Pure state merge.
     flags["_raw_text"] = user_message  # injected for deterministic language override
     new_state = intent_classifier.apply_extraction_to_state(session_state, flags)
+    apply_week_pass(new_state, flags)
+    session_state["awaiting_trial_email"] = False  # legacy in-flight trial session
 
     # ── Payment claims: Razorpay is the ONLY source of truth ──────────────────
     # A client saying "I paid" never makes them PAID and never reaches the LLM. We look for a
@@ -176,6 +182,19 @@ async def handle_incoming_message(
         old_entry = kb_loader.get_catalog_entry(old_course) or kb_loader.get_catalog_entry(kb_loader.detect_course_from_text(old_course) or "")
         norm_old_course = old_entry["id"] if old_entry else old_course
         if norm_old_course and norm_old_course != effective_course_id:
+            # Keep every verified paid enrollment, per course: asking about another course must never erase it,
+            # and coming back to the paid course restores it (otherwise the customer would be pitched again).
+            _PAID_KEYS = (
+                "payment_status", "is_enrolled", "stage", "paid_amount", "payment_id", "order_id", "qr_id",
+                "timing", "selected_timing", "teacher", "selected_teacher", "days", "selected_days", "days_code",
+                "package", "selected_duration", "fee", "student_email", "staged_enrollment", "staged_id",
+                "last_qr_package", "last_qr_amount", "payment_claimed",
+            )
+            paid_book = dict(session_state.get("paid_enrollments") or {})
+            if is_payment_verified(session_state):
+                paid_book[norm_old_course] = {k: session_state.get(k) for k in _PAID_KEYS}
+            new_state["paid_enrollments"] = paid_book
+            session_state["paid_enrollments"] = paid_book
             new_state["timing"] = None
             new_state["selected_timing"] = None
             new_state["timing_period"] = None
@@ -211,6 +230,14 @@ async def handle_incoming_message(
             session_state["gst_amount"] = None
             session_state["gst_percentage"] = None
 
+            if paid_book.get(effective_course_id):
+                # Back on a course they already paid for: restore the enrollment exactly as it was.
+                for _k, _v in paid_book[effective_course_id].items():
+                    new_state[_k] = _v
+                    session_state[_k] = _v
+                new_state["paid_course"] = effective_course_id
+                session_state["paid_course"] = effective_course_id
+
             # Course-specific enrollment isolation
             if is_payment_verified(session_state) and not session_state.get("paid_course"):
                 session_state["paid_course"] = norm_old_course
@@ -223,6 +250,8 @@ async def handle_incoming_message(
                 session_state["payment_status"] = "NONE"
                 session_state["stage"] = "NEW"
                 session_state["is_enrolled"] = False
+
+    apply_week_pass(new_state, flags)  # again: the course-switch reset above wipes the package (idempotent)
 
     # ── Gmail Interception & Auto-Staging Pipeline ──────────────────────────
     from src.services.hono_staging_client import clean_email, stage_ai_enrollment_async
@@ -1157,28 +1186,22 @@ def _sanitize_confirmation_guardrails(
         logger.warning(f"[guardrails] Trial confirmation intercepted and sanitized. Raw reply: {reply[:80]}...")
         if has_devanagari:
             sanitized_reply = (
-                "कृपया ध्यान दें कि व्हाट्सएप चैट पर AI द्वारा ट्रायल क्लास सीधे बुक या कन्फर्म नहीं की जा सकती। "
-                "अपनी फ्री ट्रायल क्लास कन्फर्म करने के लिए कृपया Sensationz ऐप में जाएं "
-                "(Profile -> Trial Links -> बैच टाइमिंग और टीचर चुनें -> Confirm Trial Enrollment पर टैप करें)। "
-                "ऐप में कन्फर्म करते ही आपकी ट्रायल क्लास सक्रिय हो जाएगी! 😊"
+                "कृपया ध्यान दें: Sensationz में अब फ्री ट्रायल क्लास उपलब्ध नहीं हैं, और व्हाट्सएप चैट पर AI कोई क्लास बुक या कन्फर्म नहीं कर सकती। "
+                "आपकी सीट पेमेंट कन्फर्म होने के बाद ही एक्टिव होती है। 😊"
             )
-            sanitized_followup = "क्या आपको ऐप में ट्रायल बैच टाइमिंग चुनने में कोई मदद चाहिए? 😊"
+            sanitized_followup = "क्या आपको बैच टाइमिंग या टीचर चुनने में कोई मदद चाहिए? 😊"
         elif is_english:
             sanitized_reply = (
-                "Please note that free trial classes cannot be booked or confirmed directly over chat by the AI. "
-                "To confirm your free trial, please open the Sensationz App "
-                "(Go to Profile -> Trial Links -> Select your preferred batch timing & teacher -> Tap Confirm Trial Enrollment). "
-                "Once confirmed in the app, your free trial class is activated! 😊"
+                "Please note that Sensationz no longer offers free trial classes, and the AI cannot book or confirm any class over chat. "
+                "Your seat is activated only after your payment is confirmed. 😊"
             )
-            sanitized_followup = "Would you like any help selecting your trial batch timing in the app? 😊"
+            sanitized_followup = "Would you like any help choosing your batch timing or instructor? 😊"
         else:
             sanitized_reply = (
-                "Dhyan dein ki WhatsApp chat par AI ke dwara trial class book ya confirm nahi hoti hai. "
-                "Free trial confirm karne ke liye Sensationz App open karein "
-                "(Profile -> Trial Links -> Batch timing aur teacher select karein -> Tap Confirm Trial Enrollment). "
-                "Wahan tap karte hi aapki free trial class confirm ho jayegi! 😊"
+                "Dhyan dein ki Sensationz mein ab free trial classes available nahi hain, aur WhatsApp chat par AI koi class book ya confirm nahi kar sakta. "
+                "Aapki seat payment confirm hone ke baad hi active hoti hai. 😊"
             )
-            sanitized_followup = "Kya aapko app mein trial batch timing select karne mein koi madad chahiye? 😊"
+            sanitized_followup = "Kya aapko batch timing ya teacher select karne mein koi madad chahiye? 😊"
         return sanitized_reply, sanitized_followup
 
     # 3. Check Course Enrollment / Admission Confirmation (only for unverified/unpaid users)
@@ -1479,7 +1502,20 @@ def _sanitize_state_grounded_replies(
                 reply = f"{prefix}Please let me know which course you would like to join first."
                 followup = "Which course would you like to know more about? 😊"
 
+    # 5. SYNC GUARD: Message #2 must never ask for a slot the lead already chose (same check the timed follow-ups use).
+    # Not an objection / paid / trial (slot_eval.next_target_slot is ENROLLED / TRIAL there, so this is a no-op).
+    from src.core.helpers.slot_engine import followup_asks_settled_slot, slot_question
+    if followup and followup_asks_settled_slot(followup, slot_eval):
+        logger.warning(f"[guardrails] Message #2 asked an already-settled slot, replaced: {followup!r}")
+        followup = slot_question(slot_eval, state.get("language"))  # None when everything is settled (payment next)
+
     return reply, followup
+
+
+def _slot_followup(state: Dict[str, Any], active_cid: str, current: Optional[str]) -> Optional[str]:
+    """Message #2 for the lead's NEXT missing slot; `current` when there is nothing to ask (payment / paid / trial)."""
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots, slot_question
+    return slot_question(evaluate_enrollment_slots(state, course_id=active_cid), state.get("language")) or current
 
 
 async def dispatch_media_guide_async(
@@ -1696,6 +1732,9 @@ async def dispatch_payment_qr_async(
     if delivered:
         from datetime import datetime, timezone
         now_utc = datetime.now(timezone.utc).isoformat()
+        if not state.get("qr_sent_at"):  # first QR only: one summary, frozen now
+            from src.services.qr_lead_summary import schedule_qr_lead_summary
+            schedule_qr_lead_summary(phone, state)
         state["qr_code_sent"] = True
         state["is_qr_sent"] = True
         state["qr_sent_at"] = state.get("qr_sent_at") or now_utc
@@ -2181,6 +2220,10 @@ async def _handle_conversation_turn_unlocked(
             "demo video", "practice video", "sample video", "upar send kar diya", "teaching style"
         ))
     )
+    # The 1 Week Pass IS the customer's package: the demo-video rule below must never ask them to pick a package duration.
+    pass_is_package = new_state.get("package") == "1 Week Pass"
+    # A customer who already paid is enrolled: never ask them to choose a package or a batch again.
+    already_paid = is_payment_verified(new_state)
     if is_demo_video_shared:
         new_state["wants_trial"] = False
         last_turn["wants_trial"] = False
@@ -2196,45 +2239,25 @@ async def _handle_conversation_turn_unlocked(
                 flags=re.IGNORECASE
             ).strip()
 
-        # Enforce Message #2 follow-up asking for package duration (or batch timing if missing)
-        is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
+        # Message #2 asks for the lead's NEXT missing slot (not blindly "package": it may already be chosen)
         has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
-        if has_timing:
-            clean_followup = (
-                "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
-                if is_eng else
-                "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
-            )
+        if (has_timing and pass_is_package) or already_paid:
+            pass  # keep the AI's own follow-up (pass pitch already matches / customer already enrolled)
         else:
-            clean_followup = (
-                "Which batch timing suits your daily routine best — morning or evening? 😊"
-                if is_eng else
-                "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
-            )
+            clean_followup = _slot_followup(new_state, active_cid, clean_followup)
 
     # Layer 2 Guard: Sanitize proactive trial pushes in followup when trial mode is LOCKED
     is_trial_unlocked = bool(
         new_state.get("wants_trial")
         or new_state.get("stage") in ["TRIAL_REQUESTED", "TRIAL_STEPS_SENT"]
         or last_turn.get("wants_trial")
+        or last_turn.get("wants_pass")
+        or new_state.get("package") == "1 Week Pass"
     )
     if not is_trial_unlocked:
         if clean_followup and re.search(r"\b(trial|trials|ट्रायल)\b", clean_followup, re.IGNORECASE):
             logger.warning(f"[guardrails] Proactive trial followup intercepted and replaced: {clean_followup}")
-            is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
-            has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
-            if has_timing:
-                clean_followup = (
-                    "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
-                    if is_eng else
-                    "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
-                )
-            else:
-                clean_followup = (
-                    "Which batch timing suits your daily routine best — morning or evening? 😊"
-                    if is_eng else
-                    "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
-                )
+            clean_followup = _slot_followup(new_state, active_cid, None)
 
         if clean_reply and re.search(r"\b(trial|trials|ट्रायल)\b", clean_reply, re.IGNORECASE):
             clean_reply = re.sub(
@@ -2257,19 +2280,10 @@ async def _handle_conversation_turn_unlocked(
     # Rule B downstream guarantee: ensure clean_followup is strictly preserved after demo video delivery
     if is_demo_video_shared:
         has_timing = bool(new_state.get("timing") or new_state.get("selected_timing"))
-        is_eng = bool(new_state.get("language") and "english" in str(new_state.get("language")).lower() and "hinglish" not in str(new_state.get("language")).lower())
-        if has_timing:
-            clean_followup = (
-                "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
-                if is_eng else
-                "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊"
-            )
+        if (has_timing and pass_is_package) or already_paid:
+            pass  # keep the AI's own follow-up (pass pitch already matches / customer already enrolled)
         else:
-            clean_followup = (
-                "Which batch timing suits your daily routine best — morning or evening? 😊"
-                if is_eng else
-                "Aap mostly subah free hote hain ya evening mein practice karna convenient rahega? 😊"
-            )
+            clean_followup = _slot_followup(new_state, active_cid, clean_followup)
     allow_video_links = bool(user_asked_demo or will_send_trial_video or will_send_install_video or is_video_guide_request)
     clean_reply = _ensure_app_website_links(clean_reply, user_asked_for_links=allow_app_links, allow_demo_links=allow_video_links)
 
@@ -2320,10 +2334,10 @@ async def _handle_conversation_turn_unlocked(
             r"\b(links?.{0,25}(download|app|website)\b.*\?)",
         )
         if any(re.search(p, clean_followup, re.IGNORECASE) for p in REDUNDANT_LINK_QUESTIONS):
-            is_trial = bool(last_turn.get("wants_trial") or new_state.get("wants_trial"))
+            # No free trials exist any more, and the 1 Week Pass IS a package: never ask a pass customer for a duration.
             clean_followup = (
-                "Would you like any help downloading the app or booking your free trial inside the app? 😊"
-                if is_trial
+                None
+                if (pass_is_package or already_paid)
                 else "Which package duration would you like to start with — 1 Month, 3 Months, 6 Months, or 1 Year? 😊"
             )
 
@@ -2333,6 +2347,22 @@ async def _handle_conversation_turn_unlocked(
         latency_sec = round(time.time() - start_time, 2)
         await save_message_async(phone, "assistant", clean_reply, response_time_sec=latency_sec)
         asyncio.create_task(log_message_async(phone, "ai", clean_reply))
+
+    # Trust proof: exact GSTIN + official GST-portal link + Google rating / social links, straight from data.
+    # (Angry accusations / refund demands go to the human-agent path instead; skip a duplicate within 60 s.)
+    if (
+        last_turn.get("wants_trust_proof")
+        and not last_turn.get("is_complaint_or_refund")
+        and not last_turn.get("wants_stop_messaging")
+        and time.time() - float(new_state.get("trust_proof_sent_at") or 0) > 60
+    ):
+        from src.core.trust_proof import build_trust_card
+        trust_card = build_trust_card(new_state.get("language"))
+        if trust_card:
+            await send_text_message_async(phone, trust_card)
+            new_state["trust_proof_sent_at"] = time.time()
+            await save_message_async(phone, "assistant", trust_card)
+            asyncio.create_task(log_message_async(phone, "ai", trust_card))
 
     if send_native_demo_video:
         await dispatch_class_demo_video_async(
@@ -2412,8 +2442,14 @@ async def _handle_conversation_turn_unlocked(
         )
     )
 
+    from src.core.pricing_engine import pass_qr_should_wait
+    pass_qr_hold = pass_qr_should_wait(new_state, last_turn, user_asked_qr)
+    # A customer who just doubted whether we are genuine must never get a payment QR in the same breath.
+    trust_hold = bool(last_turn.get("wants_trust_proof")) and not user_asked_qr
     is_payment_step = bool(
         not is_client_paid
+        and not pass_qr_hold
+        and not trust_hold
         and all_prerequisites_met
         and (user_asked_qr or not is_asking_slot)
         and (

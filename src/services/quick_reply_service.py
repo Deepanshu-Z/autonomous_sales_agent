@@ -13,6 +13,7 @@ from src.services.interakt import (
     _get_async_client,
     BASE_URL,
     send_text_message_async,
+    is_cloud_test_number,
 )
 
 
@@ -48,6 +49,11 @@ async def send_followup_with_buttons_async(
     if clean_phone.startswith("wa_"):
         clean_phone = clean_phone[3:]
         phone = clean_phone
+
+    if is_cloud_test_number(phone):
+        from src.services.whatsapp_cloud_client import send_whatsapp_cloud_buttons_async
+        res = await send_whatsapp_cloud_buttons_async(phone, followup_text, valid_buttons)
+        return isinstance(res, dict) and "error" not in res and bool(res.get("messages"))
 
     if not valid_buttons:
         # No buttons requested — send as plain text

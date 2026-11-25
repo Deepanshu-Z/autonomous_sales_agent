@@ -15,6 +15,7 @@ Core Guarantees:
 - Zero Repetition: Next target slot strictly targets the first unfilled slot.
 """
 
+import re
 from typing import Dict, Any, List, Optional
 from src.core import kb_loader
 from src.state.payment_status import is_payment_verified
@@ -82,6 +83,11 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
 
     # 4. Resolve Days
     days_val = s.get("days") or s.get("selected_days")
+    # Days already chosen: only offer instructors who really teach that timing on those days
+    # (e.g. Wed/Fri 5-6 PM must not list a teacher who is Tue/Thu + Sat/Sun at 5-6 PM). Used by the AI prompt AND the follow-ups.
+    if days_val and cid and timing_str != "NOT SELECTED" and available_teachers:
+        on_days = [t for t in available_teachers if days_val in get_available_days_for_batch(cid, timing=timing_str, teacher=t)]
+        available_teachers = on_days or available_teachers
     avail_days = (
         get_available_days_for_batch(cid, timing=timing_str, teacher=teacher_str)
         if (cid and timing_str != "NOT SELECTED" and teacher_str != "NOT SELECTED")
@@ -183,6 +189,7 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
         "teacher": teacher_val,
         "teacher_str": teacher_str,
         "available_teachers_for_timing": available_teachers,
+        "available_days": avail_days,
         "days": days_val,
         "days_str": days_str,
         "package": pkg_val,
@@ -198,3 +205,64 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
         "constraint_note": constraint_note,
     }
 
+
+
+# ── One shared "what do we ask next?" for the AI's Message #2 AND the timed follow-ups ──────────
+
+_ASKS = {  # which slot a question is asking about
+    # question forms only: a statement like "Aapne *Wed/Fri* select kiya hai" must NOT match
+    "TIMING": re.compile(r"which (batch |specific )?timing|which time slot|kaunsa (batch )?timing|kaunsi timing|kaunsa time\b|kis time", re.I),
+    "TEACHER": re.compile(r"which instructor|which teacher|kaunse instructor|kis instructor", re.I),
+    "DAYS": re.compile(r"which days|kaunse din|day.?pair|kaunsa pair|pair (chahenge|best)|tue/thu ya wed/fri", re.I),
+    "DURATION": re.compile(r"which package|kaunsa package|choose a package", re.I),
+}
+_QUESTION_SLOTS = ("COURSE", "TIMING", "TEACHER", "DAYS", "DURATION")
+
+
+def _is_english(language: Optional[str]) -> bool:
+    lang = str(language or "").lower()
+    return "english" in lang and "hinglish" not in lang
+
+
+def settled_slot_names(slot_eval: Dict[str, Any]) -> set:
+    """Slots the lead has already answered (from evaluate_enrollment_slots)."""
+    s = set()
+    if slot_eval.get("timing_str") != "NOT SELECTED":
+        s.add("TIMING")
+    if slot_eval.get("teacher_str") != "NOT SELECTED":
+        s.add("TEACHER")
+    if not any(m.startswith("Batch Days") for m in slot_eval.get("missing_slots", [])):
+        s.add("DAYS")
+    if slot_eval.get("package_str") != "NOT SELECTED":
+        s.add("DURATION")
+    return s
+
+
+def followup_asks_settled_slot(text: Optional[str], slot_eval: Dict[str, Any]) -> bool:
+    """True if `text` asks the lead for something they already chose. Not for trial / paid flows."""
+    if not text or slot_eval.get("next_target_slot") not in (*_QUESTION_SLOTS, "PAYMENT"):
+        return False
+    settled = settled_slot_names(slot_eval)
+    return any(slot in settled and rx.search(text) for slot, rx in _ASKS.items())
+
+
+def slot_question(slot_eval: Dict[str, Any], language: Optional[str] = None) -> Optional[str]:
+    """The ONE question for the lead's next missing slot, or None (payment / paid / trial: nothing to ask)."""
+    slot, en = slot_eval.get("next_target_slot"), _is_english(language)
+    if slot == "COURSE":
+        return "Which course would you like to know more about? 😊" if en else "Aap kaunsa course join karna chahenge? 😊"
+    if slot == "TIMING":
+        return "Which batch timing suits your daily routine best? 😊" if en else "Aap kaunsa batch timing select karna chahenge? 😊"
+    if slot == "TEACHER":
+        names = slot_eval.get("available_teachers_for_timing") or []
+        opts = (" or " if en else " ya ").join(names)
+        if en:
+            return f"Which instructor would you like to learn with{' — ' + opts if opts else ''}? 😊"
+        return f"Aap kis instructor ke saath seekhna chahenge{' — ' + opts if opts else ''}? 😊"
+    if slot == "DAYS":
+        opts = (" or " if en else " ya ").join(slot_eval.get("available_days") or [])
+        return f"Which days work for you{' — ' + opts if opts else ''}? 😊" if en else f"Aap kaunse din ke batch mein join karna chahenge{' — ' + opts if opts else ''}? 😊"
+    if slot == "DURATION":
+        return ("Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊" if en else
+                "Aap kaunsa package duration choose karna chahenge — 1 Month starter pack ya hamara 3 Months offer package? 😊")
+    return None

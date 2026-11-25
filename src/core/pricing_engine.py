@@ -114,12 +114,100 @@ def get_valid_packages(course_id: Optional[str] = None) -> Dict[str, str]:
     return valid_pkgs
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 1 WEEK PASS — replaces free trials. Deliberately NOT in a course's pricing.packages:
+# every "list all packages" / coupon path reads that list, so the pass would be pitched
+# upfront. It exists only as state["package"], set when the customer asks for a trial.
+# ─────────────────────────────────────────────────────────────────────────────
+WEEK_PASS = "1 Week Pass"
+WEEK_PASS_PRICE = 99      # final payable, GST included
+WEEK_PASS_END_OFFSET = 6  # end_date = start + 6: 7 inclusive days hold each weekday once
+                          # -> exactly 2 classes for day-pair batches (Kathak), 5 for Mon-Fri
+
+
+def week_pass_classes(course_id: Optional[str]) -> int:
+    return 2 if "kathak" in (course_id or "").lower() else 5
+
+
+def _week_pass_package(course_id: str) -> Dict[str, Any]:
+    gst_pct = get_course_gst_percentage(course_id)
+    net = round(WEEK_PASS_PRICE / (1 + gst_pct / 100))
+    return {
+        "duration": WEEK_PASS, "duration_code": "1W",
+        "base_price": net, "offer_price": net,
+        "gst_on_offer": WEEK_PASS_PRICE - net, "total_with_gst_offer": WEEK_PASS_PRICE,
+    }
+
+
+def route_week_pass(flags: Dict[str, Any]) -> Dict[str, Any]:
+    """Run right after the intent classifier. The multilingual LLM classifier decides (by meaning,
+    in any language) that the customer wants to try the classes; no keywords or regexes here.
+    That becomes a pass request and the legacy trial flags are zeroed, so no in-app trial path can fire."""
+    flags["wants_pass"] = bool(flags.get("wants_trial"))
+    for k in ("wants_trial", "wants_trial_guide", "wants_trial_video_guide"):
+        flags[k] = False
+    if flags["wants_pass"] and flags.get("unoffered_type") == "PACKAGE":
+        # The duration they named ("1 week", "ek hafta", ...) is the pass, not an unoffered package.
+        flags["unoffered_type"] = flags["unoffered_value"] = None
+    return flags
+
+
+def apply_week_pass(state: Dict[str, Any], flags: Dict[str, Any]) -> None:
+    """Run after apply_extraction_to_state. Sets the pass as the package (unpaid customers only).
+    A later explicit package choice simply overwrites it."""
+    from src.state.payment_status import is_payment_verified
+    # Sessions saved before trials were removed still carry the old trial state; clear it.
+    state["wants_trial"] = state["awaiting_trial_email"] = False
+    if state.get("stage") in ("TRIAL_REQUESTED", "TRIAL_STEPS_SENT"):
+        state["stage"] = "COURSE_CONFIRMED" if state.get("course") else "NEW"
+    if is_payment_verified(state):
+        return
+    if flags.get("wants_pass"):
+        state["pass_interest"] = True
+    elif state.get("pass_interest"):
+        pkg = state.get("package")
+        if pkg and pkg != WEEK_PASS:
+            state["pass_interest"] = False      # they chose a regular package: the pass is off the table
+            return
+        if pkg:
+            return
+        # package was wiped (e.g. course switch resets slots) while they still wanted the pass: restore it
+    else:
+        return
+    state["package"] = state["selected_duration"] = WEEK_PASS
+    # Same as a normal package choice: the QR dispatcher only fires from PACKAGE_SELECTED onward.
+    from src.state.chat_state import advance_stage
+    state["stage"] = advance_stage(state.get("stage", "NEW"), "PACKAGE_SELECTED")
+    bill = calculate_exact_fee(state.get("course"), WEEK_PASS) if state.get("course") else None
+    state["fee"] = bill["total_payable"] if bill else WEEK_PASS_PRICE
+
+
+# Intents (judged by the classifier, any language) that mean "still deciding / not ready to pay".
+_PASS_NOT_READY_INTENTS = {
+    "QUESTION", "DISINTEREST", "COMPLAINT", "GREETING", "OUT_OF_SCOPE",
+    "STOP_MESSAGING", "AGENT_REQUEST", "PHONE_CALL_REQUEST",
+}
+
+
+def pass_qr_should_wait(state: Dict[str, Any], last_turn: Optional[Dict[str, Any]], asked_qr: bool) -> bool:
+    """True while the customer is still deciding about the 1 Week Pass: the QR must not be pushed in the same
+    breath as the pitch, nor while they ask questions / hesitate. It goes out once they ask for it or move on
+    (any other message, e.g. "ok", "yes", a batch choice). Shared by the dispatcher and the prompt so the AI's
+    wording always matches what is actually sent."""
+    if state.get("package") != WEEK_PASS or asked_qr or state.get("last_qr_package") == WEEK_PASS:
+        return False
+    lt = last_turn or {}
+    return bool(lt.get("wants_pass") or lt.get("intent") in _PASS_NOT_READY_INTENTS)
+
+
 def get_package_by_duration(course_id: Optional[str] = None, duration: str = "") -> Optional[Dict[str, Any]]:
     """Looks up and returns the raw pricing package dict for a given duration.
     Works dynamically for any course. Zero hallucination, grounded strictly in course JSON.
     """
     if not course_id or not duration:
         return None
+    if duration.strip().lower() == WEEK_PASS.lower():
+        return _week_pass_package(course_id)
 
     from src.core.kb_loader import get_course_data
     course_data = get_course_data(course_id)

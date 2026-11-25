@@ -23,6 +23,14 @@
             }
         ],
         "important_branch_policy": "Physical branch addresses are administrative offices only. Online classes are attended from home anywhere worldwide. CASH OR OFFLINE PAYMENT IS STRICTLY NOT ACCEPTED AT ANY PHYSICAL BRANCH.",
+        "trust_proof": {
+            "_note": "Used by src/core/trust_proof.py when a customer doubts we are genuine. Leave a value null to hide it. Update the numbers monthly and set stats_as_of (e.g. \"Nov 2026\"). Never put estimates here.",
+            "gst_verify_url": "https://services.gst.gov.in/services/searchtp",
+            "google_rating": null,
+            "google_review_count": null,
+            "followers": {"instagram": null, "facebook": null, "youtube": null},
+            "stats_as_of": null
+        },
         "social_media": {
             "website": "https://www.sensationzperformingarts.com/",
             "instagram": "https://www.instagram.com/sensationz_performing_arts/",
@@ -89,24 +97,7 @@
             "substitute_option": "Classes follow a fixed daily batch schedule, but students are permitted to change their batch timing once a month."
         },
         "multiple_classes_per_day": false,
-        "gender_specific_batches": false,
-        "trial_classes": {
-            "free_trials_available": true,
-            "max_trials": 3,
-            "raw_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1790055283/WhatsApp_Video_2026-09-17_at_2.54.55_PM_r98gwo.mp4",
-            "how_to_book_video_url": "https://youtube.com/shorts/wyJBvEqIsvU?feature=share",
-            "video_caption": "🎬 How to Book Your Free Trial Class",
-            "booking_steps": [
-                "Download the Sensationz App",
-                "Login using Continue with Google",
-                "Go to Profile -> Trial Links",
-                "Select batch timing, day, and teacher",
-                "Tap Confirm Trial Enrollment"
-            ],
-            "trial_teachers": "ALL certified instructors take trial classes across all batch timings.",
-            "teacher_allotment": "The instructor allotted for a trial class is determined by the batch timing selected by the user. Each batch timing has its assigned instructor.",
-            "demo_videos_rule": "Recorded demo videos are sample previews available for instructors where specified in the active course data to showcase teaching style. Any certified teacher takes live trial classes in their assigned batch timing."
-        }
+        "gender_specific_batches": false
     },
     "universal_enrollment_flow": {
         "raw_video_url": "https://res.cloudinary.com/drqsicr04/video/upload/v1790055295/WhatsApp_Video_2026-09-17_at_2.54.55_PM_1_nhilvg.mp4",
@@ -137,8 +128,6 @@
         "escalation": "For anything outside KB scope or requiring human judgment, direct user to type *agent*.",
         "coupon_ios": "For iOS users unable to apply coupon: direct to website https://shop.sensationzperformingarts.com/",
         "rescheduling_policy": "NEVER tell a customer that their missed class will be rescheduled if they miss it on their own. Classes are ONLY rescheduled if missed due to company issues, teacher absence, or technical issues on the company side. Student missed classes cannot be carryover or rescheduled.",
-        "trial_class_instructors": "Trial classes are conducted by ALL certified teachers across all batch timings. The teacher allotted is determined by the batch timing chosen by the user (each batch timing has its assigned instructor). Demo videos are sample previews (available for instructors where specified in course data), but do NOT restrict trial classes to only those teachers! NEVER tell a customer that only teachers with demo videos take trial classes or that other teachers do not take trial classes.",
-        "trial_booking_video_rule": "Whenever a user wants to book a trial or asks how to join/book a trial class, share the step-by-step booking guide in text and mention that a video guide is also being sent. Do NOT share any video URLs in text (the video guide is sent automatically via WhatsApp media).",
         "create_profile_video_rule": "Whenever directing a customer to create a profile, share the clear step-by-step instructions in text. Do NOT share any video URLs in text (the app guide is sent automatically via WhatsApp media).",
         "unoffered_courses_rule": "Sensationz strictly does NOT offer Drawing & Fine Arts or Acting & Theatre Arts. If a customer asks about Drawing, Painting, Fine Arts, Sketching, Acting, Drama, or Theatre Arts, clearly state that Sensationz does NOT offer these courses."
     }

@@ -170,8 +170,8 @@ async def stage_ai_enrollment_async(
                 days_add = 90
             elif "2 month" in dur_lower:
                 days_add = 60
-            elif "trial" in dur_lower or enrollment_type == "TRIAL":
-                days_add = 7
+            elif dur_lower == "1 week pass":  # our own canonical name: 7 inclusive days (pricing_engine.WEEK_PASS_END_OFFSET)
+                days_add = 6
             else:
                 days_add = 30
             end_date = (start_dt + timedelta(days=days_add)).strftime("%Y-%m-%d")

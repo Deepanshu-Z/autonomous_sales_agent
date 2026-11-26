@@ -26,10 +26,15 @@
         "trust_proof": {
             "_note": "Used by src/core/trust_proof.py when a customer doubts we are genuine. Leave a value null to hide it. Update the numbers monthly and set stats_as_of (e.g. \"Nov 2026\"). Never put estimates here.",
             "gst_verify_url": "https://services.gst.gov.in/services/searchtp",
-            "google_rating": null,
-            "google_review_count": null,
-            "followers": {"instagram": null, "facebook": null, "youtube": null},
-            "stats_as_of": null
+            "google_rating": 4.6,
+            "google_review_count": 1366,
+            "followers": {
+                "instagram": null,
+                "facebook": null,
+                "youtube": null
+            },
+            "stats_as_of": null,
+            "send_with_first_qr": true
         },
         "social_media": {
             "website": "https://www.sensationzperformingarts.com/",

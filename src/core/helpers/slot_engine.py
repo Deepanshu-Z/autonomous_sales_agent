@@ -224,26 +224,13 @@ def _is_english(language: Optional[str]) -> bool:
     return "english" in lang and "hinglish" not in lang
 
 
-def settled_slot_names(slot_eval: Dict[str, Any]) -> set:
-    """Slots the lead has already answered (from evaluate_enrollment_slots)."""
-    s = set()
-    if slot_eval.get("timing_str") != "NOT SELECTED":
-        s.add("TIMING")
-    if slot_eval.get("teacher_str") != "NOT SELECTED":
-        s.add("TEACHER")
-    if not any(m.startswith("Batch Days") for m in slot_eval.get("missing_slots", [])):
-        s.add("DAYS")
-    if slot_eval.get("package_str") != "NOT SELECTED":
-        s.add("DURATION")
-    return s
-
-
-def followup_asks_settled_slot(text: Optional[str], slot_eval: Dict[str, Any]) -> bool:
-    """True if `text` asks the lead for something they already chose. Not for trial / paid flows."""
-    if not text or slot_eval.get("next_target_slot") not in (*_QUESTION_SLOTS, "PAYMENT"):
+def followup_asks_wrong_slot(text: Optional[str], slot_eval: Dict[str, Any]) -> bool:
+    """True if `text` asks for any slot other than the lead's next missing one: something already chosen,
+    or a later slot that skips ahead (e.g. package while Kathak batch days are still open). Not for trial / paid."""
+    nxt = slot_eval.get("next_target_slot")
+    if not text or nxt not in (*_QUESTION_SLOTS, "PAYMENT"):
         return False
-    settled = settled_slot_names(slot_eval)
-    return any(slot in settled and rx.search(text) for slot, rx in _ASKS.items())
+    return any(slot != nxt and rx.search(text) for slot, rx in _ASKS.items())
 
 
 def slot_question(slot_eval: Dict[str, Any], language: Optional[str] = None) -> Optional[str]:

@@ -149,28 +149,12 @@ async def handle_incoming_message(
                 "new_state": new_state,
             }
 
-    # A customer can switch topics mid-conversation ("what about Kathak
-    # timings?" or "face yoga k coupons") — if they did, that becomes the active course for THIS
-    # reply's primary KB section.
+    # A customer can switch courses mid-conversation ("what about Kathak timings?").
+    # The LLM extractor decides that (selected_course -> new_state["course"]); no keyword switching here.
     from src.core import kb_loader
 
-    # Dynamic course switch: if customer mentions any course from the catalog, switch to it for this turn
-    course_in_msg = kb_loader.detect_course_from_text(user_message, default_course=None) if user_message else None
-
     old_course = session_state.get("course") or course_id or ""
-    if course_in_msg in ("dance", "western_dance") and old_course in ("ladies_dance", "kathak"):
-        course_in_msg = old_course
-
-    # If no course is active in state or message, inspect recent user turns in conversation history
-    if not course_in_msg and not old_course and not new_state.get("course") and conversation_history:
-        for turn in reversed(conversation_history[-4:]):
-            if turn.get("role") in ("user", "customer"):
-                c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
-                if c:
-                    course_in_msg = c
-                    break
-
-    effective_course_id = course_in_msg or new_state.get("course") or old_course or ""
+    effective_course_id = new_state.get("course") or old_course or ""
 
     if effective_course_id:
         entry = kb_loader.get_catalog_entry(effective_course_id)
@@ -582,7 +566,7 @@ async def handle_incoming_message(
         or flags.get("customer_intent") == "OUT_OF_SCOPE"
     )
     has_academy_signal = bool(
-        course_in_msg
+        flags.get("selected_course")
         or flags.get("wants_fee")
         or flags.get("wants_schedule")
         or flags.get("wants_demo")
@@ -1380,7 +1364,7 @@ def _sanitize_state_grounded_replies(
 
     # Same completeness check as dispatch_payment_qr_async (Course, Timing, Teacher, Days, Package),
     # so the reply never promises a QR that the dispatcher will refuse to send.
-    from src.core.helpers.slot_engine import evaluate_enrollment_slots, followup_asks_settled_slot, slot_question
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots, followup_asks_wrong_slot, slot_question
     slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
     all_slots_settled = bool(slot_eval.get("is_complete"))
     # A real enrollment detail is still missing (paid / trial leads are excluded: no QR talk is gated there).
@@ -1540,10 +1524,10 @@ def _sanitize_state_grounded_replies(
                 reply = f"{prefix}Please let me know which course you would like to join first."
                 followup = "Which course would you like to know more about? 😊"
 
-    # 5. SYNC GUARD: Message #2 must never ask for a slot the lead already chose (same check the timed follow-ups use).
+    # 5. SYNC GUARD: Message #2 asks only for the next missing slot: never one already chosen, never skipping ahead.
     # Not an objection / paid / trial (slot_eval.next_target_slot is ENROLLED / TRIAL there, so this is a no-op).
-    if followup and followup_asks_settled_slot(followup, slot_eval):
-        logger.warning(f"[guardrails] Message #2 asked an already-settled slot, replaced: {followup!r}")
+    if followup and followup_asks_wrong_slot(followup, slot_eval):
+        logger.warning(f"[guardrails] Message #2 asked the wrong slot (next is {slot_eval.get('next_target_slot')}), replaced: {followup!r}")
         followup = slot_question(slot_eval, state.get("language"))  # None when everything is settled (payment next)
 
     return reply, followup
@@ -1551,6 +1535,8 @@ def _sanitize_state_grounded_replies(
 
 def _slot_followup(state: Dict[str, Any], active_cid: str, current: Optional[str]) -> Optional[str]:
     """Message #2 for the lead's NEXT missing slot; `current` when there is nothing to ask (payment / paid / trial)."""
+    if state.get("refusal_stage", 0) > 0:  # lead is objecting / not interested: never push the next step
+        return current
     from src.core.helpers.slot_engine import evaluate_enrollment_slots, slot_question
     return slot_question(evaluate_enrollment_slots(state, course_id=active_cid), state.get("language")) or current
 
@@ -1723,6 +1709,19 @@ async def dispatch_payment_qr_async(
     except Exception as exc:
         logger.error(f"[conversation_handler] Unexpected error generating QR: {exc}")
         return None
+
+    # "About Sensationz": faith is the main reason QR leads don't pay, so the short trust card goes ONCE per lead,
+    # right before their first QR. After that it is sent only when the customer doubts us (wants_trust_proof).
+    trust_cfg = ((kb_loader.get_global_rules() or {}).get("organization") or {}).get("trust_proof") or {}
+    if trust_cfg.get("send_with_first_qr") and not state.get("trust_card_sent_at"):
+        from src.core.trust_proof import build_trust_card
+        card = build_trust_card(state.get("language"), short=True)
+        if card:
+            await send_text_message_async(phone, card)
+            state["trust_card_sent_at"] = time.time()
+            asyncio.create_task(save_message_async(phone, "assistant", card))
+            asyncio.create_task(log_message_async(phone, "ai", card))
+            await asyncio.sleep(1.5)  # card first, QR last: the QR stays the latest thing on screen
 
     image_url = qr_data.get("image_url")
     qr_id = qr_data.get("id")
@@ -2398,6 +2397,7 @@ async def _handle_conversation_turn_unlocked(
         if trust_card:
             await send_text_message_async(phone, trust_card)
             new_state["trust_proof_sent_at"] = time.time()
+            new_state["trust_card_sent_at"] = new_state.get("trust_card_sent_at") or time.time()  # QR won't repeat it
             await save_message_async(phone, "assistant", trust_card)
             asyncio.create_task(log_message_async(phone, "ai", trust_card))
 
@@ -2497,8 +2497,9 @@ async def _handle_conversation_turn_unlocked(
             ))
         )
     )
+    qr_sent_now = None
     if is_payment_step and not will_send_trial_video:
-        await dispatch_payment_qr_async(
+        qr_sent_now = await dispatch_payment_qr_async(
             phone,
             new_state,
             course_id=active_cid,
@@ -2540,7 +2541,9 @@ async def _handle_conversation_turn_unlocked(
 
     # Deliver the follow-up as a whole different message (Message 2) after a brief pause (Plain text, no buttons)
     final_buttons = []
-    if clean_followup and clean_followup.strip() and not new_state.get("payment_claimed"):
+    # A QR just went out: summary -> card -> QR is enough. No "need help paying?" Message #2 on top
+    # (the QR caption says how to pay, and the 5-min follow-up offers help).
+    if clean_followup and clean_followup.strip() and not new_state.get("payment_claimed") and not qr_sent_now:
         await asyncio.sleep(2.5)
         await send_text_message_async(phone, clean_followup)
         await save_message_async(phone, "assistant", clean_followup)

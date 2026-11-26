@@ -214,6 +214,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 7. "selected_course":
    - Course mentioned by user ("yoga", "face yoga", "kathak", "western dance", "zumba", "music", "guitar", "singing", "drawing", "acting", etc.), else null.
+   - If an Active Course is set, return null unless the customer names a DIFFERENT course. Generic words like "dance", "class", "course" refer to the Active Course (e.g. Active Course kathak + "how many days dance conduct?" -> null).
    - CRITICAL UNOFFERED COURSE GUARD:
      • If customer asks for an unoffered course type or style not offered by Sensationz (e.g. "prenatal yoga", "swimming", "karate"), set selected_course to null!
      • Set unoffered_type to "COURSE", set unoffered_value to the requested course name, and set customer_intent to "QUESTION".
@@ -1177,24 +1178,15 @@ async def extract_intent_and_state_changes(
         if matched_day and clean.get("customer_intent") in ("QUESTION", "OTHER"):
             clean["customer_intent"] = "DAY_SELECTION"
 
-        # Deterministic course detection from user text overrides ambiguous LLM extraction
+        # The LLM alone decides the course (it sees the Active Course + history).
+        # Keyword matching runs only in the except-block fallback below.
         llm_course = clean.get("selected_course")
-        valid_llm_course = None
+        chosen_course = None
         if llm_course:
             entry = kb_loader.get_catalog_entry(str(llm_course))
             if entry:
-                valid_llm_course = entry["id"]
+                chosen_course = entry["id"]
 
-        text_course = kb_loader.detect_course_from_text(text, default_course=None)
-        if not text_course and history:
-            for turn in reversed(history[-4:]):
-                if turn.get("role") in ("user", "customer"):
-                    c = kb_loader.detect_course_from_text(turn.get("content") or "", default_course=None)
-                    if c:
-                        text_course = c
-                        break
-
-        chosen_course = text_course or valid_llm_course
         if chosen_course:
             clean["selected_course"] = chosen_course
             # If a valid catalog course is identified, it is OFFERED - clear any unoffered course flag!
@@ -1557,6 +1549,21 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
 
     # 3. Teacher Slot Merge (On selection turns OR when teacher is explicitly mentioned / demo requested)
     teacher_flag = flags.get("selected_teacher")
+    # Ground the LLM's teacher in what the customer actually typed: it has returned "Ms. Madhuri" for "vibha",
+    # and that wrong teacher wiped the chosen 7 PM timing via the conflict check below.
+    if teacher_flag and active_course and not is_paid:
+        from src.core.helpers.schedule_engine import teacher_named_in_text
+        typed_teacher = teacher_named_in_text(flags.get("_raw_text") or "", active_course)
+        current_teacher = new_state.get("selected_teacher") or new_state.get("teacher")
+        if typed_teacher:
+            teacher_flag = typed_teacher
+        elif (
+            current_teacher
+            and resolve_canonical_teacher(teacher_flag, course_id=active_course) != current_teacher
+            and intent != "TEACHER_SELECTION"
+            and not flags.get("wants_demo")
+        ):
+            teacher_flag = None  # LLM switched teacher on a turn where the customer named / chose no teacher
     timing_unresolved = flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
         "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED", "MULTIPLE_VALID", "MIXED"
     }

@@ -1001,6 +1001,18 @@ def resolve_canonical_teacher(teacher_query: str, course_id: Optional[str] = Non
     return matched
 
 
+def teacher_named_in_text(text: str, course_id: Optional[str]) -> Optional[str]:
+    """The one instructor of this course whose name the customer literally typed (whole word, e.g. 'vibha'
+    -> 'Vibha Mittal'), or None when no name / more than one name is typed."""
+    words = set(re.findall(r"[a-z]+", str(text or "").lower()))
+    titles = {"ms", "miss", "mr", "mrs", "mam", "maam", "ji", "sir", "madam", "dr"}
+    hits = {
+        t for t in get_course_instructors(course_id)
+        if any(len(w) >= 3 and w not in titles and w in words for w in re.findall(r"[a-z]+", t.lower()))
+    }
+    return hits.pop() if len(hits) == 1 else None
+
+
 # ── DAY CODES & CANONICAL NAMES ──
 DAY_MAP_DISPLAY_TO_CODE = {
     # Tuesday / Thursday

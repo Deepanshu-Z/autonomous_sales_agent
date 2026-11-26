@@ -38,8 +38,8 @@ RETRY_DRAIN_INTERVAL_SEC = int(os.getenv("PAYMENT_LEDGER_RETRY_INTERVAL_SEC", "3
 RECONCILE_INTERVAL_SEC = int(os.getenv("PAYMENT_LEDGER_RECONCILE_INTERVAL_SEC", "1800"))
 RECONCILE_LOOKBACK_HOURS = int(os.getenv("PAYMENT_LEDGER_RECONCILE_HOURS", "48"))
 SALES_QR_SOURCES = {"whatsapp_sales_agent", "sales_agent"}
-# Team test QRs are ₹1 (29 of them in Oct-Nov 2026); the cheapest real package is ₹315.
-MIN_REAL_PAYMENT_INR = float(os.getenv("PAYMENT_LEDGER_MIN_AMOUNT_INR", "100"))
+# Team test QRs are ₹1 (29 of them in Oct-Nov 2026); the cheapest real product is the ₹99 1 Week Pass.
+MIN_REAL_PAYMENT_INR = float(os.getenv("PAYMENT_LEDGER_MIN_AMOUNT_INR", "2"))
 
 _PAYMENT_ID = re.compile(r"^pay_[A-Za-z0-9]+$")
 _QR_ID = re.compile(r"^qr_[A-Za-z0-9]+$")

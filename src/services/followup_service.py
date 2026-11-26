@@ -258,6 +258,7 @@ def get_followup_decision(
     class_video_already_sent: bool = False,
     slot_eval: Optional[dict] = None,
     language: Optional[str] = None,
+    qr_id: Optional[str] = None,
 ) -> FollowupDecision:
     """
     Core single-point-of-entry decision engine.
@@ -277,50 +278,32 @@ def get_followup_decision(
     # Follow-ups allowed for payment assistance, but agent assignment is strictly prohibited.
     # -------------------------------------------------------------
     if lead_at_qr:
-        if count == 0:
-            msg = get_qr_followup_message(course_name, 0)
-            new_sent = list(set(sent_ids + ["qr_followup_5m"]))
-            return FollowupDecision(
-                action="SEND_MESSAGE",
-                message=msg,
-                next_count=1,
-                next_gap_seconds=1800,
-                step_label="QR 5-min payment assistance follow-up",
-                message_id="qr_followup_5m",
-                updated_sent_ids=new_sent,
-            )
-        elif count == 1:
-            msg = get_qr_followup_message(course_name, 1)
-            new_sent = list(set(sent_ids + ["qr_followup_30m"]))
-            return FollowupDecision(
-                action="SEND_MESSAGE",
-                message=msg,
-                next_count=2,
-                next_gap_seconds=7200,
-                step_label="QR 30-min payment assistance follow-up",
-                message_id="qr_followup_30m",
-                updated_sent_ids=new_sent,
-            )
-        elif count == 2:
-            msg = get_qr_followup_message(course_name, 2)
-            new_sent = list(set(sent_ids + ["qr_followup_2h"]))
-            return FollowupDecision(
-                action="SEND_MESSAGE",
-                message=msg,
-                next_count=3,
-                next_gap_seconds=None,
-                step_label="QR final payment reminder",
-                message_id="qr_followup_2h",
-                updated_sent_ids=new_sent,
-            )
-        else:
-            return FollowupDecision(
-                action="SKIP",
-                next_count=count,
-                next_gap_seconds=None,
-                step_label="QR lead — all follow-ups sent, skipping agent handoff (AI stays active)",
-                updated_sent_ids=sent_ids,
-            )
+        # Each reminder goes ONCE per QR. A customer reply resets `count` (arm_followup_timer), which used to
+        # replay the same "need help with payment?" messages after every exchange.
+        tag = f":{qr_id}" if qr_id else ""
+        steps = (
+            ("qr_followup_5m", 1800, "QR 5-min payment assistance follow-up"),
+            ("qr_followup_30m", 7200, "QR 30-min payment assistance follow-up"),
+            ("qr_followup_2h", None, "QR final payment reminder"),
+        )
+        for i, (step_id, gap, label) in enumerate(steps):
+            if step_id + tag not in sent_ids:
+                return FollowupDecision(
+                    action="SEND_MESSAGE",
+                    message=get_qr_followup_message(course_name, i),
+                    next_count=i + 1,
+                    next_gap_seconds=gap,
+                    step_label=label,
+                    message_id=step_id,
+                    updated_sent_ids=list(set(sent_ids + [step_id + tag])),
+                )
+        return FollowupDecision(
+            action="SKIP",
+            next_count=count,
+            next_gap_seconds=None,
+            step_label="QR lead — all follow-ups sent for this QR, skipping agent handoff (AI stays active)",
+            updated_sent_ids=sent_ids,
+        )
 
     # -------------------------------------------------------------
     # 0b. SLOT-AWARE FOLLOW-UP: lead already chose timing/teacher/days/package -> never re-ask it.

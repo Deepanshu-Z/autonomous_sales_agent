@@ -21,6 +21,14 @@ _LABELS: Dict[str, Dict[str, str]] = {
         "follow": "📣 Follow us:",
         "followers": "followers",
         "website": "🌐 Website:",
+        "about": "✅ *About Sensationz*",
+        "since": "Since {year}",
+        "students": "{n} students",
+        "countries": "{n} countries",
+        "gst_short": "(verify on the Govt. GST portal)",
+        "office": "📍 Office:",
+        "secure": "🔒 Payments are 100% secured by *Razorpay*",
+        "instagram": "📸 Instagram:",
     },
     "hinglish": {
         "title": "✅ *Khud verify kijiye — Sensationz*",
@@ -31,6 +39,14 @@ _LABELS: Dict[str, Dict[str, str]] = {
         "follow": "📣 Humse judiye:",
         "followers": "followers",
         "website": "🌐 Website:",
+        "about": "✅ *Sensationz ke baare mein*",
+        "since": "{year} se",
+        "students": "{n} students",
+        "countries": "{n} countries",
+        "gst_short": "(Govt. GST portal par verify karein)",
+        "office": "📍 Office:",
+        "secure": "🔒 Payment *Razorpay* se 100% secure",
+        "instagram": "📸 Instagram:",
     },
     "hindi": {
         "title": "✅ *खुद वेरिफ़ाई कीजिए — Sensationz*",
@@ -41,6 +57,14 @@ _LABELS: Dict[str, Dict[str, str]] = {
         "follow": "📣 हमसे जुड़िए:",
         "followers": "फ़ॉलोअर्स",
         "website": "🌐 वेबसाइट:",
+        "about": "✅ *Sensationz के बारे में*",
+        "since": "{year} से",
+        "students": "{n} छात्र",
+        "countries": "{n} देश",
+        "gst_short": "(सरकारी GST पोर्टल पर जाँचें)",
+        "office": "📍 ऑफ़िस:",
+        "secure": "🔒 पेमेंट *Razorpay* से 100% सुरक्षित",
+        "instagram": "📸 Instagram:",
     },
 }
 
@@ -72,8 +96,10 @@ def _fmt_count(n: Any) -> Optional[str]:
     return f"{n}+"
 
 
-def build_trust_card(language: Optional[str] = None) -> str:
-    """The card text, or "" when we have nothing verifiable to show (no legal name / GSTIN in the data)."""
+def build_trust_card(language: Optional[str] = None, short: bool = False) -> str:
+    """The card text, or "" when we have nothing verifiable to show (no legal name / GSTIN in the data).
+    short=True: the compact "About Sensationz" card sent once with the first QR (one link, so the QR stays the focus).
+    Default: the full card for a customer who doubts us (every way to verify)."""
     org: Dict[str, Any] = (kb_loader.get_global_rules() or {}).get("organization") or {}
     legal = org.get("legal_name") or org.get("name")
     gstin = org.get("registration_number_gstin")
@@ -83,18 +109,52 @@ def build_trust_card(language: Optional[str] = None) -> str:
     social: Dict[str, Any] = org.get("social_media") or {}
     lb = _pick_labels(language)
 
-    lines = [lb["title"], "", f"🏢 *{legal}*", f"{lb['gstin']}: *{gstin}*"]
+    # Facts straight from the data; a missing one is left out, never estimated.
+    facts = [lb["since"].format(year=org["established"])] if org.get("established") else []
+    if org.get("students_trained"):
+        facts.append(lb["students"].format(n=org["students_trained"]))
+    if org.get("countries_served"):
+        facts.append(lb["countries"].format(n=org["countries_served"]))
+    since_line = ("🏆 " + " · ".join(facts)) if facts else ""
+    branches = org.get("physical_branches") or []
+    office = branches[0].get("address") if branches and isinstance(branches[0], dict) else None
+    rating, review_count = proof.get("google_rating"), proof.get("google_review_count")
+    try:
+        reviews = f"{int(review_count):,}" if review_count else None  # exact (1,366), never rounded up
+    except (TypeError, ValueError):
+        reviews = None
+    rating_line = lb["rating"].format(rating=rating, count=reviews) if rating and reviews else None
+    if rating_line and proof.get("stats_as_of"):
+        rating_line += f" ({proof['stats_as_of']})"
+
+    if short:
+        lines = [lb["about"], ""]
+        if since_line:
+            lines.append(since_line)
+        lines += [f"🏢 {legal}", f"{lb['gstin']}: *{gstin}* {lb['gst_short']}"]
+        if office:
+            lines.append(f"{lb['office']} {office}")
+        if rating_line:
+            lines.append(rating_line)
+        lines.append(lb["secure"])
+        if social.get("instagram"):
+            lines += ["", f"{lb['instagram']} {social['instagram']}"]
+        return "\n".join(lines)
+
+    lines = [lb["title"], ""]
+    if since_line:
+        lines.append(since_line)
+    lines += [f"🏢 *{legal}*", f"{lb['gstin']}: *{gstin}*"]
     if proof.get("gst_verify_url"):
         lines += ["", f"{lb['verify']}\n{proof['gst_verify_url']}"]
+    if office:
+        lines += ["", f"{lb['office']} {office}"]
 
-    rating, reviews = proof.get("google_rating"), _fmt_count(proof.get("google_review_count"))
-    if rating and reviews:
-        line = lb["rating"].format(rating=rating, count=reviews)
-        if proof.get("stats_as_of"):
-            line += f" ({proof['stats_as_of']})"
-        lines += ["", line]
+    if rating_line:
+        lines += ["", rating_line]
     if social.get("google_reviews"):
         lines += [f"{lb['reviews']} {social['google_reviews']}"]
+    lines += ["", lb["secure"]]
 
     followers = proof.get("followers") or {}
     social_lines = []

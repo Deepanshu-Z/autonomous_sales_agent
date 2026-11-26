@@ -118,6 +118,7 @@ async def process_single_lead(row: dict, now_ts: float):
             lead_at_qr=lead_at_qr,
             sent_ids=sent_ids,
             class_video_already_sent=bool(state.get("class_demo_video_sent")),
+            qr_id=state.get("last_qr_id") or state.get("qr_id"),
         )
 
         # 4. Handle Decision

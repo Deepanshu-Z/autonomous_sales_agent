@@ -1,9 +1,9 @@
 """
-qr_lead_summary.py — one-paragraph LLM summary of a lead's chat, frozen at the moment their FIRST QR is sent.
+qr_lead_summary.py — one-paragraph LLM summary of a lead's chat, taken each time a NEW QR is sent.
 
-Called fire-and-forget from conversation_handler.dispatch_payment_qr_async. Never blocks or breaks the QR flow:
-every failure is logged and swallowed. Stored once in `lead_summaries` (key = last 10 digits of the phone);
-never updated afterwards. Table/view: docs/sql/create_lead_summaries.sql.
+Called fire-and-forget from conversation_handler.dispatch_payment_qr_async (once per created QR, never per
+message). Never blocks or breaks the QR flow: every failure is logged and swallowed. One row per lead in
+`lead_summaries` (key = last 10 digits of the phone); each new QR replaces it with the up-to-date summary.
 
 Manual check (prints, writes nothing):  venv\\Scripts\\python -m src.services.qr_lead_summary <phone>
 """
@@ -63,15 +63,15 @@ async def _run(phone: str, facts: dict) -> None:
         text = await asyncio.wait_for(summarise(facts, msgs), TIMEOUT_SEC)
         row = {"phone": _key(phone), "summary": text, "last_msg_at": msgs[-1]["created_at"], "msg_count": len(msgs),
                "model": MODEL, "updated_at": datetime.now(timezone.utc).isoformat()}
-        # ignore_duplicates: a second QR / re-run never overwrites the summary taken at the first QR
+        # Each new QR replaces the summary, so it always reflects the chat up to the latest QR
         await asyncio.to_thread(lambda: supabase.table("lead_summaries")
-                                .upsert(row, on_conflict="phone", ignore_duplicates=True).execute())
+                                .upsert(row, on_conflict="phone").execute())
     except Exception as e:
         logger.warning(f"[qr_lead_summary] failed for {phone} (non-fatal): {e}")
 
 
 def schedule_qr_lead_summary(phone: str, state: dict) -> None:
-    """Fire-and-forget. Call once, when the lead's first QR is delivered."""
+    """Fire-and-forget. Call once per QR, right after it is delivered."""
     if supabase is None:
         return
     facts = {k: state.get(k) for k in ("course", "teacher", "timing", "package", "payable_amount", "stage")}

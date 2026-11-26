@@ -1768,9 +1768,10 @@ async def dispatch_payment_qr_async(
     if delivered:
         from datetime import datetime, timezone
         now_utc = datetime.now(timezone.utc).isoformat()
-        if not state.get("qr_sent_at"):  # first QR only: one summary, frozen now
-            from src.services.qr_lead_summary import schedule_qr_lead_summary
-            schedule_qr_lead_summary(phone, state)
+        # One summary per QR: this block runs once per newly created QR (never per message),
+        # and the latest QR's summary replaces the previous one.
+        from src.services.qr_lead_summary import schedule_qr_lead_summary
+        schedule_qr_lead_summary(phone, state)
         state["qr_code_sent"] = True
         state["is_qr_sent"] = True
         state["qr_sent_at"] = state.get("qr_sent_at") or now_utc
@@ -1910,11 +1911,18 @@ async def _handle_conversation_turn_unlocked(
 
     # Check for Human Agent Escalation (Chat handoff to CRM sales agent)
     # Note: Customer Support Executives handle phone calls directly; phone requests do not trigger chat handoff.
-    if (last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST") and not last_turn.get("wants_phone_call"):
+    # A paid student asking for another timing / teacher / days / package gets the same path: the handoff sees PAID,
+    # sends the Customer Support numbers and keeps the bot active (the bot cannot change anything after payment).
+    if (
+        (last_turn.get("requests_human_agent") or last_turn.get("intent") == "AGENT_REQUEST") and not last_turn.get("wants_phone_call")
+    ) or last_turn.get("paid_change_requested"):
         await execute_agent_handoff_async(
             phone,
             user_reply_text=reply_text,
-            escalation_reason=f"Customer requested agent: {last_turn.get('question_summary') or text_clean[:50]}",
+            escalation_reason=(
+                f"Paid student asked to change batch: {text_clean[:50]}" if last_turn.get("paid_change_requested")
+                else f"Customer requested agent: {last_turn.get('question_summary') or text_clean[:50]}"
+            ),
             start_time=start_time,
         )
         return {"status": "handed_off", "reply": reply_text}

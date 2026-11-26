@@ -6,6 +6,7 @@ are dynamically injected from structured knowledge bases (kb_loader).
 Only core persona, tone, language matching, safety, and formatting rules remain here.
 """
 
+import json
 import re
 from typing import Optional, Dict, Any
 from src.core import kb_loader
@@ -136,7 +137,7 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          * Active enrolled course details (course, timing, teacher, package) are IMMUTABLE in chat.
          * If the customer requests to change their course, batch timing, teacher, or days after payment:
            - Politely explain that active batch modifications cannot be processed in WhatsApp chat.
-           - Instruct them to manage their batch directly inside the Sensationz App (My Classes -> Manage Batch) or request a human coordinator (type 'agent' or tap 'Talk to Agent').
+           - Tell them only our Customer Support team can help with that, and share the Customer Support numbers. You cannot change anything after payment: NEVER list or offer other timings, teachers, days or packages.
        - Message #1: Warmly address their question or onboarding doubt (e.g. how to join class, class schedule, instructor details, login OTP, syllabus).
        - Message #2 (followup): Provide helpful onboarding next steps (e.g. "Have you logged into the Sensationz app to check your batch, or do you have any questions before class? 😊" or null if they said thanks/goodbye).
 
@@ -543,6 +544,20 @@ def format_system_prompt(
     demo_videos_summary = kb_loader.format_demo_videos_display(cid)
     teacher_val = s.get("selected_teacher") or s.get("teacher")
     batch_timings_summary = kb_loader.format_batch_timings_display(cid)
+    # A paid student's batch is final (only Customer Support can change it). The AI is shown ONLY their own batch,
+    # so it cannot list or offer another timing / teacher / days, whatever language the student writes in.
+    paid_batch_only = is_payment_verified(s)
+    if paid_batch_only:
+        booked = " | ".join(str(v) for v in (
+            s.get("timing") or s.get("selected_timing"),
+            s.get("selected_teacher") or s.get("teacher"),
+            s.get("days") or s.get("selected_days"),
+        ) if v)
+        timing_periods_summary = batch_timings_summary = teacher_schedule = (
+            f"Customer's CONFIRMED batch: {booked}. Other batches exist but are deliberately hidden from you (never say this is the only batch). "
+            "After payment only our Customer Support team can change a batch (the once-a-month change policy is handled by them): "
+            "for any timing / teacher / days change, share the Customer Support numbers directly and never suggest a time yourself."
+        )
     course_pkgs = list(kb_loader.get_valid_packages(cid).keys()) if cid else ["1 Month", "3 Months", "6 Months", "1 Year"]
     from src.core.helpers import get_course_instructors
     course_teachers = get_course_instructors(cid if cid else None)
@@ -562,7 +577,7 @@ def format_system_prompt(
         state_context += (
             f"- TEACHER ↔ BATCH TIMINGS MAP (Use this EXACT mapping when answering teacher-specific queries — do NOT infer from raw JSON):\n{teacher_schedule}\n"
         )
-    if teacher_val and str(teacher_val).strip().upper() not in ("NOT SELECTED", "NONE", ""):
+    if teacher_val and str(teacher_val).strip().upper() not in ("NOT SELECTED", "NONE", "") and not paid_batch_only:
         state_context += (
             f"- 🎯 CURRENT ASSIGNED INSTRUCTOR ({teacher_val}): Currently assigned instructor for the customer's selected timing slot is {teacher_val}.\n"
             f"  • If the customer asks specifically about {teacher_val}'s schedule or batches, quote {teacher_val}'s slots from TEACHER ↔ BATCH TIMINGS MAP.\n"
@@ -783,7 +798,7 @@ def format_system_prompt(
                 "  • NON-NEGOTIABLE RULE: Customer has ALREADY PAID and is actively enrolled!\n"
                 "  • Under NO circumstances ask for fees, payment, or send a payment QR code!\n"
                 "  • ZERO COURSE MODIFICATION IN CHAT (RULE 2): Active enrolled courses, batch timings, or instructors CANNOT be changed via chat.\n"
-                "    If customer asks to switch batches, timings, instructors, or courses, explain politely that changes to active enrolled batches must be done directly inside the Sensationz App ('My Classes' -> 'Manage Batch') or by contacting a support coordinator (type 'agent').\n"
+                "    If customer asks to switch batches, timings, instructors, or courses, explain politely that only our Customer Support team can help with changes after payment and share their numbers. NEVER list or offer other timings, teachers, days or packages.\n"
                 "  • If customer says 'i have not paid', 'payment pending', or questions payment status:\n"
                 f"    Warmly reassure them that their payment and enrollment for {active_title} ({timing_str} with {teacher_str}) are already confirmed in our system.\n"
                 "  • Message #1: Warmly address their question, payment reassurance, onboarding steps, or batch management explanation.\n"
@@ -1072,6 +1087,12 @@ def format_system_prompt(
     course_json_str = kb_loader.get_course_prompt_str(
         cid, minified=True, include_coupons=False
     )
+    if paid_batch_only:  # same data minus every batch list (see paid_batch_only above)
+        data = {k: v for k, v in kb_loader._redact_coupon_codes(kb_loader.get_course_data(cid)).items() if k != "batch_timings"}
+        if isinstance(data.get("teachers"), list):
+            data["teachers"] = [{k: v for k, v in t.items() if k != "assigned_batches"} if isinstance(t, dict) else t
+                                for t in data["teachers"]]
+        course_json_str = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
 
     catalog_names = ", ".join(
         c.get("name", c.get("id", "").title())

@@ -88,6 +88,7 @@ def _empty_flags() -> Dict[str, Any]:
         "wants_resend_video": False,
         "claims_payment_or_enrollment": False,
         "cannot_access_classes": False,
+        "wants_schedule_change": False,
         "timing_ambiguous": False,
         "ambiguous_hour": None,
         "ambiguous_timing_candidates": None,
@@ -365,6 +366,10 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - boolean, default false. Set true when the customer, in ANY language or script, doubts or asks whether Sensationz is genuine / legit / real / a registered company, or asks for proof to verify us (GST number, company registration, reviews, ratings, social media, "how do I trust you", "is this fake?", "kya aap genuine ho?", "company registered hai?", "GST number do", "reviews dikhao"). Judge by MEANING, never by keywords.
    - Do NOT set it for ordinary course / fee / timing questions. An angry accusation, refund demand or legal threat is "is_complaint_or_refund" instead; if the customer both doubts us AND is angry or threatening, set is_complaint_or_refund true as well.
 
+27. "wants_schedule_change":
+   - boolean, default false. Set true when the customer, in ANY language or script, wants, insists on or argues for a class time, teacher or days DIFFERENT from the batch they already have, or says their current batch does not suit them, INCLUDING short follow-ups that only make sense from the transcript ("you said yes", "you told me that time", "it is not working for me"). Judge by MEANING using the transcript, never by keywords.
+   - false for questions about their own existing class (when is my class, how to join).
+
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
   "app_installed_stated": "confirmed" | "denied" | "unmentioned",
@@ -377,6 +382,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "numbers_not_timing": boolean,
   "language_unclear": boolean,
   "wants_trust_proof": boolean,
+  "wants_schedule_change": boolean,
   "selected_teacher": string | null,
   "selected_days": string | null,
   "selected_package": string | null,
@@ -426,6 +432,7 @@ Rules:
 - Demo-video requests are not tutorial-video requests. App and trial guide requests are separate from teacher demos.
 - Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
 - wants_trust_proof is true when the customer doubts whether Sensationz is genuine/registered or asks for proof (GST number, registration, reviews, ratings, social media). A calm doubt is NOT is_complaint_or_refund; anger, refund demands and threats are.
+- wants_schedule_change is true when the customer wants or insists on a class time / teacher / days different from the batch they already have, or says it does not suit them, including transcript-dependent follow-ups ("you said yes", "you told me that time"); false for questions about their own class.
 - Words like ok, yes, sir, mam, plz, pls, thanks do not make a message Hinglish; judge the whole message. language_unclear is true for acknowledgements, numbers/times, names, emails, single words, emojis (keep the earlier language); false when there are enough real words or an explicit language request.
 - Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
 
@@ -441,6 +448,7 @@ Return exactly this schema, using null for unknown strings and false for unknown
   "numbers_not_timing": boolean,
   "language_unclear": boolean,
   "wants_trust_proof": boolean,
+  "wants_schedule_change": boolean,
   "selected_teacher": string | null,
   "selected_days": string | null,
   "selected_package": string | null,
@@ -582,7 +590,7 @@ async def extract_intent_and_state_changes(
             "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
             "is_complaint_or_refund", "is_out_of_scope", "wants_stop_messaging", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
-            "wants_trial_guide", "wants_trial_video_guide", "numbers_not_timing", "language_unclear", "wants_trust_proof"
+            "wants_trial_guide", "wants_trial_video_guide", "numbers_not_timing", "language_unclear", "wants_trust_proof", "wants_schedule_change"
         ]:
             val = clean.get(bool_key)
             if isinstance(val, str):
@@ -1407,7 +1415,20 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
                 is_switching_course = True
 
         if not is_switching_course:
+            # The classifier read the meaning (any language): a paid student asked for a slot other than the booked one.
+            # Nothing can change after payment, so the handler sends Customer Support instead of an AI reply.
+            def booked(*keys):
+                return next((new_state[k] for k in keys if new_state.get(k)), None)
+            raw_teacher = flags.get("selected_teacher")
+            asked = (
+                (flags.get("selected_timing") or flags.get("unoffered_timing_mentioned"), booked("timing", "selected_timing")),
+                (raw_teacher and (resolve_canonical_teacher(raw_teacher, new_state.get("course")) or raw_teacher),
+                 booked("selected_teacher", "teacher")),
+                (flags.get("selected_days"), booked("days", "selected_days")),
+                (flags.get("selected_package"), booked("package", "selected_duration")),
+            )
             flags = dict(flags)
+            flags["paid_change_requested"] = bool(flags.get("wants_schedule_change")) or any(want and want != have for want, have in asked)
             flags["selected_course"] = None
             flags["selected_timing"] = None
             flags["unoffered_timing_mentioned"] = None
@@ -1831,6 +1852,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "preferred_start_date": flags.get("preferred_start_date"),
         "wants_stop_messaging": flags.get("wants_stop_messaging", False),
         "cannot_access_classes": flags.get("cannot_access_classes", False),
+        "paid_change_requested": flags.get("paid_change_requested", False),
         "unoffered_type": flags.get("unoffered_type"),
         "unoffered_value": flags.get("unoffered_value"),
         "unoffered_timing_mentioned": flags.get("unoffered_timing_mentioned") or (flags.get("unoffered_value") if flags.get("unoffered_type") == "TIMING" else None),

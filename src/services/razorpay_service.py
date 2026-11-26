@@ -694,6 +694,7 @@ async def fulfill_razorpay_payment_async(
                 "payment_id": payment_id,
                 "amount": amount_inr,
                 "currency": "INR",
+                "start_date": state.get("preferred_start_iso"),
             }
             # Non-blocking async background dispatch with 3x retry
             trigger_async_staging(stage_payload, phone)

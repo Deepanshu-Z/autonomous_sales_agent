@@ -350,6 +350,7 @@ async def handle_incoming_message(
                     "payment_id": payment_id_val,
                     "amount": paid_amt_val,
                     "currency": "INR",
+                    "start_date": new_state.get("preferred_start_iso") or session_state.get("preferred_start_iso"),
                 }
                 # Fast Keep-Alive attempt; if network blips, background retry ensures delivery
                 try:
@@ -1379,9 +1380,11 @@ def _sanitize_state_grounded_replies(
 
     # Same completeness check as dispatch_payment_qr_async (Course, Timing, Teacher, Days, Package),
     # so the reply never promises a QR that the dispatcher will refuse to send.
-    from src.core.helpers.slot_engine import evaluate_enrollment_slots
+    from src.core.helpers.slot_engine import evaluate_enrollment_slots, followup_asks_settled_slot, slot_question
     slot_eval = evaluate_enrollment_slots(state, course_id=active_cid)
     all_slots_settled = bool(slot_eval.get("is_complete"))
+    # A real enrollment detail is still missing (paid / trial leads are excluded: no QR talk is gated there).
+    details_missing = slot_eval.get("next_target_slot") in ("COURSE", "TIMING", "TEACHER", "DAYS", "DURATION")
 
     intent = (last_turn.get("intent") or last_turn.get("customer_intent") or "").upper()
     user_asked_qr = bool(
@@ -1402,8 +1405,31 @@ def _sanitize_state_grounded_replies(
         or last_turn.get("is_complaint_or_refund")
     )
 
+    # Checkout talk the QR dispatcher would refuse to back up while a detail is missing (English + Hinglish).
+    QR_PROMISE_REGEX = (
+        r"(order summary|payment summary|enrollment summary|booking summary|payment ke liye summary"
+        r"|qr code (?:below|above|attached|provided|here|niche|neeche|yahan)|(?:niche|neeche) (?:diya|bheja)"
+        r"|scan (?:the |this )?(?:upi )?qr|qr code (?:se|ke zariye|ke through|via)|via (?:the )?upi qr|upi qr code (?:se|ke)"
+        r"|complete (?:your |the )?payment|pay (?:directly|now|via|using)|direct (?:upi )?payment link"
+        r"|payment (?:kar sakte|complete kar|kijiye|karein|karen|directly))"
+    )
+    PAYMENT_LEAK_REGEX = (
+        rf"{QR_PROMISE_REGEX}|\b(total payable|final payable|payable amount|amount payable|fee breakdown|price breakdown"
+        r"|kul (?:rashi|amount|payable))\b"
+    )
+
+    def _drop_sentences(text: str, pattern: str) -> str:
+        """Removes only the sentences matching pattern, keeping the rest of the reply and its line layout."""
+        lines = [
+            " ".join(s for s in re.split(r"(?<=[.!?])\s+", line) if not re.search(pattern, s, re.IGNORECASE))
+            for line in text.split("\n")
+        ]
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
     # 1. OBJECTION / COMPLAINT GUARD: Suppress sales follow-up completely
     if is_objection:
+        if details_missing and re.search(QR_PROMISE_REGEX, reply, re.IGNORECASE):
+            reply = _drop_sentences(reply, QR_PROMISE_REGEX) or reply
         return reply, None
 
     # 2. QUESTION / DEMO GUARD: Ensure followup does NOT force payment QR assistance
@@ -1464,13 +1490,25 @@ def _sanitize_state_grounded_replies(
             reply = f"Here is your customized UPI payment QR code for your enrollment:\n\n{reply}".strip()
 
     # 4. PREMATURE PAYMENT BARRIER (RULE 2: Zero unprompted payment checkout until all slots confirmed)
-    # If any slot is missing, QR is strictly blocked and user must be guided to choose the missing detail
-    if not all_slots_settled and not is_objection and not is_question:
-        PAYMENT_LEAK_REGEX = r"\b(order summary|total payable|final payable|fee breakdown|please complete your payment via the upi qr|scan the upi qr code below to confirm)\b"
+    # If any slot is missing, QR is strictly blocked and user must be guided to choose the missing detail.
+    # 4a. Question turns: keep the answer (a fee answer may show prices) but drop any QR / checkout promise.
+    if details_missing and is_question and not user_asked_qr:
+        if re.search(QR_PROMISE_REGEX, reply, re.IGNORECASE) or (followup and re.search(QR_PROMISE_REGEX, followup, re.IGNORECASE)):
+            logger.warning(f"[guardrails] Premature payment promise stripped from question reply (missing {slot_eval.get('missing_slots')})")
+            stripped = _drop_sentences(reply, QR_PROMISE_REGEX)
+            if stripped:
+                reply = stripped
+                followup = slot_question(slot_eval, state.get("language")) or followup
+            else:
+                is_question = False  # nothing left of the answer: fall through to the full replacement below
+
+    # 4b. Every other turn: replace the reply with a request for the next missing detail.
+    if details_missing and not is_objection and not is_question:
         reply_leaks = bool(re.search(PAYMENT_LEAK_REGEX, reply, re.IGNORECASE))
-        followup_leaks = bool(followup and re.search(r"\b(assistance completing your payment with the upi qr|complete your payment via the upi qr)\b", followup, re.IGNORECASE))
+        followup_leaks = bool(followup and re.search(QR_PROMISE_REGEX, followup, re.IGNORECASE))
 
         if user_asked_qr or reply_leaks or followup_leaks:
+            logger.warning(f"[guardrails] Premature payment summary replaced (missing {slot_eval.get('missing_slots')})")
             next_slot = slot_eval.get("next_target_slot")
             cid_curr = (active_cid or state.get("course") or "").lower().strip()
             course_title = kb_loader.get_catalog_entry(cid_curr).get("name", cid_curr.title()) if kb_loader.get_catalog_entry(cid_curr) else cid_curr.title()
@@ -1504,7 +1542,6 @@ def _sanitize_state_grounded_replies(
 
     # 5. SYNC GUARD: Message #2 must never ask for a slot the lead already chose (same check the timed follow-ups use).
     # Not an objection / paid / trial (slot_eval.next_target_slot is ENROLLED / TRIAL there, so this is a no-op).
-    from src.core.helpers.slot_engine import followup_asks_settled_slot, slot_question
     if followup and followup_asks_settled_slot(followup, slot_eval):
         logger.warning(f"[guardrails] Message #2 asked an already-settled slot, replaced: {followup!r}")
         followup = slot_question(slot_eval, state.get("language"))  # None when everything is settled (payment next)

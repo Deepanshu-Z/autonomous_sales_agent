@@ -192,6 +192,7 @@ async def sync_customer_email_endpoint(payload: SyncEmailPayload):
                     package_duration=state.get("package") or state.get("selected_duration"),
                     payment_id=state.get("payment_id") or state.get("order_id"),
                     amount=state.get("paid_amount") or 0.0,
+                    start_date=state.get("preferred_start_iso"),
                 )
                 if staged_res and staged_res.get("success"):
                     state["staged_enrollment"] = True

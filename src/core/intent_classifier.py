@@ -1700,7 +1700,10 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         new_state["profile_created"] = False
 
     if flags.get("preferred_start_date"):
+        from src.services.hono_staging_client import resolve_start_date
         new_state["preferred_start_date"] = flags["preferred_start_date"]
+        # Resolved now so "next week" stays anchored to when the customer said it, not to payment day.
+        new_state["preferred_start_iso"] = resolve_start_date(flags["preferred_start_date"])
 
     if flags.get("wants_stop_messaging"):
         new_state["wants_stop_messaging"] = True

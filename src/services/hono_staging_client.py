@@ -12,7 +12,7 @@ import os
 import re
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, Any, Optional
 import httpx
 from dotenv import load_dotenv
@@ -82,6 +82,65 @@ def clean_email(email_str: str, is_awaiting_email: bool = False) -> Optional[str
     and algorithmic Levenshtein string distance repair.
     """
     return sanitize_email(email_str, is_awaiting_email=is_awaiting_email)
+
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_WEEKDAYS = {"monday": 0, "somwar": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+             "friday": 4, "saturday": 5, "sunday": 6}
+# ponytail: a stated start further out than this is treated as a mis-parse and ignored (starts today);
+# raise it if Sensationz ever allows longer delays.
+MAX_START_DELAY_DAYS = 90
+
+
+def resolve_start_date(text: Optional[str], today: Optional[date] = None) -> Optional[str]:
+    """
+    Turns a customer's stated start ("10 dec", "1st December", "next month", "kal se",
+    "after 5 days", "next monday", "15 tareekh") into YYYY-MM-DD.
+    Returns None when unclear, not in the future, or beyond MAX_START_DELAY_DAYS (= start today).
+    """
+    if not text:
+        return None
+    today = today or date.today()
+    t = str(text).lower()
+    d = None
+    try:
+        m = re.search(r"\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s+)?([a-z]{3})[a-z]*\.?(?:\s+(\d{4}))?", t)
+        m2 = re.search(r"\b([a-z]{3})[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4}))?", t)
+        if m and m.group(2) in _MONTHS:
+            day, mon, yr = int(m.group(1)), _MONTHS[m.group(2)], m.group(3)
+        elif m2 and m2.group(1) in _MONTHS:
+            day, mon, yr = int(m2.group(2)), _MONTHS[m2.group(1)], m2.group(3)
+        else:
+            day = mon = yr = None
+        if mon:
+            d = date(int(yr) if yr else today.year, mon, day)
+            if not yr and d < today:
+                d = date(today.year + 1, mon, day)
+        elif n := re.search(r"\b(?:after\s+)?(\d{1,3})\s*(?:din|days?)\s*(?:baad|later|after)?\b", t):
+            if re.search(r"after|baad|later", t):
+                d = today + timedelta(days=int(n.group(1)))
+        if d is None and re.search(r"\b(?:kal|tomorrow)\b", t):
+            d = today + timedelta(days=1)
+        if d is None and re.search(r"\b(?:next|agle)\s+(?:month|mahine)\b", t):
+            d = date(today.year + (today.month == 12), today.month % 12 + 1, 1)
+        if d is None:
+            wd = next((v for k, v in _WEEKDAYS.items() if k in t), None)
+            if wd is not None:
+                d = today + timedelta(days=(wd - today.weekday() - 1) % 7 + 1)
+            elif re.search(r"\b(?:next|agle)\s+(?:week|hafte)\b", t):
+                d = today + timedelta(days=7 - today.weekday())
+        if d is None and (dm := re.search(r"\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:tareekh|tarikh)?\b", t)) \
+                and re.search(r"tareekh|tarikh|\d(?:st|nd|rd|th)\b", t):
+            day = int(dm.group(1))
+            d = date(today.year, today.month, day)
+            if d <= today:
+                d = date(today.year + (today.month == 12), today.month % 12 + 1, day)
+    except ValueError:  # e.g. "31 feb"
+        return None
+    if d is None or d <= today or (d - today).days > MAX_START_DELAY_DAYS:
+        return None
+    return d.isoformat()
 
 
 async def stage_ai_enrollment_async(
@@ -156,8 +215,10 @@ async def stage_ai_enrollment_async(
     )
 
     # Calculate dates based on package duration if omitted
-    if not start_date:
-        start_date = datetime.now().strftime("%Y-%m-%d")
+    # Delayed start: a customer's future start date wins; missing or already-passed dates start today.
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if not start_date or start_date < today_str:
+        start_date = today_str
     if not end_date:
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")

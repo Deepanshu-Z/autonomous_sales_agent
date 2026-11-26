@@ -861,12 +861,14 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
         )
         return
 
+    # New ad click / ad pre-filled text = re-inquiry
+    is_target_ad_inquiry = bool(
+        (referral and (referral.get("ad_id") or referral.get("source_id") or referral.get("ad_tag")))
+        or any(kw in (text or "").lower() for kw in ["can i get more info", "offer?", "offer ?", "600 for 3 months", "1500 online kathak"])
+    )
+
     # Check escalation
     if await is_escalated_async(phone):
-        is_target_ad_inquiry = bool(
-            (referral and (referral.get("ad_id") or referral.get("source_id") or referral.get("ad_tag")))
-            or any(kw in (text or "").lower() for kw in ["can i get more info", "offer?", "offer ?", "600 for 3 months", "1500 online kathak"])
-        )
         is_trial_acceptance = bool(
             re.search(r"^\s*(yes|haan|ha|sure|yeah|free trial|yes free trial|yes\. free trial)\s*$", (text or "").strip(), re.IGNORECASE)
             and any(
@@ -891,8 +893,10 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
             )
             return
 
-    # Initial lead assignment to Supreme Owner for monitoring (Interakt only)
-    if not state.get("already_assigned") and not is_payment_verified(state):
+    # Assign to Supreme Owner for monitoring (Interakt only): on first contact, and again on an
+    # ad re-inquiry when the chat is still sitting with a previous sales agent.
+    held_by_other_agent = (state.get("assigned_agent_email") or "").strip().lower() != (OWNER_EMAIL or "").strip().lower()
+    if (not state.get("already_assigned") or (is_target_ad_inquiry and held_by_other_agent)) and not is_payment_verified(state):
         is_interakt = not (phone.startswith("wa_") or phone.startswith("ig_") or phone.startswith("fb_"))
         if OWNER_EMAIL and is_interakt:
             success = await assign_chat_to_agent_async(phone, OWNER_EMAIL)

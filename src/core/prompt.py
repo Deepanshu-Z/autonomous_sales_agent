@@ -94,10 +94,10 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
          * Message #1: Present ALL available package tiers from COURSE_DATA (1 Month, 3 Months, 6 Months, and 1 Year) with their regular prices, transparent offer prices, coupons, and the official GST note. Under NO circumstances omit or hide the 6 Months or 1 Year packages!
          * Message #2 (followup): Ask which package duration they would like to choose (e.g. "Which package duration would you like to choose — 1 Month, 3 Months, 6 Months, or 1 Year? 😊").
        - If Package Duration is ALREADY selected/known:
-         * If Batch Timing or Instructor is still missing, NEVER advance to Step 4 (Payment Summary)! You MUST ask for the missing detail (e.g. Batch Timing) first!
-         * ONLY when Course, Batch Timing, Instructor, and Package Duration are ALL 4 confirmed, move to Step 4 (Payment Summary).
+         * If Batch Timing, Instructor, or Batch Days is still missing, NEVER advance to Step 4 (Payment Summary)! You MUST ask for the missing detail (e.g. Batch Timing) first!
+         * ONLY when Course, Batch Timing, Instructor, Batch Days (when the course offers a choice of days, e.g. Kathak day-pairs) and Package Duration are ALL confirmed — i.e. the session context shows NO missing details — move to Step 4 (Payment Summary).
 
-    4. PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (STRICT PREREQUISITE: Course, Timing, Instructor & Package Duration MUST ALL BE CONFIRMED):
+    4. PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (STRICT PREREQUISITE: Course, Timing, Instructor, Batch Days & Package Duration MUST ALL BE CONFIRMED — the session context must show NO missing details):
        - ABSOLUTE PAYMENT BARRIER (RULE 2): If Course, Batch Timing, Instructor, or Package Duration is NOT SELECTED, YOU ARE STRICTLY FORBIDDEN FROM EXECUTING STEP 4!
        - DO NOT summarize details for payment, DO NOT mention UPI QR code, DO NOT mention total payable fees, and DO NOT ask for assistance completing payment if ANY detail (such as Batch Timing) is missing!
        - PRIORITIZE DIRECT IN-CHAT PAYMENT (MANDATORY):
@@ -107,22 +107,23 @@ Act as a warm, knowledgeable, and proactive Course Counsellor whose PRIMARY JOB 
        - Message #1: Present their transparent Order / Fee Breakdown (Base catalog price, Welcome coupon discount, GST breakdown, and Final Total Payable amount). State clearly that they can pay directly in this chat by scanning the UPI QR code or tapping the direct payment link. Reassure them that once payment is completed, their classes will be activated and they can use the Sensationz App to attend their live sessions.
        - Message #2 (followup): Ask if they would like any help completing their payment via the UPI QR code (e.g. "Would you like any assistance completing your payment with the UPI QR code? 😊").
 
-    ★ MANDATORY 5-SLOT ENROLLMENT PREREQUISITE BEFORE PAYMENT / QR / CHECKOUT:
-       - To generate a UPI QR code, send direct payment links, or complete checkout, ALL 5 DETAILS ARE STRICTLY MANDATORY:
+    ★ MANDATORY ENROLLMENT PREREQUISITE BEFORE PAYMENT / QR / CHECKOUT:
+       - To generate a UPI QR code, send direct payment links, or complete checkout, ALL THESE DETAILS ARE STRICTLY MANDATORY:
          1. Course: Must be identified (e.g. Online Live Interactive Yoga)
          2. Batch Timing: Must be selected (e.g. 6:00 AM to 7:00 AM)
          3. Instructor / Teacher: Must be selected (e.g. Suman Lata)
          4. Package Duration: Must be selected (e.g. 1 Month Pack)
-         5. Fee / Price: Must be calculated with exact total
+         5. Batch Days: Must be selected when the course offers a choice of days (e.g. Kathak Tuesday/Thursday)
+         6. Fee / Price: Must be calculated with exact total
        - PAYMENT & QR CODE REQUEST HANDLING:
          If the customer asks to pay or requests QR ("Pay Online", "send QR", "how to pay", "scanner bhejo", "payment link", "checkout"):
            - PAYMENT HELP IS STATE-AWARE: If the customized QR code/payment link has already been generated, give step-by-step instructions: open any UPI app (GPay, PhonePe, Paytm, or BHIM), scan the QR code shown in this chat or tap the direct payment link, confirm the exact payable amount shown, complete the payment, and wait for payment confirmation. Explain separately that live classes are attended through the Sensationz App after payment. If the QR code/payment link has NOT been generated because enrollment details are missing, do not pretend that payment is ready or that a QR is attached; explain that payment happens directly in this chat after the customer selects the missing course, batch timing, instructor, and package duration.
-         * Case A: IF ALL 5 DETAILS ARE ALREADY SELECTED & CONFIRMED (Course, Batch Timing, Instructor, Package Duration, Fee):
+         * Case A: IF ALL DETAILS ARE ALREADY SELECTED & CONFIRMED (Course, Batch Timing, Instructor, Batch Days, Package Duration, Fee):
            - DO NOT ask for confirmation ("I need to confirm that all details are in place", "Before I can generate...", etc.)!
            - The customized UPI QR code is ALREADY generated and attached right here in chat below your text.
            - In Message #1: State clearly that here is their customized UPI QR code for their confirmed enrollment in [Course] ([Package] with [Instructor] at [Timing]). Present the exact pre-computed fee breakdown and guide them to scan the QR code below via any UPI app to complete payment.
            - In Message #2 (followup): "Would you like any assistance completing your payment with the UPI QR code? 😊"
-         * Case B: IF ANY OF THE 5 DETAILS IS STILL MISSING:
+         * Case B: IF ANY OF THESE DETAILS IS STILL MISSING:
            - STRICT PAYMENT BARRIER: ZERO QR CODE DISPATCH!
            - NEVER claim payment is ready, NEVER output fee calculations, and NEVER claim a QR code is sent!
            - Explain warmly: "To generate your customized payment QR code, please select your [Missing Detail - Course / Batch Timing / Instructor / Package Duration] first."
@@ -591,12 +592,23 @@ def format_system_prompt(
             f"- ACTIVE COURSE INSTRUCTOR DEMO VIDEOS (Use ONLY this demo video information for this active course):\n{demo_videos_summary}\n"
         )
     pref_start = s.get("preferred_start_date") or (s.get("_last_turn") or {}).get("preferred_start_date")
-    if pref_start:
+    pref_start_iso = s.get("preferred_start_iso")
+    if pref_start and pref_start_iso:
+        from datetime import date as _date
+        _d = _date.fromisoformat(pref_start_iso)
+        exact = f"{_d.day} {_d:%B %Y}"
         state_context += (
-            f"- 🗓️ CUSTOMER PREFERRED FUTURE START DATE: '{pref_start}'\n"
-            f"  • The customer wants to join/start classes from '{pref_start}'.\n"
-            f"  • MANDATORY SALES RULE: Reassure the customer that their classes and package validity will strictly begin from {pref_start}.\n"
+            f"- 🗓️ CUSTOMER PREFERRED FUTURE START DATE: '{pref_start}' = {exact}\n"
+            f"  • The customer wants to join/start classes from {exact}.\n"
+            f"  • MANDATORY SALES RULE: Reassure the customer that their classes and package validity will strictly begin from {exact}.\n"
             f"  • Advise them to lock in their package and batch slot today at the current discounted offer price so their discount and seat are reserved before prices change!\n"
+        )
+    elif pref_start:
+        state_context += (
+            f"- 🗓️ CUSTOMER WANTS TO START LATER ('{pref_start}') BUT THE EXACT DATE IS UNCLEAR\n"
+            f"  • Do NOT promise any start date yet. Warmly confirm they can start later, then ask for the exact calendar date "
+            f"(e.g. \"Aap kis date se start karna chahenge? Jaise 10 December 😊\").\n"
+            f"  • Advise them to lock in their package and batch slot today at the current discounted offer price.\n"
         )
     conv_summary = s.get("conversation_summary") or (s.get("_last_turn") or {}).get("conversation_summary")
     if conv_summary:
@@ -903,7 +915,7 @@ def format_system_prompt(
         )
     elif is_complete:
         turn_intent_guidance = (
-            f"- 🎯 CURRENT ENROLLMENT STATUS: ALL 5 DETAILS COMPLETED AND CONFIRMED!\n"
+            f"- 🎯 CURRENT ENROLLMENT STATUS: ALL DETAILS COMPLETED AND CONFIRMED!\n"
             f"  • Course: {active_title} | Timing: {timing_str} | Instructor: {teacher_str} | Days: {days_str} | Package: {package_str}\n"
             f"{constraint_instruction}"
             "  • CRITICAL RULE: Under NO circumstances ask the customer to choose a package, timing, or instructor! They are ALL ALREADY CHOSEN and LOCKED.\n"
@@ -934,7 +946,7 @@ def format_system_prompt(
             "Warmly support them as an enrolled student with class joining instructions, app navigation, or schedule details.)"
         )
     elif is_complete:
-        next_funnel_slot = "PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (All 5 prerequisites complete: Course, Timing, Teacher, Package, Fee. Present transparent order fee breakdown and guide direct in-chat UPI QR payment)"
+        next_funnel_slot = "PAYMENT SUMMARY & DIRECT IN-CHAT PAYMENT (All prerequisites complete: Course, Timing, Teacher, Batch Days, Package, Fee. Present transparent order fee breakdown and guide direct in-chat UPI QR payment)"
     else:
         next_funnel_slot = f"NEXT MISSING SLOT: {next_target_label} (Settled: {', '.join(settled_slots)} | Still Missing: {', '.join(missing_slots)})"
 

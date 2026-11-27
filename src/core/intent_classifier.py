@@ -367,8 +367,8 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
    - Do NOT set it for ordinary course / fee / timing questions. An angry accusation, refund demand or legal threat is "is_complaint_or_refund" instead; if the customer both doubts us AND is angry or threatening, set is_complaint_or_refund true as well.
 
 27. "wants_schedule_change":
-   - boolean, default false. Set true when the customer, in ANY language or script, wants, insists on or argues for a class time, teacher or days DIFFERENT from the batch they already have, or says their current batch does not suit them, INCLUDING short follow-ups that only make sense from the transcript ("you said yes", "you told me that time", "it is not working for me"). Judge by MEANING using the transcript, never by keywords.
-   - false for questions about their own existing class (when is my class, how to join).
+   - boolean, default false. Set true when the customer, in ANY language or script, wants, insists on or argues for a class time, teacher, days or start date DIFFERENT from the batch they already have, or says their current batch does not suit them, INCLUDING short follow-ups that only make sense from the transcript ("you said yes", "you told me that time", "it is not working for me"). Judge by MEANING of the LATEST message using the transcript, never by keywords.
+   - false for questions about their own existing class (when is my class, how to join), for plain acknowledgements ("ok", "thanks"), and for simply attending or starting their existing batch (e.g. "from today").
 
 RESPOND ONLY WITH STRICT JSON matching this schema:
 {
@@ -432,7 +432,7 @@ Rules:
 - Demo-video requests are not tutorial-video requests. App and trial guide requests are separate from teacher demos.
 - Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
 - wants_trust_proof is true when the customer doubts whether Sensationz is genuine/registered or asks for proof (GST number, registration, reviews, ratings, social media). A calm doubt is NOT is_complaint_or_refund; anger, refund demands and threats are.
-- wants_schedule_change is true when the customer wants or insists on a class time / teacher / days different from the batch they already have, or says it does not suit them, including transcript-dependent follow-ups ("you said yes", "you told me that time"); false for questions about their own class.
+- wants_schedule_change is true when the LATEST message wants or insists on a class time / teacher / days / start date different from the batch they already have, or says it does not suit them, including transcript-dependent follow-ups ("you said yes", "you told me that time"); false for questions about their own class, plain acknowledgements, and simply attending or starting their existing batch ("from today").
 - Words like ok, yes, sir, mam, plz, pls, thanks do not make a message Hinglish; judge the whole message. language_unclear is true for acknowledgements, numbers/times, names, emails, single words, emojis (keep the earlier language); false when there are enough real words or an explicit language request.
 - Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
 
@@ -1429,6 +1429,10 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
             )
             flags = dict(flags)
             flags["paid_change_requested"] = bool(flags.get("wants_schedule_change")) or any(want and want != have for want, have in asked)
+            # The start date is fixed at payment too: never saved afterwards (the Gmail staging payload reads it, so a
+            # new date would silently move a paid enrollment). Not compared like the slots above: the classifier keeps
+            # echoing a date from the transcript on later turns; asking to change it is wants_schedule_change.
+            flags["preferred_start_date"] = None
             flags["selected_course"] = None
             flags["selected_timing"] = None
             flags["unoffered_timing_mentioned"] = None
@@ -1750,18 +1754,9 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
     if not matched_explicit and explicit_req:
         matched_explicit = explicit_req.strip().title()
 
-    # Check if raw text directly matches a language name or button
+    # A bare button tap / language name ("Hindi"). Phrases like "talk in Hindi" come from explicit_language_request.
     if not matched_explicit and raw_text:
-        # Check direct language button / option clicks
-        matched_from_text = language_loader.match_language(raw_text)
-        if matched_from_text:
-            matched_explicit = matched_from_text
-        else:
-            # Check explicit switch phrases like "talk in Hindi", "English please"
-            import re
-            m = re.search(r"\b(?:speak|talk|reply|switch|change|baat)\s+(?:in|to|me|mein)?\s*([a-zA-Z]+)", raw_text, re.IGNORECASE)
-            if m:
-                matched_explicit = language_loader.match_language(m.group(1))
+        matched_explicit = language_loader.match_language(raw_text)
 
     # [PREVIOUS BEHAVIOR - COMMENTED OUT]:
     # if matched_explicit:

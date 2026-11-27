@@ -11,21 +11,21 @@
       "id": "english",
       "name": "English",
       "button_label": "English",
-      "aliases": ["english", "eng", "1"],
+      "aliases": ["english", "eng"],
       "agent_button": "Talk to Agent"
     },
     {
       "id": "hindi",
       "name": "Hindi",
       "button_label": "हिन्दी (Hindi)",
-      "aliases": ["hindi", "हिन्दी", "हिंदी", "2"],
+      "aliases": ["hindi", "हिन्दी", "हिंदी"],
       "agent_button": "एजेंट से बात"
     },
     {
       "id": "hinglish",
       "name": "Hinglish",
       "button_label": "Hinglish",
-      "aliases": ["hinglish", "roman hindi", "3"],
+      "aliases": ["hinglish", "roman hindi"],
       "agent_button": "Agent se baat"
     },
     {

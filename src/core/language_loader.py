@@ -45,13 +45,13 @@ def get_language_config() -> Dict[str, Any]:
                 "id": "english",
                 "name": "English",
                 "button_label": "English",
-                "aliases": ["english", "eng", "en", "1"]
+                "aliases": ["english", "eng"]
             },
             {
                 "id": "hindi",
                 "name": "Hindi",
                 "button_label": "हिन्दी (Hindi)",
-                "aliases": ["hindi", "हिन्दी", "हिंदी", "hi", "2"]
+                "aliases": ["hindi", "हिन्दी", "हिंदी"]
             }
         ]
     }
@@ -100,13 +100,10 @@ def match_language(text: str) -> Optional[str]:
         btn = lang.get("button_label", "").lower()
         aliases = [a.lower() for a in lang.get("aliases", [])]
 
+        # Exact only (a button tap or the bare language name). Partial matching turned everyday words into a
+        # locked language ("Ab" -> Punjabi, "Na" -> Kannada); requests like "Hindi mein baat karo" come from the
+        # classifier's explicit_language_request, which reads meaning in any language.
         if cleaned in [name, lid, btn] or cleaned in aliases:
-            return lang.get("name")
-
-        # Partial matching for button clicks like "हिन्दी (Hindi)"
-        if name and (name == cleaned or cleaned.startswith(name)):
-            return lang.get("name")
-        if btn and (btn == cleaned or cleaned in btn or btn in cleaned):
             return lang.get("name")
 
     return None

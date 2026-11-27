@@ -822,6 +822,14 @@ async def _execute_pipeline_async(phone: str, text: str, referral: dict = None):
     except Exception as e:
         pass
 
+    # AI killed from the CRM Urgency page: stay silent. Checked before the tester commands (#bot, reset) and
+    # the auto-unescalate on a new ad click / trial "yes" below, so nothing a customer sends can revive it.
+    from src.state.chat_state import is_ai_killed
+    if await asyncio.to_thread(is_ai_killed, phone):
+        print(f"[3] ⛔ ACTION   : {phone} -> AI killed from CRM (AI staying out)")
+        log_lead_action(lead_no=phone, lead_details=lead_details, action_taken="IGNORED", reason="AI killed from CRM Urgency page")
+        return
+
     # Developer / Tester control commands
     cmd = re.sub(r"^\[Replying to:[^\]]*\]\s*", "", text or "", flags=re.IGNORECASE).strip().lower()
     if cmd in ["reset", "#reset", "/reset", "reset chat", "reset session"] or cmd.startswith("#reset") or cmd.startswith("/reset"):

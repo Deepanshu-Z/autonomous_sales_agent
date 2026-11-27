@@ -694,3 +694,59 @@ async def _process_fallback(phone: str, text: str, referral: dict, start_time: f
     )
     return {"status": "ok"}
 
+
+# ── CRM Urgency page (admin) ───────────────────────────────────────────────────
+# Called by the CRM server with the shared AUTOMATION_SECRET. The bot owns its state (Redis + Supabase),
+# so the CRM never writes it directly.
+def _admin_authorized(request: Request) -> bool:
+    import hmac
+    secret = os.getenv("AUTOMATION_SECRET", "")
+    return bool(secret) and hmac.compare_digest(request.headers.get("x-automation-secret", ""), secret)
+
+
+@router.get("/api/admin/ai-killed")
+async def admin_ai_killed(request: Request):
+    from fastapi.responses import JSONResponse
+    from src.state.chat_state import get_killed_leads
+    if not _admin_authorized(request):
+        return JSONResponse({"message": "Unauthorized"}, status_code=401)
+    return {"killed": await asyncio.to_thread(get_killed_leads)}
+
+
+@router.post("/api/admin/ai-control")
+async def admin_ai_control(request: Request):
+    """Body: {"phone", "action": "kill" | "resume" | "assign", "agent_email"?, "by"?}"""
+    from fastapi.responses import JSONResponse
+    from src.state.chat_state import kill_ai, resume_ai, canonical_phone
+    from src.services.interakt import (
+        assign_chat_to_agent_detailed_async, ASSIGNED, AGENT_NOT_FOUND, CUSTOMER_NOT_FOUND,
+    )
+    if not _admin_authorized(request):
+        return JSONResponse({"message": "Unauthorized"}, status_code=401)
+    body = await request.json()
+    phone = canonical_phone(body.get("phone"))
+    action = body.get("action")
+    by = str(body.get("by") or "CRM")
+    if len(phone) != 12 or not phone.isdigit():
+        return JSONResponse({"message": "A 10-digit Indian mobile number is required."}, status_code=400)
+
+    if action == "kill":
+        return {"phone": phone, "killed": await asyncio.to_thread(kill_ai, phone, by)}
+    if action == "resume":
+        await asyncio.to_thread(resume_ai, phone)
+        return {"phone": phone, "killed": None}
+    if action == "assign":
+        agent = str(body.get("agent_email") or "").strip()
+        if not agent:
+            return JSONResponse({"message": "agent_email is required."}, status_code=400)
+        result = await assign_chat_to_agent_detailed_async(phone, agent)
+        if result != ASSIGNED:
+            reason = {
+                AGENT_NOT_FOUND: f"{agent} is not an agent in Interakt.",
+                CUSTOMER_NOT_FOUND: "This number has never messaged on Interakt, so it can't be assigned yet.",
+            }.get(result, "Interakt did not accept the assignment. Please try again.")
+            return JSONResponse({"message": reason, "result": result}, status_code=409)
+        # The agent owns the chat now: the AI must not talk over them.
+        return {"phone": phone, "killed": await asyncio.to_thread(kill_ai, phone, by, agent)}
+    return JSONResponse({"message": "action must be kill, resume or assign."}, status_code=400)
+

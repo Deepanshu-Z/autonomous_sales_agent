@@ -30,7 +30,7 @@ from supabase import create_client
 
 from src.services.interakt import send_text_message_async, send_video_message_async
 from src.services.agent_handoff import assign_lead_to_available_agent_async
-from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state
+from src.state.chat_state import mark_escalated_async, is_at_qr_stage, get_user_state, save_user_state, is_ai_killed
 from src.state.payment_status import is_payment_verified
 from src.state.chat_history import save_message_async, get_recent_history
 from src.state.csv_logger import log_message_async
@@ -68,6 +68,16 @@ async def process_single_lead(row: dict, now_ts: float):
         return
 
     try:
+        # 0. AI killed from the CRM Urgency page: never follow up (and drop the row from future sweeps)
+        if await asyncio.to_thread(is_ai_killed, phone):
+            await asyncio.to_thread(
+                lambda: supabase.table("user_session_state").update({
+                    "next_followup_due_at": None,
+                    "is_escalated": True,
+                }).eq("phone", raw_phone).execute()
+            )
+            return
+
         state = await asyncio.to_thread(get_user_state, phone)
 
         # 1. Skip paid / enrolled users

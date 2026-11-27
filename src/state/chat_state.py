@@ -120,6 +120,54 @@ redis_conn = get_redis_connection()
 STATE_CACHE_TTL = 60 * 60 * 24 * 30  # 30 days persistence across restarts
 
 
+# ── AI kill switch (CRM Urgency page) ─────────────────────────────────────────
+# A Redis hash "91XXXXXXXXXX" -> {"by", "at", "agent"}, no TTL. Unlike a normal escalation, nothing automatic
+# (new ad click, trial "yes", the #bot / reset commands, the follow-up worker) can switch the AI back on:
+# only resume_ai(), called from the CRM, does.
+AI_KILL_KEY = "ai_killed"
+
+
+def canonical_phone(phone: str) -> str:
+    digits = re.sub(r"\D", "", str(phone or ""))
+    return f"91{digits[-10:]}" if len(digits) >= 10 else str(phone or "")
+
+
+def is_ai_killed(phone: str) -> bool:
+    try:
+        return bool(redis_conn.hexists(AI_KILL_KEY, canonical_phone(phone)))
+    except Exception as e:
+        print(f"[chat_state] is_ai_killed Redis error (escalated_chats still blocks the AI): {e}")
+        return False
+
+
+def get_killed_leads() -> dict:
+    """{"91XXXXXXXXXX": {"by", "at", "agent"}} for every lead killed from the CRM."""
+    return {p: json.loads(v) for p, v in (redis_conn.hgetall(AI_KILL_KEY) or {}).items()}
+
+
+def kill_ai(phone: str, by: str, agent: str = None) -> dict:
+    """Stop the AI and every follow-up for this lead until resume_ai()."""
+    phone = canonical_phone(phone)
+    info = {"by": by, "at": int(time.time()), "agent": agent}
+    redis_conn.hset(AI_KILL_KEY, phone, json.dumps(info))
+    mark_escalated(phone)  # escalated_chats row: the webhook pipeline stays out
+    state = get_user_state(phone)
+    reset_follow_up_timer(state)  # the follow-up sweep only picks rows with a due time and is_escalated = False
+    state["is_escalated"] = True
+    if agent:
+        state["assigned_agent_email"] = agent
+        state["already_assigned"] = True
+    save_user_state(phone, state)
+    return info
+
+
+def resume_ai(phone: str):
+    """Undo kill_ai(): the AI answers this lead's next message again (follow-ups re-arm after that reply)."""
+    phone = canonical_phone(phone)
+    redis_conn.hdel(AI_KILL_KEY, phone)
+    clear_escalation(phone)
+
+
 def get_default_state(phone: str) -> dict:
     """
     Returns the initial default session state dictionary for a new phone number.

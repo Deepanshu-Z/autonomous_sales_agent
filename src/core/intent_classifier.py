@@ -1450,8 +1450,16 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         raw_c = flags["selected_course"]
         entry = kb_loader.get_catalog_entry(raw_c)
         cand_course = entry["id"] if entry else (kb_loader.detect_course_from_text(raw_c) or None)
+        old_course = new_state.get("course")
+        has_choices = any(new_state.get(k) for k in (
+            "timing", "selected_timing", "selected_teacher", "teacher", "days", "selected_days", "package", "selected_duration"))
+        if cand_course and old_course and old_course != cand_course and intent == "QUESTION" and has_choices:
+            # A QUESTION naming another course ("Bollywood bhi sikhate ho?") is not a switch once the lead has chosen
+            # a batch here: keep the active course and its choices; the reply answers from the other-courses rule.
+            # A real switch ("Bollywood join karna hai") comes as a selection intent. Leads with no choices yet
+            # still switch on a question, so "yoga ki timing?" from a Kathak-ad lead keeps working.
+            cand_course = None
         if cand_course:
-            old_course = new_state.get("course")
             if old_course and old_course != cand_course:
                 # User switched course! Reset course-specific slots unless new ones arrived in the same turn
                 if not flags.get("selected_timing"):

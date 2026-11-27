@@ -179,6 +179,18 @@ async def handle_incoming_message(
                 paid_book[norm_old_course] = {k: session_state.get(k) for k in _PAID_KEYS}
             new_state["paid_enrollments"] = paid_book
             session_state["paid_enrollments"] = paid_book
+            # Unpaid choices are kept per course too (timing, teacher, days, package, QR stage): a switch, even a
+            # mistaken one, never loses them, and coming back to that course restores them below.
+            _PICK_KEYS = (
+                "timing", "selected_timing", "timing_period", "teacher", "selected_teacher", "days", "selected_days",
+                "days_code", "package", "selected_duration", "fee", "base_fee", "offer_fee", "gst_amount",
+                "gst_percentage", "stage",
+            )
+            picks = dict(session_state.get("course_selections") or {})
+            if not is_payment_verified(session_state):
+                picks[norm_old_course] = {k: session_state[k] for k in _PICK_KEYS if session_state.get(k) is not None}
+            new_state["course_selections"] = picks
+            session_state["course_selections"] = picks
             new_state["timing"] = None
             new_state["selected_timing"] = None
             new_state["timing_period"] = None
@@ -221,6 +233,14 @@ async def handle_incoming_message(
                     session_state[_k] = _v
                 new_state["paid_course"] = effective_course_id
                 session_state["paid_course"] = effective_course_id
+            elif picks.get(effective_course_id):
+                # Back on a course they had chosen a batch for (unpaid): restore those choices.
+                # ponytail: a new slot named in the same switch-back message is ignored (as on every switch above,
+                # which clears this turn's picks); the classifier echoes old slots too often to trust it here.
+                # Upgrade path: re-apply only slots the classifier marks as newly chosen this turn.
+                for _k, _v in picks[effective_course_id].items():
+                    new_state[_k] = _v
+                    session_state[_k] = _v
 
             # Course-specific enrollment isolation
             if is_payment_verified(session_state) and not session_state.get("paid_course"):

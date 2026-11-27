@@ -104,6 +104,13 @@ def full_kb_course_ids(exclude: Optional[str] = None) -> List[str]:
     return [c["id"] for c in get_course_catalog() if c.get("has_full_kb") and c["id"] != exclude_cid]
 
 
+def is_app_only(course_id: Optional[str]) -> bool:
+    """A catalog course with no structured data (has_full_kb false): nothing can be chosen or paid in chat,
+    the customer is sent to the Sensationz App."""
+    entry = get_catalog_entry(course_id or "")
+    return bool(entry and not entry.get("has_full_kb"))
+
+
 def course_exists(course_id: str) -> bool:
     """True if the course has a dedicated KB file OR at least a catalog entry."""
     if not course_id:

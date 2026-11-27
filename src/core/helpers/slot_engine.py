@@ -47,6 +47,18 @@ def evaluate_enrollment_slots(state: Dict[str, Any], course_id: Optional[str] = 
     else:
         active_title = cid.title() if cid else "Not Selected"
 
+    # A course with no structured data (catalog has_full_kb false): nothing can be chosen or paid in chat, the
+    # customer goes to the Sensationz App. No slots to ask, no invented defaults (e.g. "Monday to Friday"), no QR.
+    if catalog_entry and not catalog_entry.get("has_full_kb"):
+        return {
+            "course_id": cid, "course_title": active_title, "timing": None, "timing_str": "NOT SELECTED",
+            "teacher": None, "teacher_str": "NOT SELECTED", "available_teachers_for_timing": [], "available_days": [],
+            "days": None, "days_str": "NOT SELECTED", "package": None, "package_str": "NOT SELECTED",
+            "is_complete": False, "settled_slots": [f"Course: {active_title}"], "missing_slots": [],
+            "next_target_slot": "APP", "next_target_label": "Sensationz App", "next_target_buttons": [],
+            "is_paid": is_payment_verified(s), "is_trial_path": False, "constraint_note": None,
+        }
+
     # 2. Resolve Timing
     timing_val = s.get("timing") or s.get("selected_timing")
     timing_str = timing_val if timing_val else "NOT SELECTED"

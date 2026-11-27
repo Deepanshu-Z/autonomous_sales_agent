@@ -160,7 +160,8 @@ def apply_week_pass(state: Dict[str, Any], flags: Dict[str, Any]) -> None:
     state["wants_trial"] = state["awaiting_trial_email"] = False
     if state.get("stage") in ("TRIAL_REQUESTED", "TRIAL_STEPS_SENT"):
         state["stage"] = "COURSE_CONFIRMED" if state.get("course") else "NEW"
-    if is_payment_verified(state):
+    from src.core.kb_loader import is_app_only
+    if is_payment_verified(state) or is_app_only(state.get("course")):  # app-only course: nothing is sold in chat
         return
     if flags.get("wants_pass"):
         state["pass_interest"] = True

@@ -273,6 +273,18 @@ def get_followup_decision(
             if isinstance(s, str) and s not in sent_ids:
                 sent_ids.append(s)
 
+    # Course with no data (app-only): the customer was already sent to the Sensationz App; sales follow-ups
+    # (timings, packages, offers) would only repeat that or ask what cannot be chosen in chat.
+    from src.core.kb_loader import is_app_only
+    if not lead_at_qr and is_app_only(course_id):
+        return FollowupDecision(
+            action="SKIP",
+            next_count=count,
+            next_gap_seconds=None,
+            step_label="App-only course: customer redirected to the app, no sales follow-ups",
+            updated_sent_ids=sent_ids,
+        )
+
     # -------------------------------------------------------------
     # 0. QR SENT LEAD SPECIALIZED FOLLOW-UP
     # Follow-ups allowed for payment assistance, but agent assignment is strictly prohibited.

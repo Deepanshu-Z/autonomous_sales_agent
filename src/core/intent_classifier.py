@@ -81,6 +81,7 @@ def _empty_flags() -> Dict[str, Any]:
         "is_out_of_scope": False,
         "preferred_start_date": None,
         "wants_stop_messaging": False,
+        "wants_one_on_one": False,
         "customer_intent": "QUESTION",
         "question_summary": None,
         "detected_language": "English",
@@ -265,6 +266,12 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
       • Set "customer_intent" = "STOP_MESSAGING".
       • Set "is_disinterested" = true.
 
+11c. "wants_one_on_one":
+    - boolean: true if the customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class, tutor, coach or trainer (only the customer and the teacher), in ANY language, slang, or phrasing (e.g., "1-on-1 class milegi?", "1 to 1 session", "one2one", "personal class chahiye", "sirf mere liye alag class", "private tuition hai kya", "individual coaching", "home tutor", "मुझे पर्सनल क्लास चाहिए").
+    - NEGATIVE GUARD: false for group-batch questions ("batch mein kitne students hote hain?"), personal attention inside the group class ("teacher personally dhyan degi?"), and numbers that are timings, prices or durations ("1-2 baje", "1 month").
+    - Evaluated strictly by SEMANTIC MEANING in any language (English, Hindi, Hinglish, regional, typos).
+    - When true: Set "customer_intent" = "ONE_ON_ONE_REQUEST".
+
 12. "is_complaint_or_refund":
     - boolean: true if customer demands a refund, threatens legal/police action, or angrily accuses fraud/scam. (A calm question or doubt about whether Sensationz is genuine/registered is NOT a complaint: use "wants_trust_proof" for it.)
 
@@ -288,6 +295,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
     - "PROFILE_COMPLETED": Customer confirms they completed profile / app setup.
     - "AGENT_REQUEST": Customer explicitly wants human chat agent takeover ("agent", "human", "transfer to agent"). NEVER assign for phone call queries (use "PHONE_CALL_REQUEST"). NEVER assign for general guidance or button taps like "Yes, help me" (use "QUESTION" or "OTHER").
     - "PHONE_CALL_REQUEST": Customer explicitly wants to connect on a phone call, speak over the phone, or asks for phone numbers to call ("call me", "phone pe baat karni hai", "phone number do", "call par baat ho sakti hai", "give number", "want to talk on phone").
+    - "ONE_ON_ONE_REQUEST": Customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class or tutor (see "wants_one_on_one").
     - "DISINTEREST": Customer declines, rejects, or specifies their refusal obstacle/reason. This includes:
       • Explicit rejections: "not interested", "nahi chahiye", "cancel", "no", "nahi lena", "koi b nhi".
       • OBJECTION ANSWERS TO AI INQUIRIES: When the AI asked what is holding them back or why they are hesitating, and the customer names their obstacle (e.g. "timings", "timing", "fees", "price", "paise", "schedule"), this MUST be classified as "DISINTEREST" with is_disinterested = true!
@@ -405,6 +413,7 @@ RESPOND ONLY WITH STRICT JSON matching this schema:
   "cannot_access_classes": boolean,
   "preferred_start_date": string | null,
   "wants_stop_messaging": boolean,
+  "wants_one_on_one": boolean,
   "timing_ambiguous": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
@@ -433,6 +442,7 @@ Rules:
 - Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
 - wants_trust_proof is true when the customer doubts whether Sensationz is genuine/registered or asks for proof (GST number, registration, reviews, ratings, social media). A calm doubt is NOT is_complaint_or_refund; anger, refund demands and threats are.
 - wants_schedule_change is true when the LATEST message wants or insists on a class time / teacher / days / start date different from the batch they already have, or says it does not suit them, including transcript-dependent follow-ups ("you said yes", "you told me that time"); false for questions about their own class, plain acknowledgements, and simply attending or starting their existing batch ("from today").
+- wants_one_on_one is true when the customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class or tutor (any language); false for group-batch size questions, personal attention inside a group class, and numbers that are timings/prices/durations ("1-2 baje", "1 month").
 - Words like ok, yes, sir, mam, plz, pls, thanks do not make a message Hinglish; judge the whole message. language_unclear is true for acknowledgements, numbers/times, names, emails, single words, emojis (keep the earlier language); false when there are enough real words or an explicit language request.
 - Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
 
@@ -472,6 +482,7 @@ Return exactly this schema, using null for unknown strings and false for unknown
   "cannot_access_classes": boolean,
   "preferred_start_date": string | null,
   "wants_stop_messaging": boolean,
+  "wants_one_on_one": boolean,
   "timing_ambiguous": boolean,
   "wants_app_guide": boolean,
   "wants_trial_guide": boolean,
@@ -590,7 +601,8 @@ async def extract_intent_and_state_changes(
             "requests_human_agent", "wants_phone_call", "is_coupon_requested", "is_disinterested",
             "is_complaint_or_refund", "is_out_of_scope", "wants_stop_messaging", "wants_resend_video", "claims_payment_or_enrollment",
             "cannot_access_classes", "wants_demo", "wants_app_guide", "wants_app_video_guide",
-            "wants_trial_guide", "wants_trial_video_guide", "numbers_not_timing", "language_unclear", "wants_trust_proof", "wants_schedule_change"
+            "wants_trial_guide", "wants_trial_video_guide", "numbers_not_timing", "language_unclear", "wants_trust_proof", "wants_schedule_change",
+            "wants_one_on_one",
         ]:
             val = clean.get(bool_key)
             if isinstance(val, str):
@@ -604,6 +616,8 @@ async def extract_intent_and_state_changes(
         clean["wants_trial_video_guide"] = clean["wants_trial_guide"]
 
         # Sync semantic request flags with customer_intent without raw-text regex overrides
+        if clean.get("customer_intent") == "ONE_ON_ONE_REQUEST":
+            clean["wants_one_on_one"] = True  # the model sometimes reports it only as the intent
         if clean.get("customer_intent") == "STOP_MESSAGING" or clean.get("wants_stop_messaging"):
             clean["wants_stop_messaging"] = True
             clean["customer_intent"] = "STOP_MESSAGING"
@@ -1487,6 +1501,11 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
             new_state["course"] = cand_course
 
     active_course = new_state.get("course")
+    if kb_loader.is_app_only(active_course):
+        # No batches / packages exist in our data for this course: nothing the customer names is a real slot.
+        flags = {**flags, "selected_timing": None, "unoffered_timing_mentioned": None, "selected_teacher": None,
+                 "selected_days": None, "selected_package": None, "timing_resolution_status": "NONE",
+                 "timing_selection_attempted": False}
     if flags.get("timing_resolution_status") != "NONE":
         new_state["timing_resolution_status"] = flags.get("timing_resolution_status")
 
@@ -1854,6 +1873,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         "claims_payment_or_enrollment": flags.get("claims_payment_or_enrollment", False),
         "preferred_start_date": flags.get("preferred_start_date"),
         "wants_stop_messaging": flags.get("wants_stop_messaging", False),
+        "wants_one_on_one": flags.get("wants_one_on_one", False),
         "cannot_access_classes": flags.get("cannot_access_classes", False),
         "paid_change_requested": flags.get("paid_change_requested", False),
         "unoffered_type": flags.get("unoffered_type"),

@@ -580,6 +580,18 @@ async def handle_incoming_message(
             "new_state": new_state,
         }
 
+    # ── 1-on-1 / private session request: Customer Support handles it; skip the reply LLM ──
+    # The caller sends the support numbers and stops the bot + follow-ups (see wants_one_on_one there).
+    if flags.get("wants_one_on_one"):
+        new_state["next_followup_due_at"] = None
+        new_state["is_escalated"] = True
+        return {
+            "reply": _one_on_one_support_reply(new_state.get("language") or flags.get("detected_language")),
+            "followup": None,
+            "buttons": [],
+            "new_state": new_state,
+        }
+
     # ── Fast-Path Guardrail (Pillar 2): Intercept Pure Out-of-Scope Queries ───
     is_oos = bool(
         flags.get("is_out_of_scope")
@@ -1042,6 +1054,7 @@ def _should_allow_app_links(
         or state.get("staged_enrollment")
         or state.get("staged_trial")
         or state.get("stage") in _APP_ACCESS_STAGES
+        or kb_loader.is_app_only(state.get("course"))  # enrollment for this course happens only in the app
     )
     return app_access_required and not state.get("app_links_sent", False)
 
@@ -1095,6 +1108,18 @@ def _is_payment_claim(flags: dict) -> bool:
         or flags.get("customer_intent") == "PAYMENT_CLAIM"
     )
     return claims_paid and not is_asking_to_pay
+
+
+def _one_on_one_support_reply(language: Optional[str]) -> str:
+    """The fixed answer to a 1-on-1 / private session request: Customer Support handles these, the bot stops."""
+    from src.core.kb_loader import format_support_executives_display
+    contacts = format_support_executives_display()
+    lang = str(language or "Hinglish").lower()
+    if "english" in lang and "hinglish" not in lang:
+        return ("For 1-on-1 (personal) sessions, our Customer Support team will help you directly. 😊 "
+                f"You can reach them here:\n{contacts}")
+    return ("1-on-1 (personal) sessions ke liye hamari Customer Support team aapki directly help karegi. 😊 "
+            f"Aap inse connect kar sakte hain:\n{contacts}")
 
 
 def build_payment_not_received_reply(language: Optional[str]) -> str:
@@ -1928,6 +1953,22 @@ async def _handle_conversation_turn_unlocked(
     followup_msg = result.get("followup")
     new_state = result.get("new_state", state)
     last_turn = new_state.get("_last_turn", {})
+
+    # ── 1-on-1 / private session request: share Customer Support numbers, then stop the bot and its follow-ups ──
+    # Before the agent handoff, so "1-on-1 chahiye, kisi se baat karao" gets the numbers, not an Interakt agent.
+    # The reply is rebuilt here (not reply_text) because an earlier fast path (payment claim, Gmail) may have answered.
+    if last_turn.get("wants_one_on_one"):
+        reply = _format_for_whatsapp(
+            _one_on_one_support_reply(new_state.get("language") or last_turn.get("detected_language"))
+        )
+        await send_text_message_async(phone, reply)
+        await save_message_async(phone, "assistant", reply, response_time_sec=round(time.time() - start_time, 2))
+        asyncio.create_task(log_message_async(phone, "ai", reply))
+        new_state["next_followup_due_at"] = None
+        new_state["is_escalated"] = True
+        mark_escalated(phone)
+        await save_user_state_async(phone, new_state)
+        return {"status": "one_on_one_support", "reply": reply}
 
     # Check for Human Agent Escalation (Chat handoff to CRM sales agent)
     # Note: Customer Support Executives handle phone calls directly; phone requests do not trigger chat handoff.

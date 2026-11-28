@@ -524,7 +524,7 @@ THEIR CONFIRMED ENROLLMENT (SOURCE OF TRUTH)
 ════════════════════════════════════════
 HOW CLASSES WORK
 ════════════════════════════════════════
-- Live classes are attended in the Sensationz App: sign in with Google using the Gmail ID linked to this enrollment, then open 'My Classes'. Never tell them to log in with their phone number (the batch shows only on the linked Google account).
+- Live classes are attended in the Sensationz App: sign in with Google using the Gmail ID linked to this enrollment, then open 'My Courses'. Never tell them to log in with their phone number (the batch shows only on the linked Google account).
 - App links (share when they need to install or open the app):
 {app_links}
 - Answer questions about classes, syllabus, instructors and policies ONLY from COURSE DATA below. If something is not there, refer them to Customer Support instead of guessing.
@@ -593,7 +593,7 @@ def _paid_student_prompt(s: Dict[str, Any], cid: str, course_title: str, detecte
     elif classes_missing:
         situation = (
             f"- The student says their classes are not showing. Their enrollment is active and linked to {email}.\n"
-            f"- Message #1: tell them to open the Sensationz App, sign out, and sign in with Google using exactly {email}; then open 'My Classes'.\n"
+            f"- Message #1: tell them to open the Sensationz App, sign out, and sign in with Google using exactly {email}; then open 'My Courses'.\n"
             "- If they need a different Gmail linked, that can only be done by Customer Support: share their numbers.\n"
         )
     else:

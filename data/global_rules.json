@@ -112,7 +112,7 @@
             "Select your preferred batch timing and package duration",
             "Complete payment directly in the WhatsApp chat via the provided UPI QR code or payment link",
             "Download the Sensationz App and log in using your registered phone number",
-            "Access your live interactive classes under 'My Classes' on your dashboard"
+            "Access your live interactive classes under 'My Courses' on your dashboard"
         ],
         "payment_platform": "WhatsApp chat via dynamic Razorpay UPI QR code or direct payment link",
         "coupon_delivery": "Provided upfront with package pricing"

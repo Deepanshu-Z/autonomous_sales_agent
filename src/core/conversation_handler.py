@@ -403,7 +403,7 @@ async def handle_incoming_message(
                         f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
                         f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
                         f"2. ऐप खोलें और **'Continue with Google'** पर टैप करके **{user_email}** से साइन इन करें।\n"
-                        f"3. आपका बैच सीधे \"My Classes\" सेक्शन में एक्टिव मिलेगा।\n\n"
+                        f"3. आपका बैच सीधे \"My Courses\" सेक्शन में एक्टिव मिलेगा।\n\n"
                         f"क्लास में मिलते हैं! 🙏✨"
                     )
                     followup_text = "क्या आपको ऐप डाउनलोड करने या लॉगिन करने में कोई सहायता चाहिए? 😊"
@@ -420,7 +420,7 @@ async def handle_incoming_message(
                         f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
                         f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
                         f"2. App open karein aur **'Continue with Google'** par tap karke **{user_email}** se sign in karein.\n"
-                        f"3. Aapka batch sidhe \"My Classes\" section mein active milega.\n\n"
+                        f"3. Aapka batch sidhe \"My Courses\" section mein active milega.\n\n"
                         f"Class mein milte hain! 🙏✨"
                     )
                     followup_text = "Kya aapko app download karne ya login karne mein koi help chahiye? 😊"
@@ -437,7 +437,7 @@ async def handle_incoming_message(
                         f"   📱 Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
                         f"   🍎 iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n"
                         f"2. Open the app, tap **'Continue with Google'**, and select **{user_email}**.\n"
-                        f"3. Your enrolled course and live sessions are ready under \"My Classes\"!\n\n"
+                        f"3. Your enrolled course and live sessions are ready under \"My Courses\"!\n\n"
                         f"We look forward to seeing you in class! 🙏✨"
                     )
                     followup_text = "Would you like any assistance downloading the app or logging in? 😊"
@@ -450,7 +450,7 @@ async def handle_incoming_message(
                         f"📱 *कृपया Sensationz ऐप डाउनलोड कर लें:*\n"
                         f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
                         f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
-                        f"बैच एक्टिव होते ही आपके 'My Classes' सेक्शन में क्लास दिखने लगेगी!"
+                        f"बैच एक्टिव होते ही आपके 'My Courses' सेक्शन में क्लास दिखने लगेगी!"
                     )
                     followup_text = "क्या आपको ऐप डाउनलोड करने में कोई सहायता चाहिए? 😊"
                 else:
@@ -461,7 +461,7 @@ async def handle_incoming_message(
                         f"📱 *Please download the Sensationz App:*\n"
                         f"• Android: https://play.google.com/store/apps/details?id=com.sensationz.sensationz.dev\n"
                         f"• iOS: https://apps.apple.com/us/app/sensationz/id6761418351\n\n"
-                        f"Once logged in via Google, your classes will appear under **\"My Classes\"** shortly!"
+                        f"Once logged in via Google, your classes will appear under **\"My Courses\"** shortly!"
                     )
                     followup_text = "Would you like any assistance downloading the app? 😊"
 
@@ -1746,7 +1746,7 @@ async def dispatch_payment_qr_async(
             customer_phone=phone,
             name=f"Sensationz - {course_name}"[:40],
             description=f"{course_name} ({pkg}) Enrollment"[:255],
-            close_by_minutes=int(os.getenv("QR_EXPIRE_MINUTES", "0")),
+            close_by_minutes=int(os.getenv("QR_EXPIRE_MINUTES", "1440")),  # 24h; Razorpay allows 2 min to 45 days
         )
     except RazorpayServiceError as rze:
         logger.error(f"[conversation_handler] Razorpay QR generation failed: {rze}")

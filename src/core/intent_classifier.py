@@ -268,7 +268,7 @@ If customer says "nahi abhi tak nahi kiya" -> app_installed_stated: "denied", pr
 
 11c. "wants_one_on_one":
     - boolean: true if the customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class, tutor, coach or trainer (only the customer and the teacher), in ANY language, slang, or phrasing (e.g., "1-on-1 class milegi?", "1 to 1 session", "one2one", "personal class chahiye", "sirf mere liye alag class", "private tuition hai kya", "individual coaching", "home tutor", "मुझे पर्सनल क्लास चाहिए").
-    - NEGATIVE GUARD: false for group-batch questions ("batch mein kitne students hote hain?"), personal attention inside the group class ("teacher personally dhyan degi?"), and numbers that are timings, prices or durations ("1-2 baje", "1 month").
+    - NEGATIVE GUARD: false for group-batch questions ("batch mein kitne students hote hain?"), personal attention inside the group class ("teacher personally dhyan degi?"), numbers that are timings, prices or durations ("1-2 baje", "1 month"), and demo / trial / sample class requests ("need demo class", "demo chahiye", "trial class milegi?": those are wants_trial / wants_demo).
     - Evaluated strictly by SEMANTIC MEANING in any language (English, Hindi, Hinglish, regional, typos).
     - When true: Set "customer_intent" = "ONE_ON_ONE_REQUEST".
 
@@ -442,7 +442,7 @@ Rules:
 - Detect the language and script actually used. ASCII Hindi/Hinglish is Latin-script Hinglish; do not call it Devanagari.
 - wants_trust_proof is true when the customer doubts whether Sensationz is genuine/registered or asks for proof (GST number, registration, reviews, ratings, social media). A calm doubt is NOT is_complaint_or_refund; anger, refund demands and threats are.
 - wants_schedule_change is true when the LATEST message wants or insists on a class time / teacher / days / start date different from the batch they already have, or says it does not suit them, including transcript-dependent follow-ups ("you said yes", "you told me that time"); false for questions about their own class, plain acknowledgements, and simply attending or starting their existing batch ("from today").
-- wants_one_on_one is true when the customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class or tutor (any language); false for group-batch size questions, personal attention inside a group class, and numbers that are timings/prices/durations ("1-2 baje", "1 month").
+- wants_one_on_one is true when the customer asks for, or asks whether we offer, a 1-on-1 / one-to-one / private / personal / individual session, class or tutor (any language); false for group-batch size questions, personal attention inside a group class, numbers that are timings/prices/durations ("1-2 baje", "1 month"), and demo / trial / sample class requests.
 - Words like ok, yes, sir, mam, plz, pls, thanks do not make a message Hinglish; judge the whole message. language_unclear is true for acknowledgements, numbers/times, names, emails, single words, emojis (keep the earlier language); false when there are enough real words or an explicit language request.
 - Set question_summary only for QUESTION. Set conversation_summary to a short factual summary or null.
 
@@ -618,6 +618,14 @@ async def extract_intent_and_state_changes(
         # Sync semantic request flags with customer_intent without raw-text regex overrides
         if clean.get("customer_intent") == "ONE_ON_ONE_REQUEST":
             clean["wants_one_on_one"] = True  # the model sometimes reports it only as the intent
+        # A demo / trial request is never a 1-on-1 request: "need demo class" was read as a personal class, got the
+        # 1-on-1 support reply and stopped the bot (916304721630). Only while the trial interest is NEW: once the pass
+        # was offered, the model repeats wants_trial on later turns, and a real "1 to 1 class milegi?" must still count.
+        pass_already_offered = bool(s.get("pass_interest") or (s.get("package") or s.get("selected_duration")) == "1 Week Pass")
+        if clean.get("wants_one_on_one") and clean.get("wants_trial") and not pass_already_offered:
+            clean["wants_one_on_one"] = False
+            if clean.get("customer_intent") == "ONE_ON_ONE_REQUEST":
+                clean["customer_intent"] = "QUESTION"
         if clean.get("customer_intent") == "STOP_MESSAGING" or clean.get("wants_stop_messaging"):
             clean["wants_stop_messaging"] = True
             clean["customer_intent"] = "STOP_MESSAGING"
@@ -947,19 +955,18 @@ async def extract_intent_and_state_changes(
             )
             if package_candidate and not (has_time_num or has_bare_time_word):
                 timing_requested = False
-        # Semantic veto (multilingual LLM judgement, no keywords/regex): when the classifier says every number in
-        # this message is a price/GST/count/email/phone etc. and NOT a class time, the clock-time parser must not see
-        # it. Otherwise "is 99 incl. GST?" is read as an unavailable slot and wipes the customer's saved timing and
-        # teacher, and "7 days" auto-selects 7 PM. Default/unknown keeps the old behaviour; an LLM-extracted timing or a
-        # TIMING_SELECTION intent always wins over the veto.
-        if (
-            clean.get("numbers_not_timing") is True
-            and clean.get("customer_intent") != "TIMING_SELECTION"
-            and not (
-                clean.get("selected_timing") or clean.get("requested_start_24h") or clean.get("requested_end_24h")
-                or clean.get("requested_timing_period") or clean.get("unoffered_timing_mentioned")
-            )
-        ):
+        # Semantic gate (multilingual LLM judgement, no keywords/regex): the clock-time parser below reads raw digits,
+        # so it runs ONLY when the classifier itself found a time in this message. A number it did not read as a time
+        # ("Get ₹ 15", "is 99 incl. GST?", "7 days") never becomes a class timing. The old veto waited for the
+        # classifier to say "these numbers are not a time"; when it stayed silent, "₹15" became 3 PM, was judged
+        # unavailable, and wiped a customer's saved batch right after their QR (917018156374).
+        llm_saw_time = bool(
+            clean.get("customer_intent") == "TIMING_SELECTION"
+            or clean.get("selected_timing") or clean.get("requested_start_24h") or clean.get("requested_end_24h")
+            or clean.get("requested_timing_period") or clean.get("timing_period")
+            or clean.get("unoffered_timing_mentioned") or clean.get("timing_ambiguous")
+        )
+        if not llm_saw_time:
             timing_requested = False
         if timing_requested:
             timing_resolution = resolve_catalog_batch_semantics(
@@ -1506,6 +1513,17 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
         flags = {**flags, "selected_timing": None, "unoffered_timing_mentioned": None, "selected_teacher": None,
                  "selected_days": None, "selected_package": None, "timing_resolution_status": "NONE",
                  "timing_selection_attempted": False}
+    unresolved_time = bool(
+        (flags.get("timing_selection_attempted") and flags.get("timing_resolution_status") in {
+            "UNAVAILABLE", "AMBIGUOUS", "PERIOD_ONLY", "UNRESOLVED", "MULTIPLE_VALID", "MIXED"})
+        or flags.get("timing_ambiguous")
+    )
+    if unresolved_time and (new_state.get("timing") or new_state.get("selected_timing")):
+        # A time that matches no real batch never erases a saved batch (timing, teacher, package all stay): the reply
+        # says that time is not available (unoffered_* flags are kept for it). Only a real new batch replaces it.
+        flags = {**flags, "timing_resolution_status": "NONE", "timing_selection_attempted": False,
+                 "timing_ambiguous": False, "ambiguous_hour": None, "ambiguous_timing_candidates": None,
+                 "invalid_timing_candidates": None}
     if flags.get("timing_resolution_status") != "NONE":
         new_state["timing_resolution_status"] = flags.get("timing_resolution_status")
 
@@ -1595,9 +1613,7 @@ def apply_extraction_to_state(state: Dict[str, Any], flags: Dict[str, Any]) -> D
                     new_state["stage"] = "TIMING_SELECTED"
         else:
             new_state["stage"] = advance_stage(new_state.get("stage", "NEW"), "TIMING_SELECTED")
-    elif flags.get("unoffered_timing_mentioned") or flags.get("unoffered_type") == "TIMING":
-        new_state["timing"] = None
-        new_state["selected_timing"] = None
+    # (An unavailable time mentioned this turn no longer clears anything: a saved batch stays, see above.)
 
     # 3. Teacher Slot Merge (On selection turns OR when teacher is explicitly mentioned / demo requested)
     teacher_flag = flags.get("selected_teacher")

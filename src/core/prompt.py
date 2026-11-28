@@ -1029,6 +1029,12 @@ def format_system_prompt(
             )
         elif unoffered_type == "TIMING" or last_turn_dict.get("unoffered_timing_mentioned"):
             timing_target = unoffered_val or last_turn_dict.get("unoffered_timing_mentioned")
+            timing_guard = (
+                f"  • CRITICAL ANTI-ASSUMPTION GUARD: Timing is NOT SELECTED! Under NO circumstances snap to 6:00 AM or any other batch, do NOT claim 'Aapne [timing] select kiya hai', and do NOT assign any instructor!\n"
+                if timing_str == "NOT SELECTED" else
+                f"  • THEIR SAVED BATCH STAYS: {timing_str} with {teacher_str} is still their batch (a time that does not exist never removes it). "
+                f"Say {timing_target} is not available and that they can continue with {timing_str} or pick another time from the list; never say their batch was removed.\n"
+            )
             turn_intent_guidance = (
                 f"- 🚨 CUSTOMER REQUESTED UNOFFERED BATCH TIMING ('{timing_target}'):\n"
                 f"  • Customer asked for timing '{timing_target}', which is NOT held for {active_title}.\n"
@@ -1036,7 +1042,7 @@ def format_system_prompt(
                 f"  • REQUIRED ACTION (INTELLIGENT RESPONSE):\n"
                 f"    - Message #1: Warmly and clearly explain that {active_title} classes are NOT held at {timing_target}. Suggest the closest available slots (e.g. if afternoon was requested, suggest afternoon 12:00 PM to 1:00 PM or evening 4:00 PM to 5:00 PM) or re-present the real available batch timings from COURSE_DATA.\n"
                 f"    - Message #2 (followup): Ask which of the available batch timings works best for their daily routine. 😊\n"
-                f"  • CRITICAL ANTI-ASSUMPTION GUARD: Timing is NOT SELECTED! Under NO circumstances snap to 6:00 AM or any other batch, do NOT claim 'Aapne [timing] select kiya hai', and do NOT assign any instructor!\n"
+                f"{timing_guard}"
             )
         elif unoffered_type == "TEACHER":
             turn_intent_guidance = (
@@ -1164,7 +1170,11 @@ def format_system_prompt(
             f"- 🚨 UNOFFERED / UNAVAILABLE BATCH TIMING REQUESTED BY CUSTOMER: The customer asked for '{unoffered_timing}', which is NOT offered for {active_title}.\n"
             f"  • Message #1: Warmly and clearly explain that {active_title} classes are NOT held at {unoffered_timing}. Re-present the real available batch timings from COURSE_DATA.\n"
             f"  • Message #2 (followup): Ask which of the available batch timings works best for their daily routine.\n"
-            f"  • CRITICAL GUARD: Do NOT assign or snap to any other batch timing (such as 12:00 PM to 1:00 PM) and do NOT introduce or assign any instructor! The customer's timing remains UNSELECTED.\n"
+            + (
+                f"  • CRITICAL GUARD: Do NOT assign or snap to any other batch timing (such as 12:00 PM to 1:00 PM) and do NOT introduce or assign any instructor! The customer's timing remains UNSELECTED.\n"
+                if timing_str == "NOT SELECTED" else
+                f"  • THEIR SAVED BATCH STAYS: {timing_str} is still their batch; they can keep it or pick another available time. Never say it was removed.\n"
+            )
         )
 
     if timing_str != "NOT SELECTED" and cid:

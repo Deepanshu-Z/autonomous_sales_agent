@@ -97,7 +97,7 @@ if __name__ == "__main__":
         "main:app",
         host=host,
         port=port,
-        reload=True,
+        reload=False,  # production (PM2): the file-watcher burned ~67% CPU 24/7; deploy = pm2 restart bot-api
         log_level="info",
     )
 
